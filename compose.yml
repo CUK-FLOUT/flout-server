@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: flout-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-flout}
+      MYSQL_USER: ${DB_USERNAME:-flout}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-flout}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-flout-root}
+      TZ: Asia/Seoul
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - flout-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-flout-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  flout-mysql-data:

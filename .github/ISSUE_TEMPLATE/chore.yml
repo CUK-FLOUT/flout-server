@@ -1,0 +1,19 @@
+name: Chore
+description: 설정, 의존성 및 프로젝트 구성 작업을 등록합니다.
+title: "[CHORE] "
+labels: ["🌿 Chore"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 작업 설명
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 항목
+      value: |
+        - [ ]
+    validations:
+      required: true

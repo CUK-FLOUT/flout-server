@@ -1,0 +1,19 @@
+name: Docs
+description: 문서 또는 주석 변경 작업을 등록합니다.
+title: "[DOCS] "
+labels: ["📄 Docs"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 작업 설명
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 항목
+      value: |
+        - [ ]
+    validations:
+      required: true

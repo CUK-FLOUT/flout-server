@@ -1,0 +1,26 @@
+name: Bug
+description: 버그나 오류를 제보하고 수정합니다.
+title: "[FIX] "
+labels: ["🔧 Fix"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제 상황
+      description: 실제로 발생한 동작을 작성해 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+      description: 정상적으로 기대한 동작을 작성해 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 재현 방법
+      description: 문제를 재현할 수 있는 순서를 작성해 주세요.
+    validations:
+      required: true

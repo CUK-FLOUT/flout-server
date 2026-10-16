@@ -1,0 +1,36 @@
+name: Convention Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  branch-name:
+    name: Branch Name Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch and pull request title
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ "$BASE_BRANCH" == "dev" ]] && [[ ! "$HEAD_BRANCH" =~ ^(feat|fix|hotfix|chore|delete|docs|refactor)/FLOUT-[0-9]+$ ]]; then
+            echo "Invalid branch name: $HEAD_BRANCH"
+            echo "Required: {type}/FLOUT-{github-issue-number}"
+            exit 1
+          fi
+
+          if [[ "$BASE_BRANCH" == "main" ]] && [[ "$HEAD_BRANCH" != "dev" ]]; then
+            echo "Only dev can target main."
+            exit 1
+          fi
+
+          if [[ ! "$PR_TITLE" =~ ^\[(FEAT|FIX|HOTFIX|CHORE|DELETE|DOCS|REFACTOR)\]\ \#[0-9]+\ .+ ]]; then
+            echo "Invalid pull request title: $PR_TITLE"
+            echo "Required: [TYPE] #123 summary"
+            exit 1
+          fi

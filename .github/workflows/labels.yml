@@ -1,0 +1,59 @@
+name: Label Sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/labels.yml
+
+permissions:
+  issues: write
+
+jobs:
+  sync-labels:
+    name: Create or Update Labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync issue labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: "💻 Feat", color: "1D76DB", description: "새로운 기능 구현" },
+              { name: "🔧 Fix", color: "D73A4A", description: "버그 및 오류 수정" },
+              { name: "🚑 Hotfix", color: "B60205", description: "운영 또는 배포 긴급 수정" },
+              { name: "🌿 Chore", color: "0E8A16", description: "설정, 의존성 및 프로젝트 구성" },
+              { name: "🚫 Delete", color: "5319E7", description: "불필요한 코드나 파일 삭제" },
+              { name: "📄 Docs", color: "0075CA", description: "문서 및 주석 변경" },
+              { name: "♻️ Refactor", color: "FBCA04", description: "기능 변경 없는 코드 구조 개선" },
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                });
+
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  new_name: label.name,
+                  color: label.color,
+                  description: label.description,
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description,
+                });
+              }
+            }

@@ -1,0 +1,28 @@
+name: Feature
+description: 새로운 기능을 제안하거나 구현합니다.
+title: "[FEAT] "
+labels: ["💻 Feat"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 작업 설명
+      description: 구현하려는 기능과 목적을 작성해 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 항목
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건
+      value: |
+        - [ ]
+    validations:
+      required: true

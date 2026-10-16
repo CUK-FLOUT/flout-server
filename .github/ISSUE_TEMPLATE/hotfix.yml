@@ -1,0 +1,23 @@
+name: Hotfix
+description: 운영 또는 배포 관련 긴급 수정 작업을 등록합니다.
+title: "[HOTFIX] "
+labels: ["🚑 Hotfix"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 긴급 수정 사유
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 수정 계획
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 및 롤백 계획
+    validations:
+      required: true
