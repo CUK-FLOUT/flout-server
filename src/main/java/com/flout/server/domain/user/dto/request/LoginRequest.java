@@ -10,7 +10,8 @@ public record LoginRequest(
     @NotBlank(message = "이메일을 입력해주세요.") @Email(message = "올바른 이메일 형식으로 입력해주세요.") @Size(max = 100) @Schema(example = "resident@example.com")
         String email,
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-        @NotBlank(message = "비밀번호를 입력해주세요.") @Size(max = 64) String password) {
+        @NotBlank(message = "비밀번호를 입력해주세요.") @Size(max = 64) @Schema(description = "가입 시 설정한 비밀번호", format = "password", example = "password123")
+        String password) {
   @Override
   public String toString() {
     return "LoginRequest[REDACTED]";

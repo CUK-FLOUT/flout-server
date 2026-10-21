@@ -325,6 +325,71 @@ class LoginTest {
     }
   }
 
+  @Test
+  void swaggerDocumentsJwtAndPublicAuthEndpoints() throws Exception {
+    String response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var document = mapper.readTree(response);
+    assertThat(document.at("/components/securitySchemes/bearerAuth/type").asText())
+        .isEqualTo("http");
+    assertThat(document.at("/components/securitySchemes/bearerAuth/scheme").asText())
+        .isEqualTo("bearer");
+    assertThat(document.at("/security/0/bearerAuth").isArray()).isTrue();
+    for (String path :
+        java.util.List.of("/api/auth/signup", "/api/auth/login", "/api/auth/admin/login")) {
+      var operation = document.path("paths").path(path).path("post");
+      assertThat(operation.path("security").isArray()).isTrue();
+      assertThat(operation.path("security").size()).isZero();
+    }
+    var signup = document.path("paths").path("/api/auth/signup").path("post").path("responses");
+    assertThat(signup.has("200")).isFalse();
+    var signupSuccess = signup.path("201").at("/content/application~1json");
+    assertThat(signupSuccess.at("/schema/$ref").asText()).contains("SuccessResponse");
+    assertThat(signupSuccess.at("/examples/signupSuccess/value/code").asText())
+        .isEqualTo("USER_201_1");
+    assertThat(
+            signup
+                .path("409")
+                .at("/content/application~1json/examples/duplicateEmail/value/code")
+                .asText())
+        .isEqualTo("USER_409_1");
+    for (String path : java.util.List.of("/api/auth/login", "/api/auth/admin/login")) {
+      var responses = document.path("paths").path(path).path("post").path("responses");
+      assertThat(responses.has("403")).isFalse();
+      var success =
+          responses.path("200").at("/content/application~1json/examples/loginSuccess/value");
+      assertThat(success.path("code").asText()).isEqualTo("USER_200_1");
+      assertThat(success.at("/result/expiresIn").asLong()).isEqualTo(3600);
+      assertThat(success.at("/result/role").asText())
+          .isEqualTo(path.endsWith("/admin/login") ? "ADMIN" : "RESIDENT");
+      assertThat(
+              responses
+                  .path("401")
+                  .at("/content/application~1json/examples/loginFailed/value/code")
+                  .asText())
+          .isEqualTo("USER_401_1");
+      assertThat(
+              responses
+                  .path("400")
+                  .at("/content/application~1json/examples/emailRequired/value/message")
+                  .asText())
+          .isEqualTo("이메일을 입력해주세요.");
+    }
+    assertThat(
+            document
+                .path("paths")
+                .path("/api/admin/probe")
+                .path("get")
+                .at("/responses/403/content/application~1json/examples/accessDenied/value/code")
+                .asText())
+        .isEqualTo("COMMON_403_1");
+    mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
+  }
+
   @RestController
   static class ProbeController {
     @GetMapping("/api/probe")
