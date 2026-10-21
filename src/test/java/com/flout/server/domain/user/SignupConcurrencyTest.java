@@ -5,9 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.flout.server.domain.user.dto.request.SignupRequest;
-import com.flout.server.domain.user.enums.code.UserErrorCode;
 import com.flout.server.domain.user.repository.UserConsentRepository;
 import com.flout.server.domain.user.repository.UserRepository;
+import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.service.SignupService;
 import com.flout.server.global.exception.BaseException;
 import org.hibernate.exception.ConstraintViolationException;
