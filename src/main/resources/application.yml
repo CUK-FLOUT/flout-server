@@ -12,6 +12,11 @@ management:
       exposure:
         include: health,info
 
+app:
+  consent:
+    terms-version: ${TERMS_VERSION:1.0}
+    privacy-version: ${PRIVACY_VERSION:1.0}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

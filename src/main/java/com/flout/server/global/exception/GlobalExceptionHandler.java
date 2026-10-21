@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse<?>> handleMethodArgumentNotValidException(
       MethodArgumentNotValidException e) {
-    log.error("MethodArgumentNotValidException : {}", e.getMessage(), e);
+    log.warn("요청 본문 검증 실패");
     ErrorResponse<?> errorResponse =
         ErrorResponse.of(
             GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
@@ -44,7 +44,7 @@ public class GlobalExceptionHandler {
   // 요청 파라미터 검증 실패
   @ExceptionHandler(BindException.class)
   public ResponseEntity<ErrorResponse<?>> handleBindException(BindException e) {
-    log.error("BindException : {}", e.getMessage(), e);
+    log.warn("요청 파라미터 검증 실패");
     ErrorResponse<?> errorResponse =
         ErrorResponse.of(
             GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
@@ -58,7 +58,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse<?>> handleHttpMessageNotReadableException(
       HttpMessageNotReadableException e) {
-    log.error("HttpMessageNotReadableException : {}", e.getMessage(), e);
+    log.warn("요청 본문 형식 오류");
     ErrorResponse<?> errorResponse = ErrorResponse.from(GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY);
     return ResponseEntity.status(errorResponse.getStatus()).body(errorResponse);
   }
