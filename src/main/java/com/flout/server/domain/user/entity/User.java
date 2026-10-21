@@ -59,4 +59,8 @@ public class User {
   void onUpdate() {
     updatedAt = LocalDateTime.now();
   }
+
+  public void recordLogin() {
+    lastLoginAt = LocalDateTime.now();
+  }
 }

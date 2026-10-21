@@ -13,6 +13,10 @@ management:
         include: health,info
 
 app:
+  jwt:
+    secret: ${JWT_SECRET:}
+    issuer: flout
+    access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:3600}
   consent:
     terms-version: ${TERMS_VERSION:1.0}
     privacy-version: ${PRIVACY_VERSION:1.0}

@@ -2,7 +2,7 @@ package com.flout.server.domain.user.controller;
 
 import com.flout.server.domain.user.dto.request.SignupRequest;
 import com.flout.server.domain.user.dto.response.SignupResponse;
-import com.flout.server.domain.user.enums.code.UserSuccessCode;
+import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.domain.user.service.SignupService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
