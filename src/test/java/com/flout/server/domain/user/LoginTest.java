@@ -1,6 +1,9 @@
 package com.flout.server.domain.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -8,6 +11,8 @@ import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserConsentRepository;
 import com.flout.server.domain.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,7 +44,7 @@ class LoginTest {
   @Autowired MockMvc mvc;
   @Autowired UserRepository users;
   @Autowired UserConsentRepository consents;
-  @Autowired PasswordEncoder passwords;
+  @MockitoSpyBean PasswordEncoder passwords;
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper mapper;
   @Autowired JwtDecoder decoder;
@@ -241,6 +247,82 @@ class LoginTest {
         """))
         .andExpect(status().isCreated());
     mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"role", "password", "email", "delete"})
+  void concurrentAccountChangeIsPreservedAndLoginIsRejected(String change) throws Exception {
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      doAnswer(
+              invocation -> {
+                executor
+                    .submit(
+                        () -> {
+                          switch (change) {
+                            case "role" ->
+                                jdbc.update(
+                                    "UPDATE users SET role='RESIDENT' WHERE user_id=?", adminId);
+                            case "password" ->
+                                jdbc.update(
+                                    "UPDATE users SET password_hash=? WHERE user_id=?",
+                                    passwords.encode("changed123"),
+                                    adminId);
+                            case "email" ->
+                                jdbc.update(
+                                    "UPDATE users SET email='changed@example.com' WHERE user_id=?",
+                                    adminId);
+                            default -> jdbc.update("DELETE FROM users WHERE user_id=?", adminId);
+                          }
+                        })
+                    .get(10, TimeUnit.SECONDS);
+                return invocation.callRealMethod();
+              })
+          .when(passwords)
+          .matches(eq("password123"), anyString());
+
+      mvc.perform(
+              post("/api/auth/admin/login")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body("admin@example.com", "password123")))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.code").value("USER_401_1"))
+          .andExpect(jsonPath("$.result.accessToken").doesNotExist());
+
+      if (change.equals("delete")) {
+        assertThat(users.findById(adminId)).isEmpty();
+      } else {
+        User user = users.findById(adminId).orElseThrow();
+        assertThat(user.getLastLoginAt()).isNull();
+        switch (change) {
+          case "role" ->
+              assertThat(user.getRole())
+                  .isEqualTo(com.flout.server.domain.user.entity.UserRole.RESIDENT);
+          case "password" ->
+              assertThat(passwords.matches("changed123", user.getPasswordHash())).isTrue();
+          case "email" -> assertThat(user.getEmail()).isEqualTo("changed@example.com");
+        }
+      }
+    }
+  }
+
+  @Test
+  void concurrentNameChangeIsNotOverwrittenByLoginTimeUpdate() throws Exception {
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      doAnswer(
+              invocation -> {
+                executor
+                    .submit(
+                        () -> jdbc.update("UPDATE users SET name='변경된이름' WHERE user_id=?", adminId))
+                    .get(10, TimeUnit.SECONDS);
+                return invocation.callRealMethod();
+              })
+          .when(passwords)
+          .matches(eq("password123"), anyString());
+      token("/api/auth/admin/login", "admin@example.com");
+      User user = users.findById(adminId).orElseThrow();
+      assertThat(user.getName()).isEqualTo("변경된이름");
+      assertThat(user.getLastLoginAt()).isNotNull();
+    }
   }
 
   @RestController

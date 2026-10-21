@@ -9,6 +9,7 @@ import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,7 +42,13 @@ public class LoginService {
       throw new BaseException(UserErrorCode.LOGIN_FAILED);
     }
     LoginResponse response = tokens.issue(user);
-    user.recordLogin();
+    // 인증 도중 계정이 변경됐다면 토큰을 반환하지 않음
+    int updated =
+        users.updateLoginTime(
+            user.getId(), requiredRole, email, user.getPasswordHash(), LocalDateTime.now());
+    if (updated != 1) {
+      throw new BaseException(UserErrorCode.LOGIN_FAILED);
+    }
     return response;
   }
 }
