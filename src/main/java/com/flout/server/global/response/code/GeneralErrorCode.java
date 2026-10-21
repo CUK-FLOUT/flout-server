@@ -17,6 +17,8 @@ public enum GeneralErrorCode implements BaseResponseCode {
   ACCESS_DENIED_REQUEST(FORBIDDEN, "COMMON_403_1", "해당 리소스에 대한 접근 권한이 없습니다."),
   NOT_FOUND_ENDPOINT(NOT_FOUND, "COMMON_404_1", "존재하지 않는 엔드포인트입니다. 요청 href를 확인해주세요."),
   UNSUPPORTED_HTTP_METHOD(METHOD_NOT_ALLOWED, "COMMON_405_1", "지원하지 않는 HTTP 메소드입니다."),
+  NOT_ACCEPTABLE_ERROR(406, "COMMON_406_1", "지원하지 않는 응답 형식입니다."),
+  UNSUPPORTED_MEDIA_TYPE_ERROR(415, "COMMON_415_1", "지원하지 않는 요청 Content-Type입니다."),
   SERVER_ERROR(INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부에서 알 수 없는 에러가 발생했습니다.");
 
   private final int status;

@@ -13,13 +13,18 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 class CommonResponseTest {
   private MockMvc mvc;
@@ -39,6 +44,7 @@ class CommonResponseTest {
         .andExpect(jsonPath("$.isSuccess").value(true))
         .andExpect(jsonPath("$.status").value(200))
         .andExpect(jsonPath("$.code").value("COMMON_200"))
+        .andExpect(jsonPath("$.message").value("호출에 성공했습니다."))
         .andExpect(jsonPath("$.result").value("hello"))
         .andExpect(jsonPath("$.timeStamp").isString());
   }
@@ -48,7 +54,41 @@ class CommonResponseTest {
     mvc.perform(get("/business"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.isSuccess").value(false))
-        .andExpect(jsonPath("$.code").value("COMMON_400_1"));
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("COMMON_400_1"))
+        .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+  }
+
+  @Test
+  void unsupportedContentTypePreserves415() throws Exception {
+    mvc.perform(post("/validate").contentType(MediaType.TEXT_PLAIN).content("hello"))
+        .andExpect(status().isUnsupportedMediaType())
+        .andExpect(jsonPath("$.status").value(415))
+        .andExpect(jsonPath("$.code").value("COMMON_415_1"));
+  }
+
+  @Test
+  void unacceptableResponseTypePreserves406() throws Exception {
+    mvc.perform(get("/success").accept(MediaType.APPLICATION_XML))
+        .andExpect(status().isNotAcceptable())
+        .andExpect(jsonPath("$.status").value(406))
+        .andExpect(jsonPath("$.code").value("COMMON_406_1"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404, 406, 409, 415, 429, 499, 500})
+  void responseStatusExceptionPreservesStatusWithoutExposingReason(int statusCode)
+      throws Exception {
+    String body =
+        mvc.perform(get("/status/" + statusCode))
+            .andExpect(status().is(statusCode))
+            .andExpect(jsonPath("$.isSuccess").value(false))
+            .andExpect(jsonPath("$.status").value(statusCode))
+            .andExpect(jsonPath("$.code").value("COMMON_" + statusCode + "_1"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(body).doesNotContain("database-secret");
   }
 
   @Test
@@ -98,6 +138,11 @@ class CommonResponseTest {
 
     @PostMapping("/validate")
     void validate(@Valid @RequestBody Input input) {}
+
+    @GetMapping("/status/{status}")
+    void responseStatus(@PathVariable("status") int status) {
+      throw new ResponseStatusException(HttpStatusCode.valueOf(status), "database-secret");
+    }
   }
 
   record Input(@NotBlank(message = "이름은 필수입니다.") String name) {}

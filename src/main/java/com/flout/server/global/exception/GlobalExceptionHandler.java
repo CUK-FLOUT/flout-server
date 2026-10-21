@@ -4,10 +4,13 @@ import com.flout.server.global.response.ErrorResponse;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -136,6 +140,37 @@ public class GlobalExceptionHandler {
       return ResponseEntity.status(errorResponse.getStatus()).build();
 
     return ResponseEntity.status(errorResponse.getStatus()).body(errorResponse);
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<ErrorResponse<?>> handleHttpMediaTypeNotSupportedException(
+      HttpMediaTypeNotSupportedException e) {
+    ErrorResponse<?> response = ErrorResponse.from(GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR);
+    return ResponseEntity.status(response.getStatus()).body(response);
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+  public ResponseEntity<ErrorResponse<?>> handleHttpMediaTypeNotAcceptableException(
+      HttpMediaTypeNotAcceptableException e) {
+    ErrorResponse<?> response = ErrorResponse.from(GeneralErrorCode.NOT_ACCEPTABLE_ERROR);
+    return ResponseEntity.status(response.getStatus())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(response);
+  }
+
+  @ExceptionHandler(ResponseStatusException.class)
+  public ResponseEntity<ErrorResponse<?>> handleResponseStatusException(ResponseStatusException e) {
+    int status = e.getStatusCode().value();
+    for (GeneralErrorCode code : GeneralErrorCode.values()) {
+      if (code.getStatus() == status) {
+        return ResponseEntity.status(status).body(ErrorResponse.from(code));
+      }
+    }
+    // 예외의 상세 사유는 응답에 노출하지 않음
+    HttpStatus httpStatus = HttpStatus.resolve(status);
+    String message = httpStatus == null ? "요청 처리에 실패했습니다." : httpStatus.getReasonPhrase();
+    return ResponseEntity.status(status)
+        .body(ErrorResponse.of(status, "COMMON_" + status + "_1", message));
   }
 
   @ExceptionHandler(Exception.class)

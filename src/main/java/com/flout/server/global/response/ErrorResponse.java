@@ -14,6 +14,16 @@ public class ErrorResponse<T> extends ApiResponse {
   private final int status;
   private final T result;
 
+  private ErrorResponse(int status, String code, String message) {
+    super(false, code, message);
+    this.status = status;
+    this.result = null;
+  }
+
+  public static <T> ErrorResponse<T> of(int status, String code, String message) {
+    return new ErrorResponse<>(status, code, message);
+  }
+
   @Builder
   public ErrorResponse(T result, BaseResponseCode baseResponseCode) {
     super(false, baseResponseCode.getCode(), baseResponseCode.getMessage());
