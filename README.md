@@ -30,6 +30,8 @@ Tree 계열과 Boosting 계열 모델을 학습 데이터 내 교차 검증으�
 cp .env.example .env
 ```
 
+주소 검색 API를 사용하려면 `.env`의 `KAKAO_REST_API_KEY`에 Kakao Developers에서 발급한 REST API 키를 설정합니다. `.env`는 Git에서 제외되므로 실제 키를 커밋하지 않습니다.
+
 이후 실행 스크립트를 사용하면 `.env`를 환경변수로 로드하고 MySQL이 준비된 다음
 Spring Boot 서버가 시작됩니다.
 
@@ -42,6 +44,14 @@ Spring Boot 서버가 시작됩니다.
 - Health check: `http://localhost:8080/actuator/health`
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+### Windows IntelliJ 실행
+
+1. Docker Desktop에서 MySQL을 먼저 실행합니다. Git Bash에서는 `./scripts/run-local.sh`로 `.env`를 포함해 실행할 수 있습니다.
+2. IntelliJ에서는 `Run` → `Edit Configurations...` → Spring Boot 실행 구성의 `Environment variables`에 `.env`의 DB 설정값과 `KAKAO_REST_API_KEY`를 추가합니다.
+3. `Active profiles`는 `local`로 유지하고 `FloutServerApplication`을 실행합니다.
+
+`KAKAO_REST_API_KEY`에는 실제 REST API 키를 입력하며, `.env.example`의 예시 값은 사용하지 않습니다.
 
 ## 테스트와 코드 스타일
 
