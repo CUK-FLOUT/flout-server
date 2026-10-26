@@ -20,7 +20,7 @@ FLOUT 공통 백엔드 서버 및 API입니다.
 Tree 계열과 Boosting 계열 모델을 학습 데이터 내 교차 검증으로 비교합니다. 선정된
 최종 모델은 그전까지 사용하지 않은 홀드아웃 테스트 데이터에서 한 번 평가합니다.
 
-자세한 내용은 [docs/AI_MODEL_PIPELINE.md](docs/AI_MODEL_PIPELINE.md)을 확인해 주세요.
+자세한 내용은 [AI_MODEL_PIPELINE.md](docs/AI_MODEL_PIPELINE.md)을 확인해 주세요.
 
 ## 로컬 실행
 
