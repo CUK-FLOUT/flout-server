@@ -14,7 +14,18 @@ services:
     volumes:
       - flout-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-flout-root}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "--protocol=tcp",
+          "-h",
+          "127.0.0.1",
+          "-u",
+          "root",
+          "-p${DB_ROOT_PASSWORD:-flout-root}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10

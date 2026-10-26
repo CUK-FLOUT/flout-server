@@ -69,3 +69,54 @@ PR 본문에는 관련 Issue가 병합 시 종료되도록 다음 문구를 포�
 ```text
 Closes #12
 ```
+
+## Swagger / OpenAPI 문서화 규칙
+
+API를 추가하거나 변경할 때 구현 코드와 Swagger 문서를 같은 PR에서 함께 수정합니다.
+
+### 필수 문서 항목
+
+| 대상 | 필수 내용 |
+| --- | --- |
+| Controller | `@Tag`의 기능명과 설명 |
+| Endpoint | `@Operation`의 요약과 상세 설명 |
+| Request DTO | 각 필드의 설명, 형식, 예시 및 허용값 |
+| Path·Query·Header | 파라미터의 용도, 예시 및 필수 여부 |
+| 성공 응답 | 실제 HTTP 상태, 응답 코드, 메시지 및 응답 본문 예시 |
+| 오류 응답 | 해당 API에서 발생 가능한 도메인 오류의 HTTP 상태, 오류 코드 및 메시지 |
+| 인증 | 인증 필요 여부와 필요한 역할 |
+
+### 작성 원칙
+
+- 요약은 `무엇을 하는 API인지` 한 문장으로 작성하고, 상세 설명에는 제약 조건과
+  처리 규칙을 작성합니다.
+- 요청과 응답 예시는 실제 스키마와 일치해야 하며 실사용 개인정보, 토큰 및 비밀번호를
+  사용하지 않습니다.
+- 날짜·시간, 이메일, 비밀번호처럼 형식이 있는 값은 `format`과 `example`을
+  명시합니다.
+- enum처럼 허용값이 제한된 필드는 `allowableValues`와 `example`을 명시합니다.
+- DTO 필드는 `@Schema`, Path·Query·Header 파라미터는 `@Parameter`를 사용합니다.
+  응답 조건이 여러 개라면 `@ApiResponses` 또는 공통 `OpenApiConfig`에서 관리합니다.
+- 공통 응답 envelope인 `isSuccess`, `status`, `code`, `message`, `result`, `timeStamp`를
+  기준으로 예시를 작성합니다.
+- 공통 인증·인가·서버 오류는 `OpenApiConfig`에서 관리하며 Controller마다 중복
+  선언하지 않습니다. API 고유의 성공 응답과 도메인 오류만 추가합니다.
+- 전역 Bearer 인증이 기본값입니다. 공개 API를 추가할 때는 Security 설정과 Swagger의
+  공개 경로 설정을 함께 변경하고 인증 없이 접근 가능한지 테스트합니다.
+- API 구현을 변경했다면 `/swagger-ui/index.html`에서 설명과 예시를 확인하고,
+  `/v3/api-docs`가 정상 생성되는지 검증합니다.
+
+### 기본 예시
+
+```java
+@Tag(name = "회원", description = "회원 가입 및 계정 관리")
+@RestController
+public class UserController {
+
+  @PostMapping("/api/auth/signup")
+  @Operation(summary = "회원 가입", description = "필수 약관에 동의한 주민 계정을 생성합니다.")
+  public SuccessResponse<UserResponse> signup(@Valid @RequestBody SignupRequest request) {
+    // ...
+  }
+}
+```
