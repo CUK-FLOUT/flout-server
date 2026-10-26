@@ -92,8 +92,9 @@ API를 추가하거나 변경할 때 구현 코드와 Swagger 문서를 같은 P
   처리 규칙을 작성합니다.
 - 요청과 응답 예시는 실제 스키마와 일치해야 하며 실사용 개인정보, 토큰 및 비밀번호를
   사용하지 않습니다.
-- 날짜·시간, enum, 이메일, 비밀번호 등 형식이 있는 값은 `format`, `allowableValues`,
-  `example`을 명시합니다.
+- 날짜·시간, 이메일, 비밀번호처럼 형식이 있는 값은 `format`과 `example`을
+  명시합니다.
+- enum처럼 허용값이 제한된 필드는 `allowableValues`와 `example`을 명시합니다.
 - DTO 필드는 `@Schema`, Path·Query·Header 파라미터는 `@Parameter`를 사용합니다.
   응답 조건이 여러 개라면 `@ApiResponses` 또는 공통 `OpenApiConfig`에서 관리합니다.
 - 공통 응답 envelope인 `isSuccess`, `status`, `code`, `message`, `result`, `timeStamp`를
@@ -112,6 +113,7 @@ API를 추가하거나 변경할 때 구현 코드와 Swagger 문서를 같은 P
 @RestController
 public class UserController {
 
+  @PostMapping("/api/auth/signup")
   @Operation(summary = "회원 가입", description = "필수 약관에 동의한 주민 계정을 생성합니다.")
   public SuccessResponse<UserResponse> signup(@Valid @RequestBody SignupRequest request) {
     // ...
