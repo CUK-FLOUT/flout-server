@@ -24,8 +24,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "$BASE_BRANCH" == "main" ]] && [[ "$HEAD_BRANCH" != "dev" ]]; then
-            echo "Only dev can target main."
+          if [[ "$BASE_BRANCH" == "main" ]] && [[ "$HEAD_BRANCH" != "dev" ]] && [[ ! "$HEAD_BRANCH" =~ ^docs/FLOUT-[0-9]+$ ]]; then
+            echo "Only dev or docs/FLOUT-{issue-number} can target main."
             exit 1
           fi
 
