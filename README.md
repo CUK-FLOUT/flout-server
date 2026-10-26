@@ -14,6 +14,13 @@ FLOUT 공통 백엔드 서버 및 API입니다.
 - Springdoc OpenAPI
 - Spring Boot Actuator
 
+## AI 취약도 분석 모델
+
+수집된 데이터를 기반으로 `HIGH`, `CAUTION`, `LOW` 취약도 등급을 예측하고,
+Tree 계열과 Boosting 계열 모델을 비교해 최종 모델을 선정합니다.
+
+자세한 내용은 [AI 취약도 분석 모델 파이프라인](docs/AI_MODEL_PIPELINE.md)을 확인해 주세요.
+
 ## 로컬 실행
 
 ```bash
