@@ -192,13 +192,18 @@ public class OpenApiConfig {
     addError(operation, "invalidGoogleToken", UserErrorCode.GOOGLE_INVALID_TOKEN, null);
     addError(operation, "roleDenied", UserErrorCode.GOOGLE_LOGIN_DENIED, null);
     addError(operation, "linkRequired", UserErrorCode.GOOGLE_LINK_REQUIRED, null);
-    if (!admin) addError(operation, "consentRequired", UserErrorCode.GOOGLE_CONSENT_REQUIRED, null);
+    if (!admin) {
+      addError(operation, "consentRequired", UserErrorCode.GOOGLE_CONSENT_REQUIRED, null);
+      addError(operation, "emailLoginRequired", UserErrorCode.EMAIL_LOGIN_REQUIRED, null);
+    }
     addError(operation, "notConfigured", UserErrorCode.GOOGLE_NOT_CONFIGURED, null);
   }
 
   private void describeLogin(Operation operation, boolean admin, long expiresIn) {
     operation.setDescription(
-        (admin ? "사전 등록된 ADMIN 계정만 로그인할 수 있습니다." : "RESIDENT 계정만 로그인할 수 있습니다.")
+        (admin
+                ? "사전 등록된 ADMIN 계정만 로그인할 수 있습니다."
+                : "RESIDENT 계정만 로그인할 수 있습니다. Google 가입 계정은 Google 로그인을 이용하도록 안내합니다.")
             + " 이메일·비밀번호·역할이 일치하지 않으면 동일한 401 응답을 반환합니다. 액세스 토큰은 "
             + expiresIn
             + "초 동안 유효하며 리프레시 토큰은 발급하지 않습니다. 토큰 만료 시각은 UTC입니다.");
@@ -232,6 +237,8 @@ public class OpenApiConfig {
     addError(
         operation, "passwordRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "비밀번호를 입력해주세요.");
     addError(operation, "loginFailed", UserErrorCode.LOGIN_FAILED, null);
+    if (!admin)
+      addError(operation, "googleLoginRequired", UserErrorCode.GOOGLE_LOGIN_REQUIRED, null);
   }
 
   private void describeAddressSearch(Operation operation) {

@@ -148,6 +148,37 @@ class LoginTest {
         .andExpect(jsonPath("$.code").value("USER_401_1"));
   }
 
+  @Test
+  void googleResidentIsDirectedToGoogleLoginWithoutIssuingToken() throws Exception {
+    jdbc.update("UPDATE users SET google_subject='google-resident' WHERE user_id=?", residentId);
+    mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("resident@example.com", "incorrect123")))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("USER_401_3"))
+        .andExpect(jsonPath("$.message").value("구글로그인으로 가입된 계정입니다. 구글로그인을 이용해주세요."))
+        .andExpect(jsonPath("$.result").isEmpty());
+    assertThat(users.findById(residentId).orElseThrow().getLastLoginAt()).isNull();
+    mvc.perform(
+            post("/api/auth/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("resident@example.com", "incorrect123")))
+        .andExpect(jsonPath("$.code").value("USER_401_1"));
+  }
+
+  @Test
+  void googleLinkedAdminKeepsEmailLoginAndGenericPasswordFailure() throws Exception {
+    jdbc.update("UPDATE users SET google_subject='google-admin' WHERE user_id=?", adminId);
+    token("/api/auth/admin/login", "admin@example.com");
+    mvc.perform(
+            post("/api/auth/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("admin@example.com", "incorrect123")))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("USER_401_1"));
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {

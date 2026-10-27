@@ -62,6 +62,9 @@ public class GoogleLoginService {
           throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
         }
         if (user.getGoogleSubject() == null) {
+          if (requiredRole == UserRole.RESIDENT) {
+            throw new BaseException(UserErrorCode.EMAIL_LOGIN_REQUIRED);
+          }
           // 이메일만으로 기존 주민 계정을 자동 연결하지 않는다.
           // 운영자는 사전 승인된 Gmail/Workspace 주소에 한해 최초 연결한다.
           String domain = identity.getClaimAsString("hd");

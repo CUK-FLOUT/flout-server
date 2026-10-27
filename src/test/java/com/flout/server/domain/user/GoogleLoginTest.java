@@ -130,7 +130,13 @@ class GoogleLoginTest {
   @Test
   void existingResidentEmailIsNotAutomaticallyLinked() throws Exception {
     users.saveAndFlush(User.resident("person@gmail.com", passwords.encode("secret"), "주민"));
-    login("/api/auth/google", "", 409);
+    mvc.perform(
+            post("/api/auth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idToken\":\"valid\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("USER_409_3"))
+        .andExpect(jsonPath("$.message").value("이미 이메일로 가입된 계정입니다. 이메일 로그인을 이용해주세요."));
     assertThat(users.findByEmail("person@gmail.com").orElseThrow().getGoogleSubject()).isNull();
   }
 
