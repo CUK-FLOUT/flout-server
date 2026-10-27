@@ -67,6 +67,12 @@ public class OpenApiConfig {
         .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH));
   }
 
+  /**
+   * 인증 관련 API와 운영자 계정 조회 API에 응답 예시 및 공통 오류 문서를 등록합니다.
+   *
+   * @param expiresIn 로그인 응답 예시에 사용할 Access Token 유효 시간(초)
+   * @return API 경로별 응답과 인증 요구 사항을 보완하는 문서 커스터마이저
+   */
   @Bean
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
@@ -145,6 +151,22 @@ public class OpenApiConfig {
                             }
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
+                            }
+                            if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
+                              var success =
+                                  operation
+                                      .getResponses()
+                                      .computeIfAbsent("200", key -> new ApiResponse());
+                              success.setDescription(
+                                  UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage());
+                              addExample(
+                                  success,
+                                  "adminAccountSuccess",
+                                  envelope(
+                                      true,
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS,
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage(),
+                                      Map.of("name", "김담당", "jurisdiction", "부천시")));
                             }
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));

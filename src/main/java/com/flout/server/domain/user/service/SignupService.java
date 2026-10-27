@@ -42,7 +42,8 @@ public class SignupService {
   }
 
   @Transactional
-  public SignupResponse signup(@NotNull @Valid SignupRequest request) {
+  public SignupResponse signup(
+      @NotNull(message = "회원가입 정보를 입력해주세요.") @Valid SignupRequest request) {
     if (!request.password().equals(request.passwordConfirm())) {
       throw new BaseException(UserErrorCode.PASSWORD_MISMATCH);
     }

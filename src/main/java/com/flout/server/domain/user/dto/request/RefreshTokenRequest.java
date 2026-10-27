@@ -6,7 +6,7 @@ import jakarta.validation.constraints.*;
 
 public record RefreshTokenRequest(
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-        @NotBlank(message = "리프레시 토큰을 입력해주세요.") @Size(max = 512) @Schema(
+        @NotBlank(message = "리프레시 토큰을 입력해주세요.") @Size(max = 512, message = "리프레시 토큰은 512자 이하여야 합니다.") @Schema(
             description = "로그인 또는 직전 재발급 응답의 refreshToken",
             example = "example-refresh-token",
             format = "password")
