@@ -147,7 +147,7 @@ public class OpenApiConfig {
 
   private void describeSignup(Operation operation) {
     operation.setDescription(
-        "주민 계정과 필수 약관 동의를 함께 저장합니다. 역할은 RESIDENT로 고정됩니다. 비밀번호는 영문·숫자 포함 8~64자이며 공백은 허용하지 않습니다. 특수문자는 선택입니다.");
+        "주민 계정과 개인정보 제3자 제공·진행상태 알림 수신 동의를 함께 저장합니다. thirdPartyProvisionAgreed와 statusNotificationAgreed는 모두 true여야 합니다. 역할은 RESIDENT로 고정됩니다. 비밀번호는 영문·숫자 포함 8~64자이며 공백은 허용하지 않습니다. 특수문자는 선택입니다.");
     ApiResponse success = operation.getResponses().remove("200");
     if (success == null) {
       success = new ApiResponse();
@@ -169,12 +169,15 @@ public class OpenApiConfig {
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "비밀번호는 영문과 숫자를 포함한 8자 이상이어야 합니다.");
     addError(
-        operation, "termsRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "이용약관 동의는 필수입니다.");
+        operation,
+        "thirdPartyProvisionRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "개인정보 제3자 제공 동의는 필수입니다.");
     addError(
         operation,
-        "privacyRequired",
+        "statusNotificationRequired",
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
-        "개인정보 수집 및 이용 동의는 필수입니다.");
+        "진행상태 알림 수신 동의는 필수입니다.");
     addError(operation, "passwordMismatch", UserErrorCode.PASSWORD_MISMATCH, null);
     addError(operation, "passwordTooLong", UserErrorCode.PASSWORD_TOO_LONG, null);
     addError(operation, "duplicateEmail", UserErrorCode.EMAIL_ALREADY_EXISTS, null);
@@ -192,7 +195,10 @@ public class OpenApiConfig {
     addError(operation, "invalidGoogleToken", UserErrorCode.GOOGLE_INVALID_TOKEN, null);
     addError(operation, "roleDenied", UserErrorCode.GOOGLE_LOGIN_DENIED, null);
     addError(operation, "linkRequired", UserErrorCode.GOOGLE_LINK_REQUIRED, null);
-    if (!admin) addError(operation, "consentRequired", UserErrorCode.GOOGLE_CONSENT_REQUIRED, null);
+    if (!admin) {
+      addError(operation, "consentRequired", UserErrorCode.GOOGLE_CONSENT_REQUIRED, null);
+      addError(operation, "emailLoginRequired", UserErrorCode.EMAIL_LOGIN_REQUIRED, null);
+    }
     addError(operation, "notConfigured", UserErrorCode.GOOGLE_NOT_CONFIGURED, null);
   }
 

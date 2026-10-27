@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.user.controller.SignupController;
+import com.flout.server.domain.user.entity.ConsentType;
+import com.flout.server.domain.user.entity.UserConsent;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserConsentRepository;
 import com.flout.server.domain.user.repository.UserRepository;
@@ -53,7 +55,7 @@ class SignupTest {
       String privacy) {
     return """
         {"email":"%s","password":"%s","passwordConfirm":"%s","name":"%s",
-         "termsAgreed":%s,"privacyAgreed":%s,"role":"ADMIN"}
+         "thirdPartyProvisionAgreed":%s,"statusNotificationAgreed":%s,"role":"ADMIN"}
         """
         .formatted(email, password, confirmation, name, terms, privacy);
   }
@@ -81,6 +83,10 @@ class SignupTest {
     assertThat(encoder.matches("password123", user.getPasswordHash())).isTrue();
     assertThat(body).doesNotContain("password", user.getPasswordHash());
     assertThat(consents.findAll())
+        .extracting(UserConsent::getConsentType)
+        .containsExactlyInAnyOrder(
+            ConsentType.THIRD_PARTY_PROVISION, ConsentType.STATUS_NOTIFICATION);
+    assertThat(consents.findAll())
         .hasSize(2)
         .allSatisfy(
             consent -> {
@@ -102,6 +108,40 @@ class SignupTest {
         .andExpect(jsonPath("$.code").value("USER_409_1"));
     assertThat(users.count()).isEqualTo(1);
     assertThat(consents.count()).isEqualTo(2);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"thirdPartyProvisionAgreed", "statusNotificationAgreed"})
+  void requiredConsentCannotBeMissingNullOrFalse(String field) throws Exception {
+    for (String value : new String[] {"false", "null", "missing"}) {
+      String body =
+          value.equals("missing")
+              ? valid().replace("\"" + field + "\":true,", "")
+              : valid().replace("\"" + field + "\":true", "\"" + field + "\":" + value);
+      mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("COMMON_400_2"))
+          .andExpect(
+              jsonPath("$.message")
+                  .value(
+                      field.equals("thirdPartyProvisionAgreed")
+                          ? "개인정보 제3자 제공 동의는 필수입니다."
+                          : "진행상태 알림 수신 동의는 필수입니다."));
+      assertThat(users.count()).isZero();
+      assertThat(consents.count()).isZero();
+    }
+  }
+
+  @Test
+  void legacyConsentFieldsDoNotReplaceNewRequiredConsents() throws Exception {
+    String body =
+        valid()
+            .replace("thirdPartyProvisionAgreed", "termsAgreed")
+            .replace("statusNotificationAgreed", "privacyAgreed");
+    mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isBadRequest());
+    assertThat(users.count()).isZero();
+    assertThat(consents.count()).isZero();
   }
 
   @ParameterizedTest
@@ -137,10 +177,18 @@ class SignupTest {
           case "email" -> valid().replace("Resident@example.com", "invalid");
           case "password" -> valid().replace("password123", "short");
           case "name" -> valid().replace("주민", " ");
-          case "terms" -> valid().replace("\"termsAgreed\":true", "\"termsAgreed\":false");
-          case "privacy" -> valid().replace("\"privacyAgreed\":true", "\"privacyAgreed\":false");
+          case "terms" ->
+              valid()
+                  .replace(
+                      "\"thirdPartyProvisionAgreed\":true", "\"thirdPartyProvisionAgreed\":false");
+          case "privacy" ->
+              valid()
+                  .replace(
+                      "\"statusNotificationAgreed\":true", "\"statusNotificationAgreed\":false");
           case "missingConsent" ->
-              valid().replace("\"privacyAgreed\":true", "\"privacyAgreed\":null");
+              valid()
+                  .replace(
+                      "\"statusNotificationAgreed\":true", "\"statusNotificationAgreed\":null");
           case "mismatch" ->
               valid()
                   .replace(

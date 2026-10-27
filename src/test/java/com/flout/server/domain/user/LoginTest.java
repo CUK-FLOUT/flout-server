@@ -148,6 +148,37 @@ class LoginTest {
         .andExpect(jsonPath("$.code").value("USER_401_1"));
   }
 
+  @Test
+  void googleResidentFailureDoesNotRevealLoginProvider() throws Exception {
+    jdbc.update("UPDATE users SET google_subject='google-resident' WHERE user_id=?", residentId);
+    mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("resident@example.com", "incorrect123")))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("USER_401_1"))
+        .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 올바르지 않습니다."))
+        .andExpect(jsonPath("$.result").isEmpty());
+    assertThat(users.findById(residentId).orElseThrow().getLastLoginAt()).isNull();
+    mvc.perform(
+            post("/api/auth/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("resident@example.com", "incorrect123")))
+        .andExpect(jsonPath("$.code").value("USER_401_1"));
+  }
+
+  @Test
+  void googleLinkedAdminKeepsEmailLoginAndGenericPasswordFailure() throws Exception {
+    jdbc.update("UPDATE users SET google_subject='google-admin' WHERE user_id=?", adminId);
+    token("/api/auth/admin/login", "admin@example.com");
+    mvc.perform(
+            post("/api/auth/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("admin@example.com", "incorrect123")))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("USER_401_1"));
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -243,7 +274,7 @@ class LoginTest {
                 .content(
                     """
         {"email":"new@example.com","password":"password123","passwordConfirm":"password123",
-         "name":"신규주민","termsAgreed":true,"privacyAgreed":true}
+         "name":"신규주민","thirdPartyProvisionAgreed":true,"statusNotificationAgreed":true}
         """))
         .andExpect(status().isCreated());
     mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
