@@ -274,7 +274,7 @@ class LoginTest {
                 .content(
                     """
         {"email":"new@example.com","password":"password123","passwordConfirm":"password123",
-         "name":"신규주민","termsAgreed":true,"privacyAgreed":true}
+         "name":"신규주민","thirdPartyProvisionAgreed":true,"statusNotificationAgreed":true}
         """))
         .andExpect(status().isCreated());
     mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());

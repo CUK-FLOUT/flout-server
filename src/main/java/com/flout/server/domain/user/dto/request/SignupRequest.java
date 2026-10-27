@@ -19,9 +19,10 @@ public record SignupRequest(
         @NotBlank @Schema(format = "password", example = "password123")
         String passwordConfirm,
     @NotBlank @Size(max = 50) @Schema(example = "홍길동") String name,
-    @NotNull @AssertTrue(message = "이용약관 동의는 필수입니다.") @Schema(example = "true") Boolean termsAgreed,
-    @NotNull @AssertTrue(message = "개인정보 수집 및 이용 동의는 필수입니다.") @Schema(example = "true")
-        Boolean privacyAgreed) {
+    @NotNull(message = "개인정보 제3자 제공 동의는 필수입니다.") @AssertTrue(message = "개인정보 제3자 제공 동의는 필수입니다.") @Schema(description = "필수 개인정보 제3자 제공 동의. true만 허용", example = "true")
+        Boolean thirdPartyProvisionAgreed,
+    @NotNull(message = "진행상태 알림 수신 동의는 필수입니다.") @AssertTrue(message = "진행상태 알림 수신 동의는 필수입니다.") @Schema(description = "필수 진행상태 알림 수신 동의. true만 허용", example = "true")
+        Boolean statusNotificationAgreed) {
   @Override
   public String toString() {
     return "SignupRequest[REDACTED]";

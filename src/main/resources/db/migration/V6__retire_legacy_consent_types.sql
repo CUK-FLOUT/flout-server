@@ -1,0 +1,10 @@
+UPDATE user_consents
+SET consent_type = CASE consent_type
+    WHEN 'TERMS' THEN 'THIRD_PARTY_PROVISION'
+    WHEN 'PRIVACY' THEN 'STATUS_NOTIFICATION'
+    ELSE consent_type
+END
+WHERE consent_type IN ('TERMS', 'PRIVACY');
+
+ALTER TABLE user_consents MODIFY COLUMN consent_type
+    ENUM('THIRD_PARTY_PROVISION', 'STATUS_NOTIFICATION') NOT NULL;

@@ -25,20 +25,20 @@ public class SignupService {
   private final UserRepository users;
   private final UserConsentRepository consents;
   private final PasswordEncoder encoder;
-  private final String termsVersion;
-  private final String privacyVersion;
+  private final String thirdPartyProvisionVersion;
+  private final String statusNotificationVersion;
 
   public SignupService(
       UserRepository users,
       UserConsentRepository consents,
       PasswordEncoder encoder,
-      @Value("${app.consent.terms-version:1.0}") String termsVersion,
-      @Value("${app.consent.privacy-version:1.0}") String privacyVersion) {
+      @Value("${app.consent.third-party-provision-version:1.0}") String thirdPartyProvisionVersion,
+      @Value("${app.consent.status-notification-version:1.0}") String statusNotificationVersion) {
     this.users = users;
     this.consents = consents;
     this.encoder = encoder;
-    this.termsVersion = termsVersion;
-    this.privacyVersion = privacyVersion;
+    this.thirdPartyProvisionVersion = thirdPartyProvisionVersion;
+    this.statusNotificationVersion = statusNotificationVersion;
   }
 
   @Transactional
@@ -67,8 +67,10 @@ public class SignupService {
     LocalDateTime agreedAt = LocalDateTime.now();
     consents.saveAll(
         List.of(
-            UserConsent.agree(user, ConsentType.TERMS, termsVersion, agreedAt),
-            UserConsent.agree(user, ConsentType.PRIVACY, privacyVersion, agreedAt)));
+            UserConsent.agree(
+                user, ConsentType.THIRD_PARTY_PROVISION, thirdPartyProvisionVersion, agreedAt),
+            UserConsent.agree(
+                user, ConsentType.STATUS_NOTIFICATION, statusNotificationVersion, agreedAt)));
     return SignupResponse.from(user);
   }
 
