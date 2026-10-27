@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -84,7 +85,7 @@ public class GoogleLoginService {
         if (name.length() > 50) name = name.substring(0, 50);
         user = User.resident(email, passwords.encode(UUID.randomUUID().toString()), name);
         user.connectGoogle(identity.getSubject());
-        persist(user);
+        persistNew(user);
         LocalDateTime now = LocalDateTime.now();
         consents.saveAll(
             List.of(
@@ -98,6 +99,15 @@ public class GoogleLoginService {
     user.recordLogin();
     persist(user);
     return tokens.issue(user);
+  }
+
+  private void persistNew(User user) {
+    try {
+      persist(user);
+    } catch (PessimisticLockingFailureException e) {
+      // 최초 동시 가입 중 갭 락 충돌은 재로그인 가능한 충돌로 안내한다.
+      throw new BaseException(UserErrorCode.GOOGLE_LINK_REQUIRED);
+    }
   }
 
   private void persist(User user) {

@@ -289,6 +289,9 @@ public class OpenApiConfig {
   }
 
   private String errorDescription(BaseResponseCode code) {
+    if (code == UserErrorCode.GOOGLE_LINK_REQUIRED) {
+      return "계정 연결 필요 또는 동시 가입·연결 충돌";
+    }
     if (code == AddressErrorCode.ADDRESS_NOT_FOUND) {
       return "검색 결과 없음";
     }

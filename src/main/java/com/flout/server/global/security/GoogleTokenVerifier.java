@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class GoogleTokenVerifier {
+  private static final Duration CLOCK_SKEW = Duration.ofSeconds(60);
   private final Set<String> clientIds;
   private final NimbusJwtDecoder decoder;
 
@@ -33,7 +34,7 @@ public class GoogleTokenVerifier {
     this.decoder = decoder;
     decoder.setJwtValidator(
         new DelegatingOAuth2TokenValidator<>(
-            new JwtTimestampValidator(Duration.ZERO), this::validateClaims));
+            new JwtTimestampValidator(CLOCK_SKEW), this::validateClaims));
   }
 
   OAuth2TokenValidatorResult validateClaims(Jwt jwt) {
@@ -48,7 +49,7 @@ public class GoogleTokenVerifier {
                 || clientIds.contains(jwt.getClaimAsString("azp")))
             && jwt.getExpiresAt() != null
             && jwt.getIssuedAt() != null
-            && !jwt.getIssuedAt().isAfter(java.time.Instant.now())
+            && !jwt.getIssuedAt().isAfter(java.time.Instant.now().plus(CLOCK_SKEW))
             && jwt.getSubject() != null
             && !jwt.getSubject().isBlank()
             && jwt.getSubject().length() <= 255

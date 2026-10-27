@@ -54,7 +54,7 @@ class GoogleTokenVerifierTest {
         new String[] {
           token(key, "https://accounts.google.com", "other-client", true, 600),
           token(key, "https://attacker.example", "client-1", true, 600),
-          token(key, "https://accounts.google.com", "client-1", true, -60),
+          token(key, "https://accounts.google.com", "client-1", true, -120),
           token(key, "https://accounts.google.com", "client-1", false, 600),
           token(
               new RSAKeyGenerator(2048).generate(),
@@ -70,5 +70,28 @@ class GoogleTokenVerifierTest {
     GoogleTokenVerifier missing =
         new GoogleTokenVerifier("", NimbusJwtDecoder.withPublicKey(key.toRSAPublicKey()).build());
     assertThatThrownBy(() -> missing.verify("anything")).isInstanceOf(BaseException.class);
+  }
+
+  @Test
+  void allowsSmallClockDifferenceButRejectsIssueTimeBeyondSkew() throws Exception {
+    String original = token(key, "https://accounts.google.com", "client-1", true, 600);
+    var claims = SignedJWT.parse(original).getJWTClaimsSet();
+    for (long offset : new long[] {30, 120}) {
+      SignedJWT shifted =
+          new SignedJWT(
+              new JWSHeader(JWSAlgorithm.RS256),
+              new JWTClaimsSet.Builder(claims)
+                  .issueTime(Date.from(Instant.now().plusSeconds(offset)))
+                  .build());
+      shifted.sign(new RSASSASigner(key));
+      if (offset == 30)
+        assertThatCode(() -> verifier.verify(shifted.serialize())).doesNotThrowAnyException();
+      else
+        assertThatThrownBy(() -> verifier.verify(shifted.serialize()))
+            .isInstanceOf(BaseException.class);
+    }
+    assertThatCode(
+            () -> verifier.verify(token(key, "https://accounts.google.com", "client-1", true, -30)))
+        .doesNotThrowAnyException();
   }
 }
