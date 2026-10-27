@@ -57,6 +57,46 @@ class AddressSearchServiceTest {
   }
 
   @Test
+  void convertsNullKakaoResponseToApiError() {
+    when(kakaoAddressClient.search("지봉로 43")).thenReturn(null);
+
+    assertThatThrownBy(() -> service.search("지봉로 43"))
+        .isInstanceOfSatisfying(
+            BaseException.class,
+            e -> assertThat(e.getBaseResponseCode()).isEqualTo(AddressErrorCode.KAKAO_API_ERROR));
+  }
+
+  @Test
+  void convertsKakaoResponseWithNullDocumentsToApiError() {
+    when(kakaoAddressClient.search("지봉로 43")).thenReturn(new KakaoAddressSearchResponse(null));
+
+    assertThatThrownBy(() -> service.search("지봉로 43"))
+        .isInstanceOfSatisfying(
+            BaseException.class,
+            e -> assertThat(e.getBaseResponseCode()).isEqualTo(AddressErrorCode.KAKAO_API_ERROR));
+  }
+
+  @Test
+  void returnsNullJibunAddressWhenKakaoDoesNotProvideOne() {
+    when(kakaoAddressClient.search("지봉로 43"))
+        .thenReturn(
+            new KakaoAddressSearchResponse(
+                List.of(
+                    new Document(
+                        "경기 부천시 원미구 지봉로 43",
+                        "126.799900224566",
+                        "37.4881360763454",
+                        null,
+                        new RoadAddress("경기 부천시 원미구 지봉로 43", "가톨릭대학교 성심교정", "14662")))));
+
+    var response = service.search("지봉로 43");
+
+    assertThat(response.addresses())
+        .singleElement()
+        .satisfies(address -> assertThat(address.jibunAddress()).isNull());
+  }
+
+  @Test
   void convertsKakaoTimeoutToDomainError() {
     when(kakaoAddressClient.search("지봉로 43"))
         .thenThrow(new KakaoAddressException(KakaoAddressException.Type.TIMEOUT, null));

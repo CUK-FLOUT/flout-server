@@ -21,10 +21,11 @@ public class AddressSearchService {
   public AddressSearchResponse search(String keyword) {
     try {
       KakaoAddressSearchResponse response = kakaoAddressClient.search(keyword.strip());
+      if (response == null || response.documents() == null) {
+        throw new BaseException(AddressErrorCode.KAKAO_API_ERROR);
+      }
       List<AddressSearchResult> addresses =
-          response == null || response.documents() == null
-              ? List.of()
-              : response.documents().stream().map(this::toResult).toList();
+          response.documents().stream().map(this::toResult).toList();
       if (addresses.isEmpty()) {
         throw new BaseException(AddressErrorCode.ADDRESS_NOT_FOUND);
       }
@@ -41,7 +42,7 @@ public class AddressSearchService {
     var roadAddress = document.roadAddress();
     return new AddressSearchResult(
         roadAddress == null ? null : roadAddress.addressName(),
-        document.address() == null ? document.addressName() : document.address().addressName(),
+        document.address() == null ? null : document.address().addressName(),
         roadAddress == null ? null : roadAddress.buildingName(),
         roadAddress == null ? null : roadAddress.zoneNo(),
         Double.parseDouble(document.y()),
