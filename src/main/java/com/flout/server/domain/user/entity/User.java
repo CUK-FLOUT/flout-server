@@ -34,6 +34,10 @@ public class User {
   @Column(nullable = false, length = 20)
   private UserRole role;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "jurisdiction_id", foreignKey = @ForeignKey(name = "fk_users_jurisdiction"))
+  private Jurisdiction jurisdiction;
+
   @Column(name = "last_login_at")
   private LocalDateTime lastLoginAt;
 
