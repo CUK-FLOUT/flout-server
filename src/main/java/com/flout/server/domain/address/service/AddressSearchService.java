@@ -47,11 +47,26 @@ public class AddressSearchService {
         roadAddress == null ? null : roadAddress.zoneNo(),
         document.addressType(),
         isSelectable(document.addressType()),
-        Double.parseDouble(document.y()),
-        Double.parseDouble(document.x()));
+        parseCoordinate(document.y()),
+        parseCoordinate(document.x()));
   }
 
   private boolean isSelectable(String addressType) {
     return "REGION_ADDR".equals(addressType) || "ROAD_ADDR".equals(addressType);
+  }
+
+  private double parseCoordinate(String coordinate) {
+    if (coordinate == null || coordinate.isBlank()) {
+      throw new BaseException(AddressErrorCode.KAKAO_API_ERROR);
+    }
+    try {
+      double value = Double.parseDouble(coordinate);
+      if (!Double.isFinite(value)) {
+        throw new NumberFormatException();
+      }
+      return value;
+    } catch (NumberFormatException e) {
+      throw new BaseException(AddressErrorCode.KAKAO_API_ERROR);
+    }
   }
 }
