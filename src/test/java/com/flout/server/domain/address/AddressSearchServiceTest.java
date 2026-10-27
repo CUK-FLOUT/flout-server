@@ -15,7 +15,11 @@ import com.flout.server.domain.address.service.AddressSearchService;
 import com.flout.server.domain.address.service.KakaoAddressClient;
 import com.flout.server.global.exception.BaseException;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class AddressSearchServiceTest {
   private final KakaoAddressClient kakaoAddressClient = mock(KakaoAddressClient.class);
@@ -122,6 +126,18 @@ class AddressSearchServiceTest {
         .containsExactly(false, false, true, true, false, false);
   }
 
+  @ParameterizedTest
+  @MethodSource("invalidCoordinates")
+  void convertsInvalidKakaoCoordinatesToApiError(String x, String y) {
+    when(kakaoAddressClient.search("지봉로 43"))
+        .thenReturn(new KakaoAddressSearchResponse(List.of(documentWithCoordinates(x, y))));
+
+    assertThatThrownBy(() -> service.search("지봉로 43"))
+        .isInstanceOfSatisfying(
+            BaseException.class,
+            e -> assertThat(e.getBaseResponseCode()).isEqualTo(AddressErrorCode.KAKAO_API_ERROR));
+  }
+
   @Test
   void convertsKakaoTimeoutToDomainError() {
     when(kakaoAddressClient.search("지봉로 43"))
@@ -145,12 +161,28 @@ class AddressSearchServiceTest {
   }
 
   private Document document(String addressType) {
+    return documentWithCoordinates("126.799900224566", "37.4881360763454", addressType);
+  }
+
+  private Document documentWithCoordinates(String x, String y) {
+    return documentWithCoordinates(x, y, "ROAD_ADDR");
+  }
+
+  private Document documentWithCoordinates(String x, String y, String addressType) {
     return new Document(
         "경기 부천시 원미구 지봉로 43",
         addressType,
-        "126.799900224566",
-        "37.4881360763454",
+        x,
+        y,
         new Address("경기 부천시 원미구 역곡동 산 43-1"),
         new RoadAddress("경기 부천시 원미구 지봉로 43", "가톨릭대학교 성심교정", "14662"));
+  }
+
+  private static Stream<Arguments> invalidCoordinates() {
+    return Stream.of(
+        Arguments.of("126.799900224566", null),
+        Arguments.of(null, "37.4881360763454"),
+        Arguments.of("126.799900224566", " "),
+        Arguments.of("not-a-coordinate", "37.4881360763454"));
   }
 }
