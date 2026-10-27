@@ -45,7 +45,13 @@ public class AddressSearchService {
         document.address() == null ? null : document.address().addressName(),
         roadAddress == null ? null : roadAddress.buildingName(),
         roadAddress == null ? null : roadAddress.zoneNo(),
+        document.addressType(),
+        isSelectable(document.addressType()),
         Double.parseDouble(document.y()),
         Double.parseDouble(document.x()));
+  }
+
+  private boolean isSelectable(String addressType) {
+    return "REGION_ADDR".equals(addressType) || "ROAD_ADDR".equals(addressType);
   }
 }

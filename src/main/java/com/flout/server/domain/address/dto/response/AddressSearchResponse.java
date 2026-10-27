@@ -10,6 +10,8 @@ public record AddressSearchResponse(
       @Schema(description = "지번 주소", example = "경기 부천시 원미구 역곡동 산 43-1") String jibunAddress,
       @Schema(description = "건물명", example = "가톨릭대학교 성심교정") String buildingName,
       @Schema(description = "우편번호", example = "14662") String zipCode,
+      @Schema(description = "Kakao 주소 유형", example = "ROAD_ADDR") String addressType,
+      @Schema(description = "침수 취약도 분석용 주소 선택 가능 여부", example = "true") boolean isSelectable,
       @Schema(description = "위도", example = "37.4874849962478") Double latitude,
       @Schema(description = "경도", example = "126.79856716311") Double longitude) {}
 }

@@ -9,6 +9,7 @@ public record KakaoAddressSearchResponse(List<Document> documents) {
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Document(
       @JsonProperty("address_name") String addressName,
+      @JsonProperty("address_type") String addressType,
       String x,
       String y,
       @JsonProperty("address") Address address,

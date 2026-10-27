@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
+import com.flout.server.domain.address.dto.response.AddressSearchResponse.AddressSearchResult;
 import com.flout.server.domain.address.dto.response.KakaoAddressSearchResponse;
 import com.flout.server.domain.address.dto.response.KakaoAddressSearchResponse.Address;
 import com.flout.server.domain.address.dto.response.KakaoAddressSearchResponse.Document;
@@ -28,6 +29,7 @@ class AddressSearchServiceTest {
                 List.of(
                     new Document(
                         "경기 부천시 원미구 지봉로 43",
+                        "ROAD_ADDR",
                         "126.799900224566",
                         "37.4881360763454",
                         new Address("경기 부천시 원미구 역곡동 산 43-1"),
@@ -84,6 +86,7 @@ class AddressSearchServiceTest {
                 List.of(
                     new Document(
                         "경기 부천시 원미구 지봉로 43",
+                        "ROAD_ADDR",
                         "126.799900224566",
                         "37.4881360763454",
                         null,
@@ -94,6 +97,29 @@ class AddressSearchServiceTest {
     assertThat(response.addresses())
         .singleElement()
         .satisfies(address -> assertThat(address.jibunAddress()).isNull());
+  }
+
+  @Test
+  void returnsEveryAddressTypeAndMarksOnlyConcreteAddressesAsSelectable() {
+    when(kakaoAddressClient.search("부천"))
+        .thenReturn(
+            new KakaoAddressSearchResponse(
+                List.of(
+                    document("REGION"),
+                    document("ROAD"),
+                    document("REGION_ADDR"),
+                    document("ROAD_ADDR"),
+                    document("UNKNOWN"),
+                    document(null))));
+
+    var response = service.search("부천");
+
+    assertThat(response.addresses())
+        .extracting(AddressSearchResult::addressType)
+        .containsExactly("REGION", "ROAD", "REGION_ADDR", "ROAD_ADDR", "UNKNOWN", null);
+    assertThat(response.addresses())
+        .extracting(AddressSearchResult::isSelectable)
+        .containsExactly(false, false, true, true, false, false);
   }
 
   @Test
@@ -116,5 +142,15 @@ class AddressSearchServiceTest {
         .isInstanceOfSatisfying(
             BaseException.class,
             e -> assertThat(e.getBaseResponseCode()).isEqualTo(AddressErrorCode.KAKAO_API_ERROR));
+  }
+
+  private Document document(String addressType) {
+    return new Document(
+        "경기 부천시 원미구 지봉로 43",
+        addressType,
+        "126.799900224566",
+        "37.4881360763454",
+        new Address("경기 부천시 원미구 역곡동 산 43-1"),
+        new RoadAddress("경기 부천시 원미구 지봉로 43", "가톨릭대학교 성심교정", "14662"));
   }
 }
