@@ -246,7 +246,7 @@ public class OpenApiConfig {
             .getResponses()
             .computeIfAbsent(
                 Integer.toString(code.getStatus()),
-                key -> new ApiResponse().description(errorDescription(code.getStatus())));
+                key -> new ApiResponse().description(errorDescription(code)));
     addExample(
         response, name, envelope(false, code, message == null ? code.getMessage() : message, null));
     response
@@ -255,8 +255,17 @@ public class OpenApiConfig {
         .schema(new Schema<>().$ref("#/components/schemas/CommonErrorResponse"));
   }
 
-  private String errorDescription(int status) {
-    return switch (status) {
+  private String errorDescription(BaseResponseCode code) {
+    if (code == AddressErrorCode.ADDRESS_NOT_FOUND) {
+      return "검색 결과 없음";
+    }
+    if (code == AddressErrorCode.KAKAO_API_ERROR) {
+      return "외부 주소 검색 서비스 호출 실패";
+    }
+    if (code == AddressErrorCode.KAKAO_API_TIMEOUT) {
+      return "외부 주소 검색 서비스 응답 시간 초과";
+    }
+    return switch (code.getStatus()) {
       case 400 -> "입력값 검증 실패 또는 잘못된 요청 본문. 메시지는 실패한 검증에 따라 달라집니다.";
       case 401 -> "인증 실패";
       case 403 -> "접근 권한 없음";

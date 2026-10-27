@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
@@ -44,8 +45,8 @@ public class KakaoAddressClient {
               uriBuilder ->
                   uriBuilder
                       .path("/v2/local/search/address.json")
-                      .queryParam("query", keyword)
-                      .build())
+                      .queryParam("query", "{query}")
+                      .build(keyword))
           .header("Authorization", "KakaoAK " + restApiKey)
           .retrieve()
           .body(KakaoAddressSearchResponse.class);
@@ -59,6 +60,10 @@ public class KakaoAddressClient {
           timeout ? KakaoAddressException.Type.TIMEOUT : KakaoAddressException.Type.API_ERROR, e);
     } catch (RestClientResponseException e) {
       log.warn("Kakao Local API response error: status={}", e.getStatusCode().value());
+      throw new KakaoAddressException(KakaoAddressException.Type.API_ERROR, e);
+    } catch (RestClientException e) {
+      log.warn(
+          "Kakao Local API response processing failed: causeType={}", e.getClass().getSimpleName());
       throw new KakaoAddressException(KakaoAddressException.Type.API_ERROR, e);
     }
   }
