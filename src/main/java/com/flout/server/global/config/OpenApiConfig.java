@@ -30,12 +30,16 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApiConfig {
+  @Value("${app.jwt.refresh-token-seconds:604800}")
+  private long refreshExpiresIn = 604800;
+
   private static final String BEARER_AUTH = "bearerAuth";
   private static final String JSON = "application/json";
   private static final String EXAMPLE_TIME = "2026-10-21 22:30:00";
   private static final Set<String> PUBLIC_POSTS =
       Set.of(
           "/api/auth/signup",
+          "/api/auth/refresh",
           "/api/auth/login",
           "/api/auth/admin/login",
           "/api/auth/google",
@@ -98,6 +102,8 @@ public class OpenApiConfig {
                             if (publicAuth) {
                               if (path.equals("/api/auth/signup")) {
                                 describeSignup(operation);
+                              } else if (path.equals("/api/auth/refresh")) {
+                                describeRefresh(operation, expiresIn);
                               } else if (path.endsWith("/google")) {
                                 describeGoogle(operation, path.contains("/admin/"), expiresIn);
                               } else {
@@ -191,7 +197,7 @@ public class OpenApiConfig {
         (admin
                 ? "사전 등록된 ADMIN 계정만 허용합니다. Google sub를 미리 연결하거나, 등록된 Gmail/Workspace 이메일로 최초 연결합니다."
                 : "RESIDENT 계정만 허용합니다. 신규 회원은 개인정보 제3자 제공(thirdPartyProvisionAgreed)과 진행상태 알림 수신(statusNotificationAgreed)이 모두 true여야 합니다. 기존 이메일 계정은 자동 연결하지 않습니다.")
-            + " 인증 헤더 없이 Google ID 토큰을 본문으로 전달합니다. Google 서명·발급자·대상·만료·이메일 인증을 검증합니다. 서비스 액세스 토큰을 발급하며 리프레시 토큰은 발급하지 않습니다.");
+            + " 인증 헤더 없이 Google ID 토큰을 본문으로 전달합니다. Google 서명·발급자·대상·만료·이메일 인증을 검증합니다. 서비스 Access Token과 Refresh Token을 발급합니다.");
     addError(operation, "invalidGoogleToken", UserErrorCode.GOOGLE_INVALID_TOKEN, null);
     addError(operation, "roleDenied", UserErrorCode.GOOGLE_LOGIN_DENIED, null);
     addError(operation, "linkRequired", UserErrorCode.GOOGLE_LINK_REQUIRED, null);
@@ -207,7 +213,7 @@ public class OpenApiConfig {
         (admin ? "사전 등록된 ADMIN 계정만 로그인할 수 있습니다." : "RESIDENT 계정만 로그인할 수 있습니다.")
             + " 이메일·비밀번호·역할이 일치하지 않으면 동일한 401 응답을 반환합니다. 액세스 토큰은 "
             + expiresIn
-            + "초 동안 유효하며 리프레시 토큰은 발급하지 않습니다. 토큰 만료 시각은 UTC입니다.");
+            + "초 동안 유효합니다. Refresh Token도 함께 발급하며 기본 유효 기간은 7일입니다. 토큰 만료 시각은 UTC입니다.");
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("accessToken", "example-access-token");
     result.put("tokenType", "Bearer");
@@ -218,6 +224,11 @@ public class OpenApiConfig {
     result.put("email", admin ? "admin@example.com" : "resident@example.com");
     result.put("name", admin ? "김운영" : "홍길동");
     result.put("role", admin ? "ADMIN" : "RESIDENT");
+    result.put("refreshToken", "example-refresh-token");
+    result.put("refreshExpiresIn", refreshExpiresIn);
+    result.put(
+        "refreshExpiresAt",
+        Instant.parse("2026-10-21T13:30:00Z").plusSeconds(refreshExpiresIn).toString());
     ApiResponse success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(UserSuccessCode.LOGIN_SUCCESS.getMessage());
     addExample(
@@ -238,6 +249,33 @@ public class OpenApiConfig {
     addError(
         operation, "passwordRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "비밀번호를 입력해주세요.");
     addError(operation, "loginFailed", UserErrorCode.LOGIN_FAILED, null);
+  }
+
+  private void describeRefresh(Operation operation, long expiresIn) {
+    describeLogin(operation, false, expiresIn);
+    operation.getResponses().remove("400");
+    operation.getResponses().remove("401");
+    var success = operation.getResponses().get("200");
+    var media = success.getContent().get(JSON);
+    Object result = ((Map<?, ?>) media.getExamples().get("loginSuccess").getValue()).get("result");
+    media.setExamples(new LinkedHashMap<>());
+    success.setDescription(UserSuccessCode.TOKEN_REFRESH_SUCCESS.getMessage());
+    addExample(
+        success,
+        "refreshSuccess",
+        envelope(
+            true,
+            UserSuccessCode.TOKEN_REFRESH_SUCCESS,
+            UserSuccessCode.TOKEN_REFRESH_SUCCESS.getMessage(),
+            result));
+    addError(operation, "invalidRefreshToken", UserErrorCode.INVALID_REFRESH_TOKEN, null);
+    operation.setDescription(
+        "본문의 refreshToken으로 Access Token과 Refresh Token을 함께 재발급합니다. 기존 Refresh Token은 즉시 폐기하며 동시 요청은 한 건만 성공합니다. 권한은 현재 DB 계정 기준입니다. Authorization 헤더를 생략하세요. 만료된 Access Token은 보내지 않습니다.");
+    addError(
+        operation,
+        "refreshTokenRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "리프레시 토큰을 입력해주세요.");
   }
 
   private void describeAddressSearch(Operation operation) {

@@ -34,6 +34,7 @@ public class SecurityConfig {
                     .requestMatchers(
                         HttpMethod.POST,
                         "/api/auth/signup",
+                        "/api/auth/refresh",
                         "/api/auth/login",
                         "/api/auth/google",
                         "/api/auth/admin/google",
