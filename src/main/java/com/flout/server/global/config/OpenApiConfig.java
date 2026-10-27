@@ -1,5 +1,7 @@
 package com.flout.server.global.config;
 
+import com.flout.server.domain.address.response.code.AddressErrorCode;
+import com.flout.server.domain.address.response.code.AddressSuccessCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -122,6 +124,9 @@ public class OpenApiConfig {
                                     null);
                               }
                             }
+                            if (path.equals("/api/resident/addresses/search")) {
+                              describeAddressSearch(operation);
+                            }
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
@@ -200,13 +205,52 @@ public class OpenApiConfig {
     addError(operation, "loginFailed", UserErrorCode.LOGIN_FAILED, null);
   }
 
+  private void describeAddressSearch(Operation operation) {
+    operation.setDescription(
+        "Kakao Local API로 도로명 또는 지번 주소를 검색합니다. Kakao의 x(경도), y(위도)를 각각 longitude, latitude로 변환해 반환합니다.");
+    ApiResponse success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(AddressSuccessCode.ADDRESS_SEARCH_SUCCESS.getMessage());
+    addExample(
+        success,
+        "addressSearchSuccess",
+        envelope(
+            true,
+            AddressSuccessCode.ADDRESS_SEARCH_SUCCESS,
+            AddressSuccessCode.ADDRESS_SEARCH_SUCCESS.getMessage(),
+            Map.of(
+                "addresses",
+                List.of(
+                    Map.of(
+                        "roadAddress",
+                        "경기도 부천시 원미구 지봉로 43",
+                        "jibunAddress",
+                        "경기 부천시 원미구 역곡동 산 43-1",
+                        "buildingName",
+                        "가톨릭대학교 성심교정",
+                        "zipCode",
+                        "14662",
+                        "addressType",
+                        "ROAD_ADDR",
+                        "isSelectable",
+                        true,
+                        "latitude",
+                        37.4874849962478,
+                        "longitude",
+                        126.79856716311)))));
+    addError(
+        operation, "keywordRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "검색어를 입력해주세요.");
+    addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
+    addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
+    addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
   private void addError(Operation operation, String name, BaseResponseCode code, String message) {
     ApiResponse response =
         operation
             .getResponses()
             .computeIfAbsent(
                 Integer.toString(code.getStatus()),
-                key -> new ApiResponse().description(errorDescription(code.getStatus())));
+                key -> new ApiResponse().description(errorDescription(code)));
     addExample(
         response, name, envelope(false, code, message == null ? code.getMessage() : message, null));
     response
@@ -215,8 +259,17 @@ public class OpenApiConfig {
         .schema(new Schema<>().$ref("#/components/schemas/CommonErrorResponse"));
   }
 
-  private String errorDescription(int status) {
-    return switch (status) {
+  private String errorDescription(BaseResponseCode code) {
+    if (code == AddressErrorCode.ADDRESS_NOT_FOUND) {
+      return "검색 결과 없음";
+    }
+    if (code == AddressErrorCode.KAKAO_API_ERROR) {
+      return "외부 주소 검색 서비스 호출 실패";
+    }
+    if (code == AddressErrorCode.KAKAO_API_TIMEOUT) {
+      return "외부 주소 검색 서비스 응답 시간 초과";
+    }
+    return switch (code.getStatus()) {
       case 400 -> "입력값 검증 실패 또는 잘못된 요청 본문. 메시지는 실패한 검증에 따라 달라집니다.";
       case 401 -> "인증 실패";
       case 403 -> "접근 권한 없음";
