@@ -12,4 +12,22 @@ SET jurisdiction_id = (SELECT jurisdiction_id FROM jurisdictions WHERE name = '�
 WHERE user_id = :userId AND role = 'ADMIN';
 ```
 
-운영자 이름과 관할 지역을 반환하는 조회 API는 이번 DB 변경에 포함하지 않습니다.
+## GET /api/admin/me
+
+운영자 Access Token을 `Authorization: Bearer {accessToken}` 헤더로 전달합니다. 요청 본문과 파라미터는 없습니다.
+토큰으로 로그인한 운영자를 식별하고 현재 DB의 이름과 관할 지역을 반환합니다.
+
+성공 응답의 `result`에는 아래 두 필드만 포함합니다.
+
+```json
+{
+  "name": "김담당",
+  "jurisdiction": "부천시"
+}
+```
+
+- 성공: `200 / USER_200_3`
+- 관할 지역 미지정: `jurisdiction: null`
+- 미인증: `401 / COMMON_401_1`
+- 유효하지 않거나 만료된 토큰: `401 / COMMON_401_3`
+- 주민 계정 접근: `403 / COMMON_403_1`

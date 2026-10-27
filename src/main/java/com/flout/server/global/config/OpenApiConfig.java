@@ -146,6 +146,22 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
                             }
+                            if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
+                              var success =
+                                  operation
+                                      .getResponses()
+                                      .computeIfAbsent("200", key -> new ApiResponse());
+                              success.setDescription(
+                                  UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage());
+                              addExample(
+                                  success,
+                                  "adminAccountSuccess",
+                                  envelope(
+                                      true,
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS,
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage(),
+                                      Map.of("name", "김담당", "jurisdiction", "부천시")));
+                            }
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };

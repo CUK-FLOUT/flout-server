@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/auth")
-@Tag(name = "Google 로그인", description = "주민 가입·로그인 및 사전 등록 운영자 Google 인증")
+@Tag(name = "인증/인가", description = "회원가입, 로그인, 토큰 재발급 및 운영자 계정 정보 조회")
 public class GoogleLoginController {
   private final GoogleLoginService service;
 
