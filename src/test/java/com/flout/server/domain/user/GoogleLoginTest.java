@@ -1,0 +1,174 @@
+package com.flout.server.domain.user;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import com.flout.server.domain.user.entity.ConsentType;
+import com.flout.server.domain.user.entity.User;
+import com.flout.server.domain.user.entity.UserConsent;
+import com.flout.server.domain.user.repository.*;
+import com.flout.server.domain.user.response.code.UserErrorCode;
+import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.security.GoogleTokenVerifier;
+import java.time.Instant;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.*;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest(
+    properties = {
+      "spring.flyway.enabled=true",
+      "spring.jpa.hibernate.ddl-auto=validate",
+      "spring.datasource.url=jdbc:h2:mem:google;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+    })
+@AutoConfigureMockMvc
+class GoogleLoginTest {
+  @Autowired MockMvc mvc;
+  @Autowired UserRepository users;
+  @Autowired UserConsentRepository consents;
+  @Autowired PasswordEncoder passwords;
+  @Autowired JdbcTemplate jdbc;
+  @MockitoBean GoogleTokenVerifier verifier;
+
+  @BeforeEach
+  void setup() {
+    consents.deleteAll();
+    users.deleteAll();
+    when(verifier.verify("valid")).thenReturn(identity("subject-1", "person@gmail.com"));
+  }
+
+  Jwt identity(String sub, String email) {
+    return Jwt.withTokenValue("valid")
+        .header("alg", "RS256")
+        .subject(sub)
+        .issuedAt(Instant.now())
+        .expiresAt(Instant.now().plusSeconds(600))
+        .claim("email", email)
+        .claim("email_verified", true)
+        .claim("name", "구글주민")
+        .build();
+  }
+
+  void login(String path, String extra, int status) throws Exception {
+    mvc.perform(
+            post(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idToken\":\"valid\"" + extra + "}"))
+        .andExpect(status().is(status));
+  }
+
+  @Test
+  void newResidentNeedsConsentAndRepeatLoginDoesNotDuplicate() throws Exception {
+    login("/api/auth/google", "", 400);
+    assertThat(users.count()).isZero();
+    login(
+        "/api/auth/google",
+        ",\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":true",
+        200);
+    login("/api/auth/google", "", 200);
+    assertThat(users.count()).isEqualTo(1);
+    assertThat(consents.count()).isEqualTo(2);
+    assertThat(consents.findAll())
+        .extracting(UserConsent::getConsentType)
+        .containsExactlyInAnyOrder(
+            ConsentType.THIRD_PARTY_PROVISION, ConsentType.STATUS_NOTIFICATION);
+    assertThat(consents.findAll())
+        .allSatisfy(
+            consent -> {
+              assertThat(consent.isAgreed()).isTrue();
+              assertThat(consent.getAgreedAt()).isNotNull();
+              assertThat(consent.getVersion()).isEqualTo("1.0");
+            });
+    User user = users.findByEmail("person@gmail.com").orElseThrow();
+    assertThat(user.getGoogleSubject()).isEqualTo("subject-1");
+    assertThat(user.getLastLoginAt()).isNotNull();
+    login("/api/auth/admin/google", "", 403);
+  }
+
+  @Test
+  void bothNewConsentsMustBeExplicitlyTrue() throws Exception {
+    for (String input :
+        new String[] {
+          ",\"thirdPartyProvisionAgreed\":true",
+          ",\"statusNotificationAgreed\":true",
+          ",\"thirdPartyProvisionAgreed\":false,\"statusNotificationAgreed\":true",
+          ",\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":false",
+          ",\"termsAgreed\":true,\"privacyAgreed\":true"
+        }) {
+      login("/api/auth/google", input, 400);
+      assertThat(users.count()).isZero();
+      assertThat(consents.count()).isZero();
+    }
+  }
+
+  @Test
+  void adminRequiresPreRegistrationAndBindsOnlyOnce() throws Exception {
+    login("/api/auth/admin/google", "", 403);
+    assertThat(users.count()).isZero();
+    User admin =
+        users.saveAndFlush(User.resident("person@gmail.com", passwords.encode("secret"), "운영자"));
+    jdbc.update("UPDATE users SET role='ADMIN' WHERE user_id=?", admin.getId());
+    login("/api/auth/google", "", 403);
+    login("/api/auth/admin/google", "", 200);
+    assertThat(users.findById(admin.getId()).orElseThrow().getGoogleSubject())
+        .isEqualTo("subject-1");
+    when(verifier.verify("valid")).thenReturn(identity("different-subject", "person@gmail.com"));
+    login("/api/auth/admin/google", "", 403);
+    assertThat(users.count()).isEqualTo(1);
+  }
+
+  @Test
+  void existingResidentEmailIsNotAutomaticallyLinked() throws Exception {
+    users.saveAndFlush(User.resident("person@gmail.com", passwords.encode("secret"), "주민"));
+    login("/api/auth/google", "", 409);
+    assertThat(users.findByEmail("person@gmail.com").orElseThrow().getGoogleSubject()).isNull();
+  }
+
+  @Test
+  void externalEmailAdminNeedsPrelinkedSubject() throws Exception {
+    User admin =
+        users.saveAndFlush(User.resident("admin@example.com", passwords.encode("secret"), "운영자"));
+    jdbc.update("UPDATE users SET role='ADMIN' WHERE user_id=?", admin.getId());
+    when(verifier.verify("valid")).thenReturn(identity("subject-1", "admin@example.com"));
+    login("/api/auth/admin/google", "", 409);
+    jdbc.update("UPDATE users SET google_subject='subject-1' WHERE user_id=?", admin.getId());
+    login("/api/auth/admin/google", "", 200);
+  }
+
+  @Test
+  void invalidTokenAndMissingInputAreRejected() throws Exception {
+    when(verifier.verify("valid")).thenThrow(new BaseException(UserErrorCode.GOOGLE_INVALID_TOKEN));
+    login("/api/auth/google", "", 401);
+    mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isBadRequest());
+    assertThat(users.count()).isZero();
+  }
+
+  @Test
+  void googleEndpointsAreDocumentedAsPublic() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.components.schemas.CommonErrorResponse.type").value("object"))
+        .andExpect(jsonPath("$.components.schemas.CommonErrorResponse.properties.code").exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/auth/google'].post.responses['401'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/CommonErrorResponse"))
+        .andExpect(jsonPath("$.paths['/api/auth/google'].post.security").isEmpty())
+        .andExpect(jsonPath("$.paths['/api/auth/admin/google'].post.responses['403']").exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/auth/google'].post.responses['200'].content['application/json'].examples.loginSuccess.value.result.role")
+                .value("RESIDENT"));
+  }
+}

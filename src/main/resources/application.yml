@@ -13,6 +13,8 @@ management:
         include: health,info
 
 app:
+  google:
+    client-ids: ${GOOGLE_CLIENT_IDS:}
   jwt:
     secret: ${JWT_SECRET:}
     issuer: flout
@@ -20,6 +22,8 @@ app:
   consent:
     terms-version: ${TERMS_VERSION:1.0}
     privacy-version: ${PRIVACY_VERSION:1.0}
+    third-party-provision-version: ${THIRD_PARTY_PROVISION_VERSION:1.0}
+    status-notification-version: ${STATUS_NOTIFICATION_VERSION:1.0}
   kakao:
     rest-api-key: ${KAKAO_REST_API_KEY:}
     base-url: https://dapi.kakao.com

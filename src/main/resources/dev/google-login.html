@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <title>FLOUT Google 로그인 테스트</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f3f6f9;color:#203346;font:16px/1.6 system-ui,sans-serif}
+    main{max-width:680px;margin:40px auto;padding:28px;background:white;border-radius:16px;box-shadow:0 8px 32px #153b5712}
+    h1{font-size:24px;margin:0 0 12px}h2{font-size:18px}label{display:block;margin:12px 0}select,button,textarea{font:inherit}
+    select,textarea{width:100%;border:1px solid #cbd6df;border-radius:8px;padding:10px}textarea{font:12px/1.5 monospace;min-height:100px;resize:vertical}
+    button{padding:10px 16px;border:0;border-radius:8px;background:#244e70;color:white;cursor:pointer}button:disabled{opacity:.45;cursor:default}
+    #google-button{margin:20px 0;min-height:44px}#status{padding:12px;background:#edf3f7;border-radius:8px;white-space:pre-wrap}
+    pre{background:#f3f6f9;padding:14px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:340px;overflow:auto;font-size:13px}
+    small{color:#607385}a{color:#244e70}section{margin-top:24px;border-top:1px solid #e2e8ee;padding-top:16px}
+    @media(max-width:700px){main{margin:16px;padding:20px}}
+  </style>
+</head>
+<body>
+<main data-client-id="__GOOGLE_CLIENT_ID__">
+  <h1>Google 로그인 테스트</h1>
+  <p>프론트 없이 Google 인증과 FLOUT 로그인을 확인하는 로컬 전용 화면입니다.</p>
+  <label for="role">테스트할 계정</label>
+  <select id="role"><option value="resident">주민</option><option value="admin">운영자 (사전 등록 계정)</option></select>
+  <div id="consents">
+    <label><input type="checkbox" id="third-party"> [필수] 개인정보 제3자 제공에 동의합니다.</label>
+    <label><input type="checkbox" id="notification"> [필수] 진행상태 알림 수신에 동의합니다.</label>
+    <small>신규 주민 가입 시 두 항목이 필요합니다. 기존 회원은 다시 동의하지 않아도 됩니다.</small>
+  </div>
+  <div id="google-button"></div>
+  <p id="status" role="status" aria-live="polite">Google 로그인 버튼을 불러오는 중입니다.</p>
+  <section>
+    <h2>1. Google ID 토큰</h2>
+    <p>Google 로그인 후 아래에 표시됩니다. Swagger의 <code>idToken</code> 필드에 붙여넣을 수 있습니다.</p>
+    <textarea id="id-token" readonly aria-label="Google ID 토큰" placeholder="Google 로그인 후 표시됩니다."></textarea>
+    <button id="copy-token" disabled>토큰 복사</button>
+  </section>
+  <section>
+    <h2>2. FLOUT 로그인 API 호출</h2>
+    <p>위에서 계정 종류와 동의 항목을 선택한 뒤 눌러주세요.</p>
+    <button id="call-api" disabled>로그인 API 테스트</button>
+    <pre id="response" aria-live="polite">아직 호출하지 않았습니다.</pre>
+    <a href="/swagger-ui/index.html" target="_blank" rel="noopener">Swagger 열기</a>
+  </section>
+  <p><small>토큰은 이 화면의 메모리에서만 사용하며 새로고침하면 사라집니다. 토큰이 보이는 화면이나 결과를 공유하지 마세요.</small></p>
+</main>
+<script>
+  const byId = id => document.getElementById(id);
+  const status = byId('status');
+  const clientId = document.querySelector('main').dataset.clientId;
+  let idToken = '';
+  byId('role').addEventListener('change', () => {
+    byId('consents').hidden = byId('role').value === 'admin';
+    byId('response').textContent = '아직 호출하지 않았습니다.';
+  });
+  byId('copy-token').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(idToken); status.textContent = 'Google ID 토큰을 복사했습니다.'; }
+    catch { byId('id-token').focus(); byId('id-token').select(); status.textContent = '선택된 토큰을 Ctrl+C로 복사해주세요.'; }
+  });
+  byId('call-api').addEventListener('click', async () => {
+    if (!idToken) return;
+    const admin = byId('role').value === 'admin';
+    const path = admin ? '/api/auth/admin/google' : '/api/auth/google';
+    const body = { idToken };
+    if (!admin) {
+      body.thirdPartyProvisionAgreed = byId('third-party').checked;
+      body.statusNotificationAgreed = byId('notification').checked;
+    }
+    byId('call-api').disabled = true;
+    byId('response').textContent = '요청 중…';
+    try {
+      const response = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), cache:'no-store' });
+      const data = await response.json();
+      byId('response').textContent = 'HTTP ' + response.status + '\n' + JSON.stringify(data, null, 2);
+      status.textContent = response.ok ? 'FLOUT 로그인 성공! 응답의 accessToken은 서비스 API 인증에 사용합니다.' : '로그인 실패: ' + (data.message || '아래 응답을 확인해주세요.');
+    } catch { byId('response').textContent = '서버 응답을 확인할 수 없습니다. 서버 실행 상태를 확인해주세요.'; }
+    finally { byId('call-api').disabled = false; }
+  });
+  if (!clientId) {
+    status.textContent = 'GOOGLE_CLIENT_IDS를 설정한 뒤 서버를 재시작해주세요.';
+  } else {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.onload = () => {
+      google.accounts.id.initialize({ client_id:clientId, auto_select:false, callback:result => {
+        idToken = result.credential;
+        byId('id-token').value = idToken;
+        byId('copy-token').disabled = false;
+        byId('call-api').disabled = false;
+        byId('response').textContent = '아직 호출하지 않았습니다.';
+        status.textContent = 'Google 인증 완료. 동의 항목을 확인한 뒤 로그인 API 테스트를 눌러주세요.';
+      }});
+      google.accounts.id.renderButton(byId('google-button'), { theme:'outline', size:'large', text:'signin_with' });
+      status.textContent = '아래 Google 로그인 버튼으로 계정을 선택해주세요.';
+    };
+    script.onerror = () => { status.textContent = 'Google 로그인 스크립트를 불러오지 못했습니다. 인터넷 연결과 브라우저 차단 설정을 확인해주세요.'; };
+    document.head.appendChild(script);
+  }
+</script>
+</body>
+</html>

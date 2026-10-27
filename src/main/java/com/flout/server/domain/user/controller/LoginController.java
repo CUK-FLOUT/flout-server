@@ -27,7 +27,23 @@ public class LoginController {
   }
 
   @PostMapping("/admin/login")
-  @Operation(summary = "운영자 로그인", description = "미리 등록된 ADMIN 계정만 로그인할 수 있습니다.")
+  @Operation(
+      summary = "운영자 로그인",
+      description = "미리 등록된 ADMIN 계정만 로그인할 수 있습니다.",
+      requestBody =
+          @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @io.swagger.v3.oas.annotations.media.Content(
+                      mediaType = "application/json",
+                      examples =
+                          @io.swagger.v3.oas.annotations.media.ExampleObject(
+                              value =
+                                  """
+                      {
+                        "email": "admin@example.com",
+                        "password": "admin123"
+                      }
+                      """))))
   public SuccessResponse<LoginResponse> admin(@Valid @RequestBody LoginRequest request) {
     return SuccessResponse.of(
         loginService.login(request, UserRole.ADMIN), UserSuccessCode.LOGIN_SUCCESS);

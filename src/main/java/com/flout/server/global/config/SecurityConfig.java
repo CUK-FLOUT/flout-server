@@ -35,7 +35,11 @@ public class SecurityConfig {
                         HttpMethod.POST,
                         "/api/auth/signup",
                         "/api/auth/login",
+                        "/api/auth/google",
+                        "/api/auth/admin/google",
                         "/api/auth/admin/login")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/dev/google-login")
                     .permitAll()
                     .requestMatchers(
                         "/swagger-ui.html",
