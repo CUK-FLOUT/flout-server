@@ -1,0 +1,104 @@
+package com.flout.server.domain.inspectionapplication.service;
+
+import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
+import com.flout.server.domain.inspectionapplication.dto.response.CreateInspectionApplicationResponse;
+import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.preventionguide.repository.PreventionGuideRepository;
+import com.flout.server.domain.riskassessment.entity.RiskAssessment;
+import com.flout.server.domain.riskassessment.entity.RiskAssessmentStatus;
+import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
+import com.flout.server.domain.user.entity.User;
+import com.flout.server.domain.user.entity.UserRole;
+import com.flout.server.domain.user.repository.UserRepository;
+import com.flout.server.global.exception.BaseException;
+import java.sql.SQLException;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+
+@Service
+public class InspectionApplicationService {
+  private static final int MAX_RECEIPT_NUMBER_ATTEMPTS = 10;
+  private static final String RECEIPT_NUMBER_UNIQUE_CONSTRAINT =
+      "uk_inspection_applications_receipt_no";
+
+  private final UserRepository users;
+  private final RiskAssessmentRepository assessments;
+  private final PreventionGuideRepository guides;
+  private final InspectionApplicationSubmissionTransaction submissionTransaction;
+
+  public InspectionApplicationService(
+      UserRepository users,
+      RiskAssessmentRepository assessments,
+      PreventionGuideRepository guides,
+      InspectionApplicationSubmissionTransaction submissionTransaction) {
+    this.users = users;
+    this.assessments = assessments;
+    this.guides = guides;
+    this.submissionTransaction = submissionTransaction;
+  }
+
+  public CreateInspectionApplicationResponse submit(
+      Long userId, CreateInspectionApplicationRequest request) {
+    User applicant =
+        users
+            .findById(userId)
+            .orElseThrow(() -> new BaseException(InspectionApplicationErrorCode.RESIDENT_ONLY));
+    if (applicant.getRole() != UserRole.RESIDENT) {
+      throw new BaseException(InspectionApplicationErrorCode.RESIDENT_ONLY);
+    }
+
+    var assessment =
+        assessments
+            .findById(request.assessmentId())
+            .orElseThrow(
+                () -> new BaseException(InspectionApplicationErrorCode.ASSESSMENT_NOT_FOUND));
+    if (!assessment.getUser().getId().equals(userId)) {
+      throw new BaseException(InspectionApplicationErrorCode.ASSESSMENT_ACCESS_DENIED);
+    }
+    if (assessment.getStatus() != RiskAssessmentStatus.COMPLETED) {
+      throw new BaseException(InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED);
+    }
+    if (request.guideId() != null
+        && !guides.existsByIdAndAssessmentId(request.guideId(), assessment.getId())) {
+      throw new BaseException(InspectionApplicationErrorCode.GUIDE_NOT_FOUND);
+    }
+
+    return submitWithReceiptNumberRetry(applicant, assessment, request);
+  }
+
+  private CreateInspectionApplicationResponse submitWithReceiptNumberRetry(
+      User applicant, RiskAssessment assessment, CreateInspectionApplicationRequest request) {
+    for (int attempt = 0; attempt < MAX_RECEIPT_NUMBER_ATTEMPTS; attempt++) {
+      try {
+        return submissionTransaction.create(applicant, assessment, request);
+      } catch (ReceiptNumberCollisionException e) {
+        // The candidate already exists before this transaction writes it.
+      } catch (DataIntegrityViolationException e) {
+        if (!isReceiptNumberUniqueConstraintViolation(e)) {
+          throw e;
+        }
+      }
+    }
+    throw new BaseException(InspectionApplicationErrorCode.RECEIPT_NUMBER_GENERATION_FAILED);
+  }
+
+  private boolean isReceiptNumberUniqueConstraintViolation(
+      DataIntegrityViolationException exception) {
+    Throwable cause = exception;
+    while (cause != null) {
+      if (cause instanceof ConstraintViolationException violation
+          && RECEIPT_NUMBER_UNIQUE_CONSTRAINT.equals(violation.getConstraintName())) {
+        return true;
+      }
+      if (cause instanceof SQLException sqlException
+          && "23000".equals(sqlException.getSQLState())
+          && sqlException.getMessage() != null
+          && sqlException.getMessage().contains(RECEIPT_NUMBER_UNIQUE_CONSTRAINT)) {
+        return true;
+      }
+      cause = cause.getCause();
+    }
+    return false;
+  }
+}
