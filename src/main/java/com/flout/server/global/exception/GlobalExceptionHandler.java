@@ -4,7 +4,6 @@ import com.flout.server.global.response.ErrorResponse;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -167,8 +166,7 @@ public class GlobalExceptionHandler {
       }
     }
     // 예외의 상세 사유는 응답에 노출하지 않음
-    HttpStatus httpStatus = HttpStatus.resolve(status);
-    String message = httpStatus == null ? "요청 처리에 실패했습니다." : httpStatus.getReasonPhrase();
+    String message = "요청 처리에 실패했습니다.";
     return ResponseEntity.status(status)
         .body(ErrorResponse.of(status, "COMMON_" + status + "_1", message));
   }
