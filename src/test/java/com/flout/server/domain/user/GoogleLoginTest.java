@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
@@ -38,6 +39,7 @@ class GoogleLoginTest {
   @Autowired UserConsentRepository consents;
   @Autowired PasswordEncoder passwords;
   @Autowired JdbcTemplate jdbc;
+  @Autowired ObjectMapper mapper;
   @MockitoBean GoogleTokenVerifier verifier;
 
   @BeforeEach
@@ -60,11 +62,17 @@ class GoogleLoginTest {
   }
 
   void login(String path, String extra, int status) throws Exception {
-    mvc.perform(
-            post(path)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"idToken\":\"valid\"" + extra + "}"))
-        .andExpect(status().is(status));
+    var response =
+        mvc.perform(
+                post(path)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"idToken\":\"valid\"" + extra + "}"))
+            .andExpect(status().is(status));
+    if (status == 200) {
+      response
+          .andExpect(jsonPath("$.result.refreshToken").isNotEmpty())
+          .andExpect(jsonPath("$.result.refreshExpiresIn").value(604800));
+    }
   }
 
   @Test
@@ -158,6 +166,29 @@ class GoogleLoginTest {
     mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON).content("{}"))
         .andExpect(status().isBadRequest());
     assertThat(users.count()).isZero();
+  }
+
+  @Test
+  void googleLoginTokenCanBeRefreshedThroughCommonEndpoint() throws Exception {
+    String response =
+        mvc.perform(
+                post("/api/auth/google")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"idToken\":\"valid\",\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":true}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String refreshToken = mapper.readTree(response).path("result").path("refreshToken").asText();
+    mvc.perform(
+            post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("refreshToken", refreshToken))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("USER_200_2"))
+        .andExpect(jsonPath("$.result.role").value("RESIDENT"))
+        .andExpect(jsonPath("$.result.email").value("person@gmail.com"));
   }
 
   @Test

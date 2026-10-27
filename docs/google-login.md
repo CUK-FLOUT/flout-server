@@ -37,8 +37,8 @@ ID 토큰을 복사해 Swagger에서 사용할 수 있습니다. 신규 주민 �
 동의 버전은 `THIRD_PARTY_PROVISION_VERSION`, `STATUS_NOTIFICATION_VERSION`으로 설정하며 기본값은 1.0입니다.
 이메일 회원가입도 같은 두 필드와 동의 유형을 사용합니다. V6에서 기존 TERMS는 THIRD_PARTY_PROVISION으로, PRIVACY는 STATUS_NOTIFICATION으로 변경하며 동의 여부·버전·시각은 유지합니다.
 프론트는 동의 화면에서 받은 값만 보내야 합니다. 기존 Google 회원과 운영자는 생략합니다.
-성공 응답은 기존 이메일 로그인과 동일한 `LoginResponse`로, 서비스 Access Token만 발급합니다.
-현재 서비스에는 Refresh Token 발급 기능이 없습니다.
+성공 응답은 이메일 로그인과 동일한 `LoginResponse`로 서비스 Access Token과 Refresh Token을 발급합니다.
+재발급은 `POST /api/auth/refresh`를 공통으로 사용합니다. [토큰 재발급](refresh-token.md)을 참고하세요.
 
 ## 주민
 
