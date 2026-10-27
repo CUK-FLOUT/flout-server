@@ -38,13 +38,6 @@ public class LoginService {
         request.password().getBytes(StandardCharsets.UTF_8).length <= 72
             && encoder.matches(
                 request.password(), user == null ? dummyHash : user.getPasswordHash());
-    if (user != null
-        && user.getRole() == requiredRole
-        && requiredRole == UserRole.RESIDENT
-        && user.getGoogleSubject() != null
-        && !matches) {
-      throw new BaseException(UserErrorCode.GOOGLE_LOGIN_REQUIRED);
-    }
     if (user == null || !matches || user.getRole() != requiredRole) {
       throw new BaseException(UserErrorCode.LOGIN_FAILED);
     }

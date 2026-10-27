@@ -12,7 +12,6 @@ public enum UserErrorCode implements BaseResponseCode {
   PASSWORD_TOO_LONG(400, "USER_400_2", "비밀번호가 너무 깁니다. 더 짧게 입력해주세요."),
   LOGIN_FAILED(401, "USER_401_1", "이메일 또는 비밀번호가 올바르지 않습니다."),
   GOOGLE_INVALID_TOKEN(401, "USER_401_2", "Google 인증 정보가 올바르지 않습니다."),
-  GOOGLE_LOGIN_REQUIRED(401, "USER_401_3", "구글로그인으로 가입된 계정입니다. 구글로그인을 이용해주세요."),
   GOOGLE_LOGIN_DENIED(403, "USER_403_1", "Google 로그인이 허용되지 않은 계정입니다."),
   GOOGLE_LINK_REQUIRED(409, "USER_409_2", "기존 계정에 Google 계정 연결이 필요합니다."),
   EMAIL_LOGIN_REQUIRED(409, "USER_409_3", "이미 이메일로 가입된 계정입니다. 이메일 로그인을 이용해주세요."),

@@ -8,6 +8,68 @@ import org.junit.jupiter.api.Test;
 
 class ConsentMigrationTest {
   @Test
+  void preservesBothHistoriesWhenOldAndNewTypesHaveTheSameVersion() throws Exception {
+    String url = "jdbc:h2:mem:consent-migration-collision;MODE=MySQL;DB_CLOSE_DELAY=-1";
+    Flyway.configure().dataSource(url, "sa", "").target("5").load().migrate();
+    try (var connection = DriverManager.getConnection(url, "sa", "");
+        var statement = connection.createStatement()) {
+      statement.executeUpdate(
+          """
+          INSERT INTO users (email, password_hash, name, role)
+          VALUES ('collision@example.com', 'hash', 'collision', 'RESIDENT')
+          """);
+      statement.executeUpdate(
+          """
+          INSERT INTO user_consents (user_id, consent_type, version, is_agreed, agreed_at)
+          VALUES (1, 'TERMS', '1.0', TRUE, '2026-01-01 12:00:00'),
+                 (1, 'PRIVACY', '1.0', FALSE, '2026-01-02 12:00:00'),
+                 (1, 'THIRD_PARTY_PROVISION', '1.0', FALSE, '2026-02-01 12:00:00'),
+                 (1, 'STATUS_NOTIFICATION', '1.0', TRUE, '2026-02-02 12:00:00')
+          """);
+      var flyway = Flyway.configure().dataSource(url, "sa", "").load();
+      flyway.migrate();
+      assertThat(flyway.migrate().migrationsExecuted).isZero();
+      try (var archived =
+          statement.executeQuery(
+              "SELECT * FROM user_consent_migration_conflicts ORDER BY consent_id")) {
+        assertThat(archived.next()).isTrue();
+        assertThat(archived.getLong("consent_id")).isEqualTo(1);
+        assertThat(archived.getLong("user_id")).isEqualTo(1);
+        assertThat(archived.getString("original_consent_type")).isEqualTo("TERMS");
+        assertThat(archived.getString("target_consent_type")).isEqualTo("THIRD_PARTY_PROVISION");
+        assertThat(archived.getString("version")).isEqualTo("1.0");
+        assertThat(archived.getBoolean("is_agreed")).isTrue();
+        assertThat(archived.getTimestamp("agreed_at").toLocalDateTime().toString())
+            .isEqualTo("2026-01-01T12:00");
+        assertThat(archived.next()).isTrue();
+        assertThat(archived.getLong("consent_id")).isEqualTo(2);
+        assertThat(archived.getString("original_consent_type")).isEqualTo("PRIVACY");
+        assertThat(archived.getString("target_consent_type")).isEqualTo("STATUS_NOTIFICATION");
+        assertThat(archived.getString("version")).isEqualTo("1.0");
+        assertThat(archived.getBoolean("is_agreed")).isFalse();
+        assertThat(archived.getTimestamp("agreed_at").toLocalDateTime().toString())
+            .isEqualTo("2026-01-02T12:00");
+        assertThat(archived.next()).isFalse();
+      }
+      try (var active = statement.executeQuery("SELECT * FROM user_consents ORDER BY consent_id")) {
+        assertThat(active.next()).isTrue();
+        assertThat(active.getLong("consent_id")).isEqualTo(3);
+        assertThat(active.getString("consent_type")).isEqualTo("THIRD_PARTY_PROVISION");
+        assertThat(active.getBoolean("is_agreed")).isFalse();
+        assertThat(active.getTimestamp("agreed_at").toLocalDateTime().toString())
+            .isEqualTo("2026-02-01T12:00");
+        assertThat(active.next()).isTrue();
+        assertThat(active.getLong("consent_id")).isEqualTo(4);
+        assertThat(active.getString("consent_type")).isEqualTo("STATUS_NOTIFICATION");
+        assertThat(active.getBoolean("is_agreed")).isTrue();
+        assertThat(active.getTimestamp("agreed_at").toLocalDateTime().toString())
+            .isEqualTo("2026-02-02T12:00");
+        assertThat(active.next()).isFalse();
+      }
+    }
+  }
+
+  @Test
   void renamesOldTypesWithoutChangingConsentDecisions() throws Exception {
     String url = "jdbc:h2:mem:consent-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
     Flyway.configure().dataSource(url, "sa", "").target("5").load().migrate();
