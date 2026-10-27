@@ -2,7 +2,9 @@ package com.flout.server.global.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import io.swagger.v3.oas.models.*;
+import io.swagger.v3.oas.models.responses.ApiResponses;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -58,5 +60,54 @@ class OpenApiConfigTest {
                                                 ref.substring("#/components/schemas/".length()));
                                       }
                                     })));
+  }
+
+  @Test
+  void inspectionApplicationIsDocumentedWithCreatedAndActualErrorResponses() {
+    OpenAPI api = new OpenAPI().paths(new Paths());
+    api.getPaths().addPathItem("/api/resident/applications", new PathItem().post(new Operation()));
+
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+
+    var responses = api.getPaths().get("/api/resident/applications").getPost().getResponses();
+    assertThat(responses).containsKeys("201", "400", "401", "403", "404", "409", "500");
+    assertThat(responses).doesNotContainKey("200");
+    assertThat(responses.get("201").getContent().get("application/json").getExamples())
+        .containsKey("inspectionApplicationCreated");
+    assertThat(responses.get("201").getDescription())
+        .isEqualTo(InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage());
+    assertThat(
+            responses
+                .get("201")
+                .getContent()
+                .get("application/json")
+                .getExamples()
+                .get("inspectionApplicationCreated")
+                .getValue())
+        .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+        .containsEntry(
+            "message", InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage())
+        .containsEntry("code", "APPLICATION_201_1");
+    assertThat(responses.get("403").getContent().get("application/json").getExamples())
+        .containsKeys("assessmentAccessDenied", "residentOnly");
+    assertThat(responses.get("403").getDescription()).isEqualTo("취약도 분석 결과에 대한 접근 권한이 없습니다.");
+    assertThat(responses.get("404").getDescription()).isEqualTo("취약도 분석 결과를 찾을 수 없습니다.");
+    assertThat(responses.get("409").getDescription()).isEqualTo("취약도 분석이 완료되지 않았습니다.");
+    assertExampleMessage(responses, "403", "assessmentAccessDenied", "본인의 취약도 분석 결과만 사용할 수 있습니다.");
+    assertExampleMessage(responses, "404", "assessmentNotFound", "취약도 분석 결과를 찾을 수 없습니다.");
+    assertExampleMessage(
+        responses, "409", "assessmentNotCompleted", "취약도 분석이 완료되지 않아 현장점검을 신청할 수 없습니다.");
+    assertExampleMessage(responses, "500", "receiptNumberGenerationFailed", "접수번호 생성에 실패했습니다.");
+    assertExampleMessage(
+        responses, "400", "guideNotLinkedToAssessment", "가이드가 취약도 분석 결과에 연결되어 있지 않습니다.");
+  }
+
+  @SuppressWarnings("unchecked")
+  private void assertExampleMessage(
+      ApiResponses responses, String status, String exampleName, String message) {
+    var example =
+        responses.get(status).getContent().get("application/json").getExamples().get(exampleName);
+    assertThat((java.util.Map<String, Object>) example.getValue())
+        .containsEntry("message", message);
   }
 }

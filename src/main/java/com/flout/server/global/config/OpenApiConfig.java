@@ -2,6 +2,8 @@ package com.flout.server.global.config;
 
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.domain.address.response.code.AddressSuccessCode;
+import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -154,20 +156,26 @@ public class OpenApiConfig {
                             }
                             if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
                               var success =
-                                  operation
-                                      .getResponses()
-                                      .computeIfAbsent("200", key -> new ApiResponse());
+                                      operation
+                                              .getResponses()
+                                              .computeIfAbsent("200", key -> new ApiResponse());
                               success.setDescription(
-                                  UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage());
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage());
                               addExample(
-                                  success,
-                                  "adminAccountSuccess",
-                                  envelope(
-                                      true,
-                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS,
-                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage(),
-                                      Map.of("name", "김담당", "jurisdiction", "부천시")));
+                                      success,
+                                      "adminAccountSuccess",
+                                      envelope(
+                                              true,
+                                              UserSuccessCode.ADMIN_ACCOUNT_SUCCESS,
+                                              UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage(),
+                                              Map.of("name", "김담당", "jurisdiction", "부천시")));
                             }
+
+                            if (path.equals("/api/resident/applications")
+                                    && method == PathItem.HttpMethod.POST) {
+                              describeInspectionApplication(operation);
+                            }
+
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
@@ -337,6 +345,74 @@ public class OpenApiConfig {
     addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
+  private void describeInspectionApplication(Operation operation) {
+    ApiResponse success = operation.getResponses().remove("200");
+    if (success == null) {
+      success = new ApiResponse();
+    }
+    success.setDescription(
+        InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage());
+    addExample(
+        success,
+        "inspectionApplicationCreated",
+        envelope(
+            true,
+            InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED,
+            InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage(),
+            Map.of(
+                "applicationId",
+                1,
+                "receiptNo",
+                "IA-A1B2C3D4E5F678901",
+                "status",
+                "SUBMITTED",
+                "submittedAt",
+                "2026-10-28T10:30:00")));
+    operation.getResponses().addApiResponse("201", success);
+
+    addError(
+        operation,
+        "assessmentIdRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "취약도 분석 결과 ID는 필수입니다.");
+    addError(
+        operation,
+        "latitudeOutOfRange",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "위도는 -90 이상이어야 합니다.");
+    addError(
+        operation, "contactRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "연락처는 필수입니다.");
+    addError(
+        operation,
+        "guideNotLinkedToAssessment",
+        InspectionApplicationErrorCode.GUIDE_NOT_FOUND,
+        null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    addError(
+        operation,
+        "assessmentAccessDenied",
+        InspectionApplicationErrorCode.ASSESSMENT_ACCESS_DENIED,
+        null);
+    addError(operation, "residentOnly", InspectionApplicationErrorCode.RESIDENT_ONLY, null);
+    operation.getResponses().get("403").setDescription("취약도 분석 결과에 대한 접근 권한이 없습니다.");
+    addError(
+        operation, "assessmentNotFound", InspectionApplicationErrorCode.ASSESSMENT_NOT_FOUND, null);
+    operation.getResponses().get("404").setDescription("취약도 분석 결과를 찾을 수 없습니다.");
+    addError(
+        operation,
+        "assessmentNotCompleted",
+        InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED,
+        null);
+    operation.getResponses().get("409").setDescription("취약도 분석이 완료되지 않았습니다.");
+    addError(
+        operation,
+        "receiptNumberGenerationFailed",
+        InspectionApplicationErrorCode.RECEIPT_NUMBER_GENERATION_FAILED,
+        null);
   }
 
   private void addError(Operation operation, String name, BaseResponseCode code, String message) {
