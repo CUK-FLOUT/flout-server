@@ -156,23 +156,23 @@ public class OpenApiConfig {
                             }
                             if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
                               var success =
-                                      operation
-                                              .getResponses()
-                                              .computeIfAbsent("200", key -> new ApiResponse());
+                                  operation
+                                      .getResponses()
+                                      .computeIfAbsent("200", key -> new ApiResponse());
                               success.setDescription(
-                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage());
+                                  UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage());
                               addExample(
-                                      success,
-                                      "adminAccountSuccess",
-                                      envelope(
-                                              true,
-                                              UserSuccessCode.ADMIN_ACCOUNT_SUCCESS,
-                                              UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage(),
-                                              Map.of("name", "김담당", "jurisdiction", "부천시")));
+                                  success,
+                                  "adminAccountSuccess",
+                                  envelope(
+                                      true,
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS,
+                                      UserSuccessCode.ADMIN_ACCOUNT_SUCCESS.getMessage(),
+                                      Map.of("name", "김담당", "jurisdiction", "부천시")));
                             }
 
                             if (path.equals("/api/resident/applications")
-                                    && method == PathItem.HttpMethod.POST) {
+                                && method == PathItem.HttpMethod.POST) {
                               describeInspectionApplication(operation);
                             }
 

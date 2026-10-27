@@ -21,7 +21,7 @@ class JurisdictionMigrationTest {
                  ('admin2@example.com', 'hash2', 'admin2', 'ADMIN'),
                  ('resident@example.com', 'hash3', 'resident', 'RESIDENT')
           """);
-      var flyway = Flyway.configure().dataSource(url, "sa", "").load();
+      var flyway = Flyway.configure().dataSource(url, "sa", "").target("8").load();
       assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
       assertThat(flyway.migrate().migrationsExecuted).isZero();
       try (var rows =
