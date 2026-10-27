@@ -14,6 +14,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   Optional<User> findByEmail(String email);
 
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  Optional<User> findByGoogleSubject(String subject);
+
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @Query("select u from User u where u.email = :email")
+  Optional<User> findForGoogleByEmail(@Param("email") String email);
+
   @Modifying(clearAutomatically = true)
   @Query(
       """

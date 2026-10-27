@@ -1,3 +1,7 @@
+app:
+  google:
+    client-ids: ${GOOGLE_CLIENT_IDS:256860334030-f3od5skin0p2cqrpu9ui222g6pv4aeai.apps.googleusercontent.com}
+
 spring:
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:flout}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8

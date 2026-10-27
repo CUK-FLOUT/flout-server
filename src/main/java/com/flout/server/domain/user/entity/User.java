@@ -24,6 +24,9 @@ public class User {
   @Column(name = "password_hash", nullable = false, length = 255)
   private String passwordHash;
 
+  @Column(name = "google_subject", unique = true, length = 255)
+  private String googleSubject;
+
   @Column(nullable = false, length = 50)
   private String name;
 
@@ -47,6 +50,14 @@ public class User {
     user.name = name;
     user.role = UserRole.RESIDENT;
     return user;
+  }
+
+  public void connectGoogle(String subject) {
+    this.googleSubject = subject;
+  }
+
+  public void recordLogin() {
+    this.lastLoginAt = LocalDateTime.now();
   }
 
   @PrePersist

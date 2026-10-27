@@ -34,7 +34,12 @@ public class OpenApiConfig {
   private static final String JSON = "application/json";
   private static final String EXAMPLE_TIME = "2026-10-21 22:30:00";
   private static final Set<String> PUBLIC_POSTS =
-      Set.of("/api/auth/signup", "/api/auth/login", "/api/auth/admin/login");
+      Set.of(
+          "/api/auth/signup",
+          "/api/auth/login",
+          "/api/auth/admin/login",
+          "/api/auth/google",
+          "/api/auth/admin/google");
 
   @Bean
   OpenAPI openAPI() {
@@ -62,6 +67,12 @@ public class OpenApiConfig {
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
+      // 오류 응답의 참조와 스키마를 같은 문서 커스터마이징 단계에서 등록한다.
+      // 문서 생성 중 미참조 스키마 정리로 초기 등록이 제거된 경우에도 복구한다.
+      if (api.getComponents() == null) {
+        api.setComponents(new Components());
+      }
+      api.getComponents().addSchemas("CommonErrorResponse", errorSchema());
       if (api.getPaths() == null) {
         return;
       }
@@ -87,6 +98,8 @@ public class OpenApiConfig {
                             if (publicAuth) {
                               if (path.equals("/api/auth/signup")) {
                                 describeSignup(operation);
+                              } else if (path.endsWith("/google")) {
+                                describeGoogle(operation, path.contains("/admin/"), expiresIn);
                               } else {
                                 describeLogin(operation, path.endsWith("/admin/login"), expiresIn);
                               }
@@ -165,6 +178,22 @@ public class OpenApiConfig {
     addError(operation, "passwordMismatch", UserErrorCode.PASSWORD_MISMATCH, null);
     addError(operation, "passwordTooLong", UserErrorCode.PASSWORD_TOO_LONG, null);
     addError(operation, "duplicateEmail", UserErrorCode.EMAIL_ALREADY_EXISTS, null);
+  }
+
+  private void describeGoogle(Operation operation, boolean admin, long expiresIn) {
+    describeLogin(operation, admin, expiresIn);
+    operation.getResponses().remove("400");
+    operation.getResponses().remove("401");
+    operation.setDescription(
+        (admin
+                ? "사전 등록된 ADMIN 계정만 허용합니다. Google sub를 미리 연결하거나, 등록된 Gmail/Workspace 이메일로 최초 연결합니다."
+                : "RESIDENT 계정만 허용합니다. 신규 회원은 개인정보 제3자 제공(thirdPartyProvisionAgreed)과 진행상태 알림 수신(statusNotificationAgreed)이 모두 true여야 합니다. 기존 이메일 계정은 자동 연결하지 않습니다.")
+            + " 인증 헤더 없이 Google ID 토큰을 본문으로 전달합니다. Google 서명·발급자·대상·만료·이메일 인증을 검증합니다. 서비스 액세스 토큰을 발급하며 리프레시 토큰은 발급하지 않습니다.");
+    addError(operation, "invalidGoogleToken", UserErrorCode.GOOGLE_INVALID_TOKEN, null);
+    addError(operation, "roleDenied", UserErrorCode.GOOGLE_LOGIN_DENIED, null);
+    addError(operation, "linkRequired", UserErrorCode.GOOGLE_LINK_REQUIRED, null);
+    if (!admin) addError(operation, "consentRequired", UserErrorCode.GOOGLE_CONSENT_REQUIRED, null);
+    addError(operation, "notConfigured", UserErrorCode.GOOGLE_NOT_CONFIGURED, null);
   }
 
   private void describeLogin(Operation operation, boolean admin, long expiresIn) {
