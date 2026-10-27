@@ -18,6 +18,12 @@ import org.springframework.web.bind.annotation.*;
 public class AdminAccountController {
   private final AdminAccountService service;
 
+  /**
+   * 인증된 운영자의 계정 정보를 조회합니다.
+   *
+   * @param jwt 인증 과정에서 검증된 토큰으로, subject는 사용자 ID입니다.
+   * @return 운영자의 이름과 관할 지역을 담은 성공 응답
+   */
   @GetMapping("/me")
   @Operation(
       summary = "운영자 계정 정보 조회",

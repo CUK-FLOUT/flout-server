@@ -27,6 +27,7 @@ class AdminAccountTest {
   @Autowired UserRepository users;
   @Autowired JwtService jwt;
 
+  /** 지정한 역할과 관할 지역 배정 여부로 사용자를 생성하고 실제 서명된 Access Token을 발급합니다. */
   private String token(String role, boolean assigned) {
     jdbc.update(
         """
@@ -43,6 +44,7 @@ class AdminAccountTest {
     return jwt.issue(user).accessToken();
   }
 
+  /** 인증된 운영자 응답에 이름과 관할 지역 두 필드만 포함되는지 검증합니다. */
   @Test
   void returnsOnlyAuthenticatedAdminNameAndJurisdiction() throws Exception {
     mvc.perform(get("/api/admin/me").header("Authorization", "Bearer " + token("ADMIN", true)))
@@ -53,6 +55,7 @@ class AdminAccountTest {
         .andExpect(jsonPath("$.result.jurisdiction").value("부천시"));
   }
 
+  /** 관할 지역이 지정되지 않은 운영자도 조회에 성공하고 null을 반환하는지 검증합니다. */
   @Test
   void unassignedAdminReturnsNullJurisdiction() throws Exception {
     mvc.perform(get("/api/admin/me").header("Authorization", "Bearer " + token("ADMIN", false)))
@@ -61,6 +64,7 @@ class AdminAccountTest {
         .andExpect(jsonPath("$.result.jurisdiction").value(org.hamcrest.Matchers.nullValue()));
   }
 
+  /** 토큰 누락과 잘못된 토큰에 각각 대응하는 인증 오류 코드가 반환되는지 검증합니다. */
   @Test
   void rejectsUnauthenticatedAndInvalidTokenRequests() throws Exception {
     mvc.perform(get("/api/admin/me"))
@@ -71,6 +75,7 @@ class AdminAccountTest {
         .andExpect(jsonPath("$.code").value("COMMON_401_3"));
   }
 
+  /** 유효한 주민 토큰으로 운영자 계정 조회 API에 접근하면 거부되는지 검증합니다. */
   @Test
   void rejectsResidentAccounts() throws Exception {
     mvc.perform(get("/api/admin/me").header("Authorization", "Bearer " + token("RESIDENT", false)))
@@ -78,6 +83,7 @@ class AdminAccountTest {
         .andExpect(jsonPath("$.code").value("COMMON_403_1"));
   }
 
+  /** 생성된 API 문서에 성공 응답 예시와 인증 및 권한 오류 응답이 포함되는지 검증합니다. */
   @Test
   void swaggerDocumentsSuccessAndAuthorizationFailures() throws Exception {
     mvc.perform(get("/v3/api-docs"))
