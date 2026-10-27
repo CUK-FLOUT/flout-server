@@ -183,6 +183,10 @@ class AddressSearchServiceTest {
         Arguments.of("126.799900224566", null),
         Arguments.of(null, "37.4881360763454"),
         Arguments.of("126.799900224566", " "),
-        Arguments.of("not-a-coordinate", "37.4881360763454"));
+        Arguments.of("not-a-coordinate", "37.4881360763454"),
+        Arguments.of("126.799900224566", "NaN"),
+        Arguments.of("NaN", "37.4881360763454"),
+        Arguments.of("126.799900224566", "Infinity"),
+        Arguments.of("Infinity", "37.4881360763454"));
   }
 }
