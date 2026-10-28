@@ -209,6 +209,11 @@ public class OpenApiConfig {
                               describePriorityDesignation(operation);
                             }
 
+                            if (path.equals("/api/admin/priority-inspections/order")
+                                && method == PathItem.HttpMethod.PUT) {
+                              describePriorityOrder(operation);
+                            }
+
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
@@ -378,6 +383,48 @@ public class OpenApiConfig {
     addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
+  // 우선점검 순서 저장 응답과 오류 예시
+  private void describePriorityOrder(Operation operation) {
+    var code = PriorityInspectionSuccessCode.ORDER_SAVED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "orderSaved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "applications",
+                List.of(
+                    Map.of("applicationId", 3, "receiptNo", "000003", "selectionOrder", 1),
+                    Map.of("applicationId", 1, "receiptNo", "000001", "selectionOrder", 2)))));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation, "duplicateApplication", PriorityInspectionErrorCode.DUPLICATE_APPLICATION, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(operation, "notDesignated", PriorityInspectionErrorCode.NOT_DESIGNATED, null);
+    addError(operation, "orderListChanged", PriorityInspectionErrorCode.ORDER_LIST_CHANGED, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    operation.getResponses().get("409").setDescription("우선점검 미지정 신청 포함 또는 전체 대상 목록 불일치");
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   // 우선점검 지정·취소 응답과 오류 예시

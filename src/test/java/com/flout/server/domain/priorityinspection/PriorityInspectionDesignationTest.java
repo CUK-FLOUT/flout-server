@@ -514,4 +514,265 @@ class PriorityInspectionDesignationTest {
       assertThat(designations.count()).isZero();
     }
   }
+
+  private Long additionalApplication(String address) {
+    var assessment =
+        assessments.saveAndFlush(
+            RiskAssessment.completedDemo(resident, address, "102호", RiskLevel.HIGH));
+    var request =
+        new CreateInspectionApplicationRequest(
+            assessment.getId(),
+            null,
+            new BigDecimal("37.4874850"),
+            new BigDecimal("126.7985672"),
+            "010-1234-5678",
+            OccupancyType.OWNER,
+            FloodExperience.YES,
+            false,
+            "점검 요청",
+            LocalDate.of(2030, 1, 3),
+            PreferredTimeSlot.MORNING,
+            null);
+    return applications
+        .saveAndFlush(
+            InspectionApplication.received(
+                resident,
+                assessment,
+                request,
+                "IA-" + UUID.randomUUID().toString().substring(0, 17)))
+        .getId();
+  }
+
+  private void designateApplication(Long id) throws Exception {
+    mvc.perform(
+            put("/api/admin/priority-inspections/" + id + "/designation")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"designated\":true}"))
+        .andExpect(status().isOk());
+  }
+
+  private org.springframework.test.web.servlet.ResultActions saveOrder(List<Long> ids)
+      throws Exception {
+    return mvc.perform(
+        put("/api/admin/priority-inspections/order")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of("applicationIds", ids))));
+  }
+
+  private List<Long> savedOrder() {
+    return jdbc.queryForList(
+        "SELECT application_id FROM priority_inspection_designations ORDER BY selection_order",
+        Long.class);
+  }
+
+  // 선정 순서 저장 후 신청과 최초 지정 정보 유지
+  @Test
+  void savesOrderAndPreservesOriginalDesignationAndApplication() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    designateApplication(applicationId);
+    designateApplication(second);
+    var original =
+        jdbc.queryForMap(
+            "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId);
+    when(inspectionClock.instant()).thenReturn(NOW.plusHours(1).atZone(SEOUL).toInstant());
+    saveOrder(List.of(second, applicationId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_200_3"))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(second))
+        .andExpect(jsonPath("$.result.applications[0].selectionOrder").value(1))
+        .andExpect(
+            jsonPath("$.result.applications[1].receiptNo")
+                .value(String.format(Locale.ROOT, "%06d", applicationId)))
+        .andExpect(jsonPath("$.result.applications[1].selectionOrder").value(2));
+    assertThat(savedOrder()).containsExactly(second, applicationId);
+    var row =
+        jdbc.queryForMap(
+            "SELECT * FROM priority_inspection_designations WHERE application_id = ?",
+            applicationId);
+    assertThat(((Timestamp) row.get("designated_at")).toLocalDateTime()).isEqualTo(NOW);
+    assertThat(((Number) row.get("designated_by_user_id")).longValue()).isEqualTo(operatorId);
+    assertThat(((Timestamp) row.get("order_updated_at")).toLocalDateTime())
+        .isEqualTo(NOW.plusHours(1));
+    assertThat(((Number) row.get("order_updated_by_user_id")).longValue()).isEqualTo(operatorId);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId))
+        .isEqualTo(original);
+    assertThat(inspections.findById(inspectionId).orElseThrow().getStatus().name())
+        .isEqualTo("RECEIVED");
+    when(inspectionClock.instant()).thenReturn(NOW.plusDays(1).atZone(SEOUL).toInstant());
+    saveOrder(List.of(second, applicationId)).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM priority_inspection_designations WHERE application_id = ?",
+                applicationId))
+        .isEqualTo(row);
+  }
+
+  @Test
+  void validatesOrderListAndDoesNotSavePartialChanges() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    designateApplication(applicationId);
+    designateApplication(second);
+    var original = savedOrder();
+    for (String body :
+        List.of(
+            "",
+            "{}",
+            "{\"applicationIds\":null}",
+            "{\"applicationIds\":[]}",
+            "{\"applicationIds\":[null]}",
+            "{\"applicationIds\":[0]}",
+            "{\"applicationIds\":[-1]}",
+            "{\"applicationIds\":[\"abc\"]}")) {
+      mvc.perform(
+              put("/api/admin/priority-inspections/order")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    }
+    saveOrder(List.of(applicationId, applicationId))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_400_1"));
+    saveOrder(List.of(applicationId))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_409_2"));
+    saveOrder(List.of(applicationId, Long.MAX_VALUE)).andExpect(status().isNotFound());
+    var undesignated = additionalApplication("부천시 길주로 212");
+    saveOrder(List.of(undesignated, second))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_409_1"));
+    var other = additionalApplication("서울특별시 중구 세종대로 1");
+    saveOrder(List.of(other, applicationId)).andExpect(status().isForbidden());
+    assertThat(savedOrder()).isEqualTo(original);
+  }
+
+  @Test
+  void orderRequiresAdminAndJurisdiction() throws Exception {
+    designateApplication(applicationId);
+    mvc.perform(
+            put("/api/admin/priority-inspections/order")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"applicationIds\":[1]}"))
+        .andExpect(status().isUnauthorized());
+    var operatorToken = token;
+    token = jwt.issue(resident).accessToken();
+    saveOrder(List.of(applicationId)).andExpect(status().isForbidden());
+    token = operatorToken;
+    jdbc.update("UPDATE users SET jurisdiction_id = NULL WHERE user_id = ?", operatorId);
+    saveOrder(List.of(applicationId)).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void designationAppendsAndCancellationClosesOrderGap() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    var third = additionalApplication("부천시 길주로 212");
+    designateApplication(applicationId);
+    designateApplication(second);
+    saveOrder(List.of(second, applicationId)).andExpect(status().isOk());
+    designateApplication(third);
+    assertThat(savedOrder()).containsExactly(second, applicationId, third);
+    saveOrder(List.of(second, applicationId)).andExpect(status().isConflict());
+    updateDesignation(false).andExpect(status().isOk());
+    assertThat(savedOrder()).containsExactly(second, third);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT selection_order FROM priority_inspection_designations ORDER BY selection_order",
+                Integer.class))
+        .containsExactly(1, 2);
+    designateApplication(applicationId);
+    assertThat(savedOrder()).containsExactly(second, third, applicationId);
+  }
+
+  @Test
+  void orderFailureRollsBackEveryRankAndAuditChange() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    designateApplication(applicationId);
+    designateApplication(second);
+    var original =
+        jdbc.queryForList("SELECT * FROM priority_inspection_designations ORDER BY application_id");
+    doAnswer(
+            invocation -> {
+              entityManager.flush();
+              throw new IllegalStateException("simulated order failure");
+            })
+        .when(designations)
+        .flush();
+    saveOrder(List.of(second, applicationId)).andExpect(status().isInternalServerError());
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY application_id"))
+        .isEqualTo(original);
+  }
+
+  // 동시 저장 후에도 완전한 순위 유지
+  @Test
+  void concurrentOrdersAndDesignationKeepDistinctRanks() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    var third = additionalApplication("부천시 길주로 212");
+    designateApplication(applicationId);
+    designateApplication(second);
+    var gate = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(3)) {
+      var first =
+          executor.submit(
+              () -> {
+                gate.await();
+                return saveOrder(List.of(second, applicationId))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+              });
+      var next =
+          executor.submit(
+              () -> {
+                gate.await();
+                return saveOrder(List.of(applicationId, second))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+              });
+      var added =
+          executor.submit(
+              () -> {
+                gate.await();
+                designateApplication(third);
+                return true;
+              });
+      gate.countDown();
+      assertThat(first.get(20, TimeUnit.SECONDS)).isIn(200, 409);
+      assertThat(next.get(20, TimeUnit.SECONDS)).isIn(200, 409);
+      assertThat(added.get(20, TimeUnit.SECONDS)).isTrue();
+    }
+    assertThat(savedOrder()).containsExactlyInAnyOrder(applicationId, second, third);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT selection_order FROM priority_inspection_designations ORDER BY selection_order",
+                Integer.class))
+        .containsExactly(1, 2, 3);
+  }
+
+  @Test
+  void swaggerDocumentsOrderEndpoint() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections/order'].put.tags[0]")
+                .value("운영자-우선점검 관리"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/order'].put.responses['200'].content['application/json'].examples.orderSaved.value.code")
+                .value("PRIORITY_INSPECTION_200_3"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/order'].put.responses['404'].description")
+                .value("현장점검 신청을 찾을 수 없습니다."))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/order'].put.responses['409'].description")
+                .value("우선점검 미지정 신청 포함 또는 전체 대상 목록 불일치"));
+  }
 }

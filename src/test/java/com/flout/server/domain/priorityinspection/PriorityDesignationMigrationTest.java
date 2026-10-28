@@ -67,6 +67,43 @@ class PriorityDesignationMigrationTest {
         columns.next();
         assertThat(columns.getInt(1)).isZero();
       }
+      for (int id = 2; id <= 4; id++) {
+        sql.executeUpdate(
+            "INSERT INTO inspection_applications (application_id, applicant_user_id, assessment_id, receipt_no, address, latitude, longitude, contact, occupancy_type, flood_experience, existing_facility, status) VALUES ("
+                + id
+                + ", 1, 1, 'PRIORITY-"
+                + id
+                + "', '부천시 길주로 210', 37.5, 126.7, '010-1234-5678', 'OWNER', 'NO', FALSE, 'RECEIVED')");
+      }
+      // 지정 시각 우선 정렬 및 같은 시각의 신청 ID 순서 확인
+      sql.executeUpdate(
+          "INSERT INTO priority_inspection_designations (application_id, designated_by_user_id, designated_at) VALUES (2, 2, '2030-01-03 14:00:00'), (4, 2, '2030-01-01 14:00:00'), (3, 2, '2030-01-01 14:00:00')");
+      var order = Flyway.configure().dataSource(url, "sa", "").target("20").load();
+      assertThat(order.migrate().migrationsExecuted).isEqualTo(1);
+      order.validate();
+      assertThat(order.migrate().migrationsExecuted).isZero();
+      try (var row =
+          sql.executeQuery(
+              "SELECT selection_order, designated_by_user_id, designated_at, order_updated_at FROM priority_inspection_designations WHERE application_id = 1")) {
+        assertThat(row.next()).isTrue();
+        assertThat(row.getInt(1)).isEqualTo(3);
+        assertThat(row.getLong(2)).isEqualTo(2);
+        assertThat(row.getTimestamp(3).toLocalDateTime())
+            .isEqualTo(java.time.LocalDateTime.of(2030, 1, 2, 14, 0));
+        assertThat(row.getTimestamp(4)).isNull();
+      }
+      try (var rows =
+          sql.executeQuery(
+              "SELECT application_id, selection_order FROM priority_inspection_designations ORDER BY selection_order")) {
+        var ids = new java.util.ArrayList<Long>();
+        var ranks = new java.util.ArrayList<Integer>();
+        while (rows.next()) {
+          ids.add(rows.getLong(1));
+          ranks.add(rows.getInt(2));
+        }
+        assertThat(ids).containsExactly(3L, 4L, 1L, 2L);
+        assertThat(ranks).containsExactly(1, 2, 3, 4);
+      }
       try (var row =
           sql.executeQuery(
               "SELECT internal_memo FROM inspection_applications WHERE application_id = 1")) {

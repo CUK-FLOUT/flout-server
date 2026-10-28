@@ -29,6 +29,23 @@ public class PriorityInspectionDesignation {
   @Column(name = "designated_at", nullable = false)
   private LocalDateTime designatedAt;
 
+  @Column(name = "selection_order", nullable = false)
+  private int selectionOrder;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "order_updated_by_user_id")
+  private User orderUpdatedBy;
+
+  @Column(name = "order_updated_at")
+  private LocalDateTime orderUpdatedAt;
+
+  public void changeOrder(int selectionOrder, User operator, LocalDateTime now) {
+    if (this.selectionOrder == selectionOrder) return;
+    this.selectionOrder = selectionOrder;
+    this.orderUpdatedBy = operator;
+    this.orderUpdatedAt = now;
+  }
+
   public static PriorityInspectionDesignation designated(
       InspectionApplication application, User operator, LocalDateTime now) {
     var designation = new PriorityInspectionDesignation();
