@@ -21,6 +21,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +80,17 @@ public class OpenApiConfig {
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
+      if (api.getTags() != null) {
+        var tagOrder = List.of("인증/인가", "운영자-GIS 신청관리", "주민 주소", "현장점검 신청");
+        var tags = new ArrayList<>(api.getTags());
+        tags.sort(
+            Comparator.comparingInt(
+                tag -> {
+                  int index = tagOrder.indexOf(tag.getName());
+                  return index < 0 ? Integer.MAX_VALUE : index;
+                }));
+        api.setTags(tags);
+      }
       // 오류 응답의 참조와 스키마를 같은 문서 커스터마이징 단계에서 등록한다.
       // 문서 생성 중 미참조 스키마 정리로 초기 등록이 제거된 경우에도 복구한다.
       if (api.getComponents() == null) {
@@ -174,6 +186,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeInspectionApplication(operation);
+                            }
+
+                            if (path.equals("/api/admin/applications/{applicationId}/internal-memo")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeInternalMemo(operation);
                             }
 
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
@@ -345,6 +362,54 @@ public class OpenApiConfig {
     addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
+  private void describeInternalMemo(Operation operation) {
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    var code = InspectionApplicationSuccessCode.INTERNAL_MEMO_SAVED;
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "memoSaved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of("applicationId", 1, "internalMemo", "방문 전 연락하여 출입 가능 여부를 확인해주세요.")));
+    Map<String, Object> cleared = new LinkedHashMap<>();
+    cleared.put("applicationId", 1);
+    cleared.put("internalMemo", null);
+    addExample(success, "memoCleared", envelope(true, code, code.getMessage(), cleared));
+    addError(
+        operation,
+        "memoRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "내부 메모는 필수입니다. 삭제하려면 빈 문자열을 입력해주세요.");
+    addError(
+        operation,
+        "memoTooLong",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "내부 메모는 2000자 이하여야 합니다.");
+    addError(operation, "malformedJson", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionApplicationErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeInspectionApplication(Operation operation) {
