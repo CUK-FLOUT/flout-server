@@ -604,7 +604,7 @@ public class OpenApiConfig {
                 "inspectionId",
                 1,
                 "receiptNo",
-                "IA-A1B2C3D4E5F678901",
+                "000001",
                 "status",
                 "RECEIVED",
                 "submittedAt",

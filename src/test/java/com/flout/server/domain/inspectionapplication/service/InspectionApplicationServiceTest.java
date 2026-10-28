@@ -66,7 +66,7 @@ class InspectionApplicationServiceTest {
         service.submit(1L, validRequest(List.of(InflowLocation.WINDOW, InflowLocation.DRAIN)));
 
     assertThat(response.applicationId()).isEqualTo(100L);
-    assertThat(response.receiptNo()).hasSize(20);
+    assertThat(response.receiptNo()).isEqualTo("000100");
     assertThat(response.status()).isEqualTo(InspectionApplicationStatus.RECEIVED);
     verify(submissionTransaction).create(eq(applicant), eq(assessment), any());
   }
@@ -107,7 +107,7 @@ class InspectionApplicationServiceTest {
 
     var response = service.submit(1L, validRequest(List.of()));
 
-    assertThat(response.receiptNo()).isEqualTo("IA-0123456789ABCDE12");
+    assertThat(response.receiptNo()).isEqualTo("000100");
     verify(submissionTransaction, times(2)).create(any(), any(), any());
   }
 
@@ -227,7 +227,7 @@ class InspectionApplicationServiceTest {
     return new CreateInspectionApplicationResponse(
         100L,
         200L,
-        "IA-0123456789ABCDE12",
+        "000100",
         InspectionApplicationStatus.RECEIVED,
         LocalDateTime.of(2026, 1, 1, 10, 0));
   }

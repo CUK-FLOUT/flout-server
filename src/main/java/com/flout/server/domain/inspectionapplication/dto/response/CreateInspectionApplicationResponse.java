@@ -3,6 +3,7 @@ package com.flout.server.domain.inspectionapplication.dto.response;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 public record CreateInspectionApplicationResponse(
     Long applicationId,
@@ -15,7 +16,7 @@ public record CreateInspectionApplicationResponse(
     return new CreateInspectionApplicationResponse(
         application.getId(),
         inspectionId,
-        application.getReceiptNo(),
+        String.format(Locale.ROOT, "%06d", application.getId()),
         application.getStatus(),
         application.getCreatedAt());
   }
