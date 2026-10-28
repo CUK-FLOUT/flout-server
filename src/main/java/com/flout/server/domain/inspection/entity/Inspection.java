@@ -59,6 +59,7 @@ public class Inspection {
   }
 
   public void assign(User inspector, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
+    if (this.inspector != null) throw new IllegalStateException("이미 배정된 점검입니다.");
     if (status != InspectionStatus.SCHEDULED)
       throw new IllegalStateException("예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
     this.inspector = inspector;

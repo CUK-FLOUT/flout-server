@@ -45,6 +45,8 @@ public class InspectionAssignmentService {
         || !"부천시".equals(operator.getJurisdiction().getName())
         || !BUCHEON_ADDRESS.matcher(inspection.getApplication().getAddress().strip()).find())
       throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    if (inspection.getInspector() != null)
+      throw new BaseException(InspectionErrorCode.ALREADY_ASSIGNED);
     if (inspection.getStatus() != InspectionStatus.SCHEDULED)
       throw new BaseException(InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED);
     var inspector =

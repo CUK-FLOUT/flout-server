@@ -438,10 +438,8 @@ public class OpenApiConfig {
     operation.getResponses().get("404").setDescription("점검 또는 점검 담당자를 찾을 수 없습니다.");
     addError(
         operation, "scheduledRequired", InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED, null);
-    operation
-        .getResponses()
-        .get("409")
-        .setDescription(InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED.getMessage());
+    addError(operation, "alreadyAssigned", InspectionErrorCode.ALREADY_ASSIGNED, null);
+    operation.getResponses().get("409").setDescription("이미 배정된 점검이거나 예정 상태로 저장되지 않은 점검입니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

@@ -295,7 +295,7 @@ class InspectionAssignmentTest {
   }
 
   @Test
-  void reschedulingUpdatesAutomaticStartTime() throws Exception {
+  void firstAssignmentSetsAutomaticStartTime() throws Exception {
     schedule();
     jdbc.update(
         "UPDATE inspections SET scheduled_at = ? WHERE inspection_id = ?",
@@ -309,6 +309,49 @@ class InspectionAssignmentTest {
     assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
         .isEqualTo(InspectionStatus.IN_PROGRESS);
     assertThat(histories.count()).isEqualTo(2);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"SCHEDULED", "IN_PROGRESS", "COMPLETED"})
+  void rejectsSecondAssignmentAndPreservesOriginalValues(String state) throws Exception {
+    schedule();
+    save(request()).andExpect(status().isOk());
+    jdbc.update("UPDATE inspections SET status = ? WHERE inspection_id = ?", state, inspectionId);
+    var before =
+        jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
+    var changed = request();
+    changed.put("inspectorId", resident.getId());
+    changed.put("visitDate", "2030-01-04");
+    changed.put("preVisitNotice", "바뀌면 안 되는 안내");
+    save(changed)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("INSPECTION_409_4"))
+        .andExpect(jsonPath("$.message").value("이미 배정된 점검입니다."));
+    assertThat(jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId))
+        .isEqualTo(before);
+    assertThat(histories.count()).isEqualTo(1);
+  }
+
+  @Test
+  void concurrentAssignmentsSucceedOnlyOnce() throws Exception {
+    schedule();
+    var gate = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      java.util.concurrent.Callable<Integer> attempt =
+          () -> {
+            gate.await();
+            return save(request()).andReturn().getResponse().getStatus();
+          };
+      var first = executor.submit(attempt);
+      var second = executor.submit(attempt);
+      gate.countDown();
+      assertThat(List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(200, 409);
+      save(request())
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.code").value("INSPECTION_409_4"));
+      assertThat(histories.count()).isEqualTo(1);
+    }
   }
 
   @Test
