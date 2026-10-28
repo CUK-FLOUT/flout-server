@@ -1,0 +1,2 @@
+ALTER TABLE application_status_histories DROP FOREIGN KEY fk_application_status_histories_actor;
+ALTER TABLE application_status_histories DROP COLUMN processed_by_user_id;
