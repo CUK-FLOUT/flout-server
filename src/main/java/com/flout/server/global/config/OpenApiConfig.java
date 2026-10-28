@@ -200,6 +200,11 @@ public class OpenApiConfig {
                               describeInspectionStatus(operation);
                             }
 
+                            if (path.equals("/api/admin/inspections/{inspectionId}/assignment")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeInspectionAssignment(operation);
+                            }
+
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
@@ -369,6 +374,77 @@ public class OpenApiConfig {
     addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
+  private void describeInspectionAssignment(Operation operation) {
+    var code = InspectionSuccessCode.ASSIGNMENT_SAVED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "assignmentSaved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "inspectionId",
+                1,
+                "inspectorId",
+                2,
+                "inspectorName",
+                "김담당",
+                "visitDate",
+                "2030-01-03",
+                "visitTime",
+                "14:00",
+                "preVisitNotice",
+                "방문 전 배수구 주변을 정리해주세요.",
+                "status",
+                "SCHEDULED",
+                "updatedAt",
+                "2030-01-02T14:00:00")));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "inspectorRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "점검 담당자를 선택해주세요.");
+    addError(
+        operation, "dateRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "확정 방문일을 입력해주세요.");
+    addError(
+        operation, "timeRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "방문 시간을 입력해주세요.");
+    addError(
+        operation,
+        "noticeRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "주민 방문 전 안내를 입력해주세요.");
+    addError(
+        operation,
+        "noticeTooLong",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "주민 방문 전 안내는 2000자 이하여야 합니다.");
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "invalidInspector", InspectionErrorCode.INVALID_INSPECTOR, null);
+    addError(operation, "pastVisitTime", InspectionErrorCode.PAST_VISIT_TIME, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    addError(operation, "inspectorNotFound", InspectionErrorCode.INSPECTOR_NOT_FOUND, null);
+    operation.getResponses().get("404").setDescription("점검 또는 점검 담당자를 찾을 수 없습니다.");
+    addError(
+        operation, "scheduledRequired", InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED, null);
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED.getMessage());
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeInspectionStatus(Operation operation) {

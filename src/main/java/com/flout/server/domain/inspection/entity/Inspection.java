@@ -1,6 +1,7 @@
 package com.flout.server.domain.inspection.entity;
 
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
+import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -26,6 +27,13 @@ public class Inspection {
   @Column(name = "scheduled_at")
   private LocalDateTime scheduledAt;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "inspector_user_id")
+  private User inspector;
+
+  @Column(name = "pre_visit_notice", columnDefinition = "TEXT")
+  private String preVisitNotice;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private InspectionStatus status;
@@ -48,6 +56,15 @@ public class Inspection {
     if (!status.canTransitionTo(next)) throw new IllegalStateException("허용되지 않은 점검 상태 변경입니다.");
     status = next;
     updatedAt = changedAt;
+  }
+
+  public void assign(User inspector, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
+    if (status != InspectionStatus.SCHEDULED)
+      throw new IllegalStateException("예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
+    this.inspector = inspector;
+    this.scheduledAt = scheduledAt;
+    this.preVisitNotice = notice;
+    this.updatedAt = now;
   }
 
   @PrePersist
