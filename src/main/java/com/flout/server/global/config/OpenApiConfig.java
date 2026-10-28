@@ -2,6 +2,8 @@ package com.flout.server.global.config;
 
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.domain.address.response.code.AddressSuccessCode;
+import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
+import com.flout.server.domain.inspection.response.code.InspectionSuccessCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
@@ -81,7 +83,7 @@ public class OpenApiConfig {
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
       if (api.getTags() != null) {
-        var tagOrder = List.of("인증/인가", "운영자-GIS 신청관리", "주민 주소", "현장점검 신청");
+        var tagOrder = List.of("인증/인가", "운영자-GIS 신청관리", "운영자-현장점검 관리", "주민 주소", "현장점검 신청");
         var tags = new ArrayList<>(api.getTags());
         tags.sort(
             Comparator.comparingInt(
@@ -191,6 +193,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/admin/applications/{applicationId}/internal-memo")
                                 && method == PathItem.HttpMethod.PATCH) {
                               describeInternalMemo(operation);
+                            }
+
+                            if (path.equals("/api/admin/inspections/{inspectionId}/status")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeInspectionStatus(operation);
                             }
 
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
@@ -362,6 +369,45 @@ public class OpenApiConfig {
     addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
+  private void describeInspectionStatus(Operation operation) {
+    var code = InspectionSuccessCode.STATUS_CHANGED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "inspectionStatusChanged",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of("inspectionId", 1, "status", "SCHEDULED", "updatedAt", "2026-10-28T19:00:00")));
+    addError(
+        operation, "statusRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "점검 상태를 선택해주세요.");
+    addError(operation, "invalidStatusOrBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
+    addError(
+        operation, "invalidStatusTransition", InspectionErrorCode.INVALID_STATUS_TRANSITION, null);
+    addError(operation, "visitTimeNotReached", InspectionErrorCode.VISIT_TIME_NOT_REACHED, null);
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(InspectionErrorCode.INVALID_STATUS_TRANSITION.getMessage());
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeInternalMemo(Operation operation) {

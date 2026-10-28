@@ -13,6 +13,10 @@ management:
         include: health,info
 
 app:
+  inspection:
+    auto-start:
+      enabled: ${INSPECTION_AUTO_START_ENABLED:true}
+      interval-millis: ${INSPECTION_AUTO_START_INTERVAL_MILLIS:5000}
   google:
     client-ids: ${GOOGLE_CLIENT_IDS:}
   jwt:
