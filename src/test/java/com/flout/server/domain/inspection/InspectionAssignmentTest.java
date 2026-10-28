@@ -110,12 +110,12 @@ class InspectionAssignmentTest {
             null);
     var application =
         applications.saveAndFlush(
-            InspectionApplication.submitted(resident, assessment, request, "IA-STATUS-TEST"));
+            InspectionApplication.received(resident, assessment, request, "IA-STATUS-TEST"));
     applicationId = application.getId();
     jdbc.update(
         "UPDATE inspection_applications SET status = 'RECEIVED', internal_memo = '유지할 내부 메모' WHERE application_id = ?",
         applicationId);
-    inspectionId = inspections.saveAndFlush(Inspection.waiting(application)).getId();
+    inspectionId = inspections.saveAndFlush(Inspection.received(application)).getId();
   }
 
   private String path() {
@@ -168,6 +168,34 @@ class InspectionAssignmentTest {
     var application = applications.findById(applicationId).orElseThrow();
     assertThat(application.getInternalMemo()).isEqualTo("유지할 내부 메모");
     assertThat(application.getStatus()).isEqualTo(InspectionApplicationStatus.RECEIVED);
+  }
+
+  /** 담당자와 저장 운영자가 달라도 실제 인증 주체를 기록하고 자동 상태 변경 후에도 보존한다. */
+  @Test
+  void recordsAuthenticatedOperatorSeparatelyFromInspectorAndKeepsAssignmentTimestamp()
+      throws Exception {
+    jdbc.update(
+        """
+        INSERT INTO users (email, password_hash, name, role, jurisdiction_id)
+        VALUES ('other-inspector@example.com', 'hash', '다른담당', 'ADMIN',
+          (SELECT jurisdiction_id FROM jurisdictions WHERE name = '부천시'))
+        """);
+    Long inspectorId = users.findByEmail("other-inspector@example.com").orElseThrow().getId();
+    schedule();
+    var body = request();
+    body.put("inspectorId", inspectorId);
+    save(body).andExpect(status().isOk());
+    var row = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
+    assertThat(((Number) row.get("inspector_user_id")).longValue()).isEqualTo(inspectorId);
+    assertThat(((Number) row.get("scheduled_by_user_id")).longValue()).isEqualTo(operatorId);
+    assertThat(((Timestamp) row.get("assigned_at")).toLocalDateTime()).isEqualTo(NOW);
+    when(inspectionClock.instant())
+        .thenReturn(LocalDateTime.of(2030, 1, 3, 14, 0).atZone(SEOUL).toInstant());
+    assertThat(service.startIfDue(inspectionId)).isTrue();
+    var after = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
+    assertThat(after.get("scheduled_by_user_id")).isEqualTo(row.get("scheduled_by_user_id"));
+    assertThat(after.get("assigned_at")).isEqualTo(row.get("assigned_at"));
+    assertThat(after.get("updated_at")).isNotEqualTo(row.get("updated_at"));
   }
 
   @ParameterizedTest

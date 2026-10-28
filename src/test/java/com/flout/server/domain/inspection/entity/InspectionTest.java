@@ -15,7 +15,7 @@ class InspectionTest {
   void initializesAuditTimesUsingSeoulTime() {
     ZoneId seoul = ZoneId.of("Asia/Seoul");
     LocalDateTime before = LocalDateTime.now(seoul).truncatedTo(ChronoUnit.SECONDS);
-    Inspection inspection = Inspection.waiting(mock(InspectionApplication.class));
+    Inspection inspection = Inspection.received(mock(InspectionApplication.class));
     inspection.onCreate();
     LocalDateTime after = LocalDateTime.now(seoul).truncatedTo(ChronoUnit.SECONDS);
 

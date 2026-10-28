@@ -63,6 +63,23 @@ class InspectionMigrationTest {
       assertThatThrownBy(
               () -> statement.executeUpdate("UPDATE inspections SET inspector_user_id = 999999"))
           .isInstanceOf(SQLException.class);
+      statement.executeUpdate(
+          "UPDATE inspections SET inspector_user_id = 1, pre_visit_notice = '기존 안내'");
+      var auditMigration = Flyway.configure().dataSource(url, "sa", "").target("15").load();
+      assertThat(auditMigration.migrate().migrationsExecuted).isEqualTo(1);
+      auditMigration.validate();
+      try (var rows =
+          statement.executeQuery(
+              "SELECT inspector_user_id, pre_visit_notice, scheduled_by_user_id, assigned_at FROM inspections")) {
+        assertThat(rows.next()).isTrue();
+        assertThat(rows.getLong("inspector_user_id")).isEqualTo(1L);
+        assertThat(rows.getString("pre_visit_notice")).isEqualTo("기존 안내");
+        assertThat(rows.getObject("scheduled_by_user_id")).isNull();
+        assertThat(rows.getObject("assigned_at")).isNull();
+      }
+      assertThatThrownBy(
+              () -> statement.executeUpdate("UPDATE inspections SET scheduled_by_user_id = 999999"))
+          .isInstanceOf(SQLException.class);
     }
   }
 }

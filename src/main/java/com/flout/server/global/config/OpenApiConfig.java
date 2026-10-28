@@ -549,10 +549,12 @@ public class OpenApiConfig {
             Map.of(
                 "applicationId",
                 1,
+                "inspectionId",
+                1,
                 "receiptNo",
                 "IA-A1B2C3D4E5F678901",
                 "status",
-                "SUBMITTED",
+                "RECEIVED",
                 "submittedAt",
                 "2026-10-28T10:30:00")));
     operation.getResponses().addApiResponse("201", success);

@@ -93,9 +93,9 @@ class InternalMemoTest {
             null);
     var application =
         applications.saveAndFlush(
-            InspectionApplication.submitted(resident, assessment, request, "IA-MEMO-TEST"));
+            InspectionApplication.received(resident, assessment, request, "IA-MEMO-TEST"));
     applicationId = application.getId();
-    histories.saveAndFlush(ApplicationStatusHistory.submitted(application));
+    histories.saveAndFlush(ApplicationStatusHistory.received(application));
   }
 
   private String path() {
@@ -302,7 +302,7 @@ class InternalMemoTest {
         applicationId);
     var response =
         CreateInspectionApplicationResponse.from(
-            applications.findById(applicationId).orElseThrow());
+            applications.findById(applicationId).orElseThrow(), 1L);
     assertThat(mapper.readTree(mapper.writeValueAsString(response)).has("internalMemo")).isFalse();
   }
 

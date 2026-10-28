@@ -81,7 +81,8 @@ public class InspectionApplication {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-  public static InspectionApplication submitted(
+  /** 신청 제출 즉시 접수 상태로 생성한다. */
+  public static InspectionApplication received(
       User applicant,
       RiskAssessment assessment,
       CreateInspectionApplicationRequest request,
@@ -102,7 +103,7 @@ public class InspectionApplication {
     application.requestReason = request.requestReason();
     application.preferredVisitDate = request.preferredVisitDate();
     application.preferredTimeSlot = request.preferredTimeSlot();
-    application.status = InspectionApplicationStatus.SUBMITTED;
+    application.status = InspectionApplicationStatus.RECEIVED;
     return application;
   }
 

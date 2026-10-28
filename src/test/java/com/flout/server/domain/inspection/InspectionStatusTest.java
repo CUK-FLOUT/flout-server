@@ -111,12 +111,12 @@ class InspectionStatusTest {
             null);
     var application =
         applications.saveAndFlush(
-            InspectionApplication.submitted(resident, assessment, request, "IA-STATUS-TEST"));
+            InspectionApplication.received(resident, assessment, request, "IA-STATUS-TEST"));
     applicationId = application.getId();
     jdbc.update(
         "UPDATE inspection_applications SET status = 'RECEIVED', internal_memo = '유지할 내부 메모' WHERE application_id = ?",
         applicationId);
-    inspectionId = inspections.saveAndFlush(Inspection.waiting(application)).getId();
+    inspectionId = inspections.saveAndFlush(Inspection.received(application)).getId();
   }
 
   private String path() {
@@ -167,7 +167,7 @@ class InspectionStatusTest {
     assertThat(rows).hasSize(3);
     assertThat(rows)
         .extracting(row -> row.get("previous_status"))
-        .containsExactly("WAITING", "SCHEDULED", "IN_PROGRESS");
+        .containsExactly("RECEIVED", "SCHEDULED", "IN_PROGRESS");
     assertThat(rows)
         .extracting(row -> row.get("status"))
         .containsExactly("SCHEDULED", "IN_PROGRESS", "COMPLETED");
@@ -198,8 +198,8 @@ class InspectionStatusTest {
 
   @ParameterizedTest
   @CsvSource({
-    "WAITING,IN_PROGRESS",
-    "WAITING,COMPLETED",
+    "RECEIVED,IN_PROGRESS",
+    "RECEIVED,COMPLETED",
     "SCHEDULED,COMPLETED",
     "IN_PROGRESS,SCHEDULED",
     "COMPLETED,SCHEDULED",
@@ -266,7 +266,7 @@ class InspectionStatusTest {
     var scheduler = new InspectionAutoStartScheduler(inspections, service, inspectionClock);
     seed("SCHEDULED", null);
     scheduler.startDueInspections();
-    for (String state : List.of("WAITING", "IN_PROGRESS", "COMPLETED")) {
+    for (String state : List.of("RECEIVED", "IN_PROGRESS", "COMPLETED")) {
       seed(state, NOW.minusDays(1));
       scheduler.startDueInspections();
       assertThat(inspections.findById(inspectionId).orElseThrow().getStatus().name())
@@ -338,7 +338,7 @@ class InspectionStatusTest {
                 .content(body("SCHEDULED")))
         .andExpect(status().isInternalServerError());
     assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
-        .isEqualTo(InspectionStatus.WAITING);
+        .isEqualTo(InspectionStatus.RECEIVED);
     assertThat(histories.count()).isZero();
   }
 
@@ -346,7 +346,14 @@ class InspectionStatusTest {
   void validatesRequestAndInspectionId() throws Exception {
     for (String invalid :
         List.of(
-            "{}", "{\"status\":null}", body("WAITING"), body("UNKNOWN"), body("scheduled"), "{")) {
+            "{}",
+            "{\"status\":null}",
+            body("RECEIVED"),
+            body("WAITING"),
+            body("SUBMITTED"),
+            body("UNKNOWN"),
+            body("scheduled"),
+            "{")) {
       mvc.perform(
               patch(path())
                   .header("Authorization", "Bearer " + token)

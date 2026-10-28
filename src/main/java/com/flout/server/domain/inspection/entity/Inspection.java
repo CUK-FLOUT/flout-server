@@ -31,6 +31,13 @@ public class Inspection {
   @JoinColumn(name = "inspector_user_id")
   private User inspector;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "scheduled_by_user_id")
+  private User scheduledBy;
+
+  @Column(name = "assigned_at")
+  private LocalDateTime assignedAt;
+
   @Column(name = "pre_visit_notice", columnDefinition = "TEXT")
   private String preVisitNotice;
 
@@ -44,10 +51,10 @@ public class Inspection {
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
 
-  public static Inspection waiting(InspectionApplication application) {
+  public static Inspection received(InspectionApplication application) {
     Inspection inspection = new Inspection();
     inspection.application = application;
-    inspection.status = InspectionStatus.WAITING;
+    inspection.status = InspectionStatus.RECEIVED;
     return inspection;
   }
 
@@ -58,13 +65,17 @@ public class Inspection {
     updatedAt = changedAt;
   }
 
-  public void assign(User inspector, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
+  /** 예정 상태의 최초 배정만 허용하며 담당자와 별개로 저장한 운영자 및 배정 시각을 보존한다. */
+  public void assign(
+      User inspector, LocalDateTime scheduledAt, String notice, User operator, LocalDateTime now) {
     if (this.inspector != null) throw new IllegalStateException("이미 배정된 점검입니다.");
     if (status != InspectionStatus.SCHEDULED)
       throw new IllegalStateException("예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
     this.inspector = inspector;
     this.scheduledAt = scheduledAt;
     this.preVisitNotice = notice;
+    this.scheduledBy = operator;
+    this.assignedAt = now;
     this.updatedAt = now;
   }
 

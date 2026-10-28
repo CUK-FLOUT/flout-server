@@ -32,7 +32,7 @@ public class InspectionStatusService {
       Long operatorId, Long inspectionId, InspectionStatus target) {
     if (inspectionId == null || inspectionId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
-    if (target == null || target == InspectionStatus.WAITING)
+    if (target == null || target == InspectionStatus.RECEIVED)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY);
     var operator =
         users
