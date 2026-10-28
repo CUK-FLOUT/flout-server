@@ -7,7 +7,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
 class JurisdictionMigrationTest {
-  /** V8 최초 실행의 계정별 지역 배정과 정상 완료 후 재실행 시 적용할 마이그레이션이 없음을 검증합니다. */
+  // 계정별 관할 배정 및 마이그레이션 재실행 확인
   @Test
   void assignsBucheonToEveryExistingAdminAndLeavesResidentsUnassigned() throws Exception {
     String url = "jdbc:h2:mem:jurisdiction-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";

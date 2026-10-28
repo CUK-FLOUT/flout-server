@@ -380,11 +380,11 @@ public class OpenApiConfig {
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
   }
 
-  // 우선점검 지정 응답과 오류 예시
+  // 우선점검 지정·취소 응답과 오류 예시
   private void describePriorityDesignation(Operation operation) {
     var code = PriorityInspectionSuccessCode.DESIGNATED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
-    success.setDescription(code.getMessage());
+    success.setDescription("우선점검 대상 지정 또는 취소 완료");
     addExample(
         success,
         "priorityDesignated",
@@ -401,6 +401,27 @@ public class OpenApiConfig {
                 true,
                 "designatedAt",
                 "2026-10-29T10:00:00")));
+    var cancelled = new java.util.LinkedHashMap<String, Object>();
+    cancelled.put("applicationId", 1);
+    cancelled.put("receiptNo", "000001");
+    cancelled.put("designated", false);
+    cancelled.put("designatedAt", null);
+    addExample(
+        success,
+        "priorityCancelled",
+        envelope(
+            true,
+            PriorityInspectionSuccessCode.CANCELLED,
+            PriorityInspectionSuccessCode.CANCELLED.getMessage(),
+            cancelled));
+    addError(
+        operation,
+        "designationRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "우선점검 지정 여부를 선택해주세요.");
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(
         operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
     addError(

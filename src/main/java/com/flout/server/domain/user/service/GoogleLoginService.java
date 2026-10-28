@@ -65,8 +65,8 @@ public class GoogleLoginService {
           if (requiredRole == UserRole.RESIDENT) {
             throw new BaseException(UserErrorCode.EMAIL_LOGIN_REQUIRED);
           }
-          // 이메일만으로 기존 주민 계정을 자동 연결하지 않는다.
-          // 운영자는 사전 승인된 Gmail/Workspace 주소에 한해 최초 연결한다.
+          // 기존 주민 계정 자동 연결 차단
+          // 사전 승인된 Gmail·Workspace 운영자만 최초 연결
           String domain = identity.getClaimAsString("hd");
           boolean authoritative =
               email.endsWith("@gmail.com") || (domain != null && !domain.isBlank());
@@ -108,7 +108,7 @@ public class GoogleLoginService {
     try {
       persist(user);
     } catch (PessimisticLockingFailureException e) {
-      // 최초 동시 가입 중 갭 락 충돌은 재로그인 가능한 충돌로 안내한다.
+      // 동시 가입 중 갭 락 충돌 시 재로그인 안내
       throw new BaseException(UserErrorCode.GOOGLE_LINK_REQUIRED);
     }
   }
@@ -117,7 +117,7 @@ public class GoogleLoginService {
     try {
       users.saveAndFlush(user);
     } catch (DataIntegrityViolationException e) {
-      // 동시 가입/연결은 고유 제약으로 차단하고 다시 로그인을 요청한다.
+      // 고유 제약으로 동시 가입·연결 차단 후 재로그인 안내
       throw new BaseException(UserErrorCode.GOOGLE_LINK_REQUIRED);
     }
   }

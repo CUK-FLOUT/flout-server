@@ -31,7 +31,8 @@ public class PriorityInspectionDesignationService {
 
   // 중복 지정 방지 및 잠금 대기 후 최신 지정 결과 조회
   @Transactional(isolation = Isolation.READ_COMMITTED)
-  public PriorityInspectionDesignationResponse designate(Long operatorId, Long applicationId) {
+  public PriorityInspectionDesignationResponse designate(
+      Long operatorId, Long applicationId, boolean designated) {
     if (applicationId == null || applicationId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     var operator =
@@ -50,6 +51,13 @@ public class PriorityInspectionDesignationService {
         || !BUCHEON_ADDRESS.matcher(application.getAddress().strip()).find())
       throw new BaseException(PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED);
     var existing = designations.findById(applicationId).orElse(null);
+    if (!designated) {
+      if (existing != null) {
+        designations.delete(existing);
+        designations.flush();
+      }
+      return PriorityInspectionDesignationResponse.cancelled(applicationId);
+    }
     if (existing != null) return PriorityInspectionDesignationResponse.from(existing);
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     var designation =

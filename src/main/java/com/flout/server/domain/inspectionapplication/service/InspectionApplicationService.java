@@ -73,7 +73,7 @@ public class InspectionApplicationService {
       try {
         return submissionTransaction.create(applicant, assessment, request);
       } catch (ReceiptNumberCollisionException e) {
-        // The candidate already exists before this transaction writes it.
+        // 저장 전 접수번호 중복 감지
       } catch (DataIntegrityViolationException e) {
         if (!isReceiptNumberUniqueConstraintViolation(e)) {
           throw e;

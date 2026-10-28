@@ -22,7 +22,7 @@ public class InspectionAutoStartScheduler {
   private final InspectionStatusService service;
   private final Clock inspectionClock;
 
-  /** 시작 시간이 지난 예정 점검을 조회하고, 실패한 점검은 다음 주기에 다시 시도한다. */
+  // 방문 시각이 지난 예정 점검 전환 및 실패 건 재시도
   @Scheduled(
       fixedDelayString = "${app.inspection.auto-start.interval-millis:5000}",
       initialDelayString = "${app.inspection.auto-start.interval-millis:5000}")
