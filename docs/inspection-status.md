@@ -51,12 +51,18 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다. 운영자 Access Tok
   "message": "점검 상태가 저장되었습니다.",
   "result": {
     "inspectionId": 1,
+    "receiptNo": "000001",
     "status": "SCHEDULED",
     "updatedAt": "2026-10-28T19:00:00"
   },
   "timeStamp": "2026-10-28 19:00:00"
 }
 ```
+
+저장 완료 화면에는 `result.receiptNo`(접수번호)와 `result.status`(처리 상태)를 사용합니다.
+`receiptNo`는 연결된 신청 ID를 최소 6자리로 표시합니다(신청 ID 1 → `000001`).
+점검 ID 기준이 아니며 6자리를 넘는 번호는 자르지 않습니다. 신청 테이블의 기존 접수번호는 변경하지 않습니다.
+상태는 `SCHEDULED` → 점검 예정, `IN_PROGRESS` → 점검 진행, `COMPLETED` → 점검 완료로 표시합니다.
 
 ### 오류
 

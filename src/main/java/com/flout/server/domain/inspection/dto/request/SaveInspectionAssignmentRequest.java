@@ -1,14 +1,14 @@
 package com.flout.server.domain.inspection.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+@JsonIgnoreProperties("inspectorId")
 public record SaveInspectionAssignmentRequest(
-    @NotNull(message = "점검 담당자를 선택해주세요.") @Positive(message = "점검 담당자 ID는 양의 정수여야 합니다.") @Schema(description = "같은 관할 지역 운영자 ID", example = "2")
-        Long inspectorId,
     @NotNull(message = "확정 방문일을 입력해주세요.") @Schema(example = "2030-01-03") LocalDate visitDate,
     @NotNull(message = "방문 시간을 입력해주세요.") @JsonFormat(pattern = "HH:mm")
         @Schema(type = "string", example = "14:00")

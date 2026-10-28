@@ -65,13 +65,12 @@ public class Inspection {
     updatedAt = changedAt;
   }
 
-  /** 예정 상태의 최초 배정만 허용하며 담당자와 별개로 저장한 운영자 및 배정 시각을 보존한다. */
-  public void assign(
-      User inspector, LocalDateTime scheduledAt, String notice, User operator, LocalDateTime now) {
+  /** 예정 상태의 최초 배정만 허용하며 저장한 운영자 본인을 담당자로 기록하고 배정 시각을 보존한다. */
+  public void assign(User operator, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
     if (this.inspector != null) throw new IllegalStateException("이미 배정된 점검입니다.");
     if (status != InspectionStatus.SCHEDULED)
       throw new IllegalStateException("예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
-    this.inspector = inspector;
+    this.inspector = operator;
     this.scheduledAt = scheduledAt;
     this.preVisitNotice = notice;
     this.scheduledBy = operator;

@@ -390,6 +390,10 @@ public class OpenApiConfig {
             Map.of(
                 "inspectionId",
                 1,
+                "receiptNo",
+                "000001",
+                "applicantName",
+                "김주민",
                 "inspectorId",
                 2,
                 "inspectorName",
@@ -406,11 +410,6 @@ public class OpenApiConfig {
                 "2030-01-02T14:00:00")));
     addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
-        operation,
-        "inspectorRequired",
-        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
-        "점검 담당자를 선택해주세요.");
-    addError(
         operation, "dateRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "확정 방문일을 입력해주세요.");
     addError(
         operation, "timeRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "방문 시간을 입력해주세요.");
@@ -426,7 +425,6 @@ public class OpenApiConfig {
         "주민 방문 전 안내는 2000자 이하여야 합니다.");
     addError(
         operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
-    addError(operation, "invalidInspector", InspectionErrorCode.INVALID_INSPECTOR, null);
     addError(operation, "pastVisitTime", InspectionErrorCode.PAST_VISIT_TIME, null);
     addError(
         operation,
@@ -434,8 +432,7 @@ public class OpenApiConfig {
         InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
         null);
     addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
-    addError(operation, "inspectorNotFound", InspectionErrorCode.INSPECTOR_NOT_FOUND, null);
-    operation.getResponses().get("404").setDescription("점검 또는 점검 담당자를 찾을 수 없습니다.");
+    operation.getResponses().get("404").setDescription("점검을 찾을 수 없습니다.");
     addError(
         operation, "scheduledRequired", InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED, null);
     addError(operation, "alreadyAssigned", InspectionErrorCode.ALREADY_ASSIGNED, null);
@@ -456,7 +453,15 @@ public class OpenApiConfig {
             true,
             code,
             code.getMessage(),
-            Map.of("inspectionId", 1, "status", "SCHEDULED", "updatedAt", "2026-10-28T19:00:00")));
+            Map.of(
+                "inspectionId",
+                1,
+                "receiptNo",
+                "000001",
+                "status",
+                "SCHEDULED",
+                "updatedAt",
+                "2026-10-28T19:00:00")));
     addError(
         operation, "statusRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "점검 상태를 선택해주세요.");
     addError(operation, "invalidStatusOrBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);

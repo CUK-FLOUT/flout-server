@@ -26,8 +26,8 @@ public class InspectionAssignmentService {
   private final Clock inspectionClock;
 
   /**
-   * 관할과 최초 배정 여부를 행 잠금 안에서 검증하고 배정 내용·저장 운영자·배정 시각을 함께 저장한다. 이미 배정된 점검은 상태와 무관하게 거부하며, 상태 자동 전환 및
-   * 알림 발송은 수행하지 않는다.
+   * 관할과 최초 배정 여부를 행 잠금 안에서 검증하고 로그인한 운영자 본인을 담당자로 지정해 저장한다. 이미 배정된 점검은 상태와 무관하게 거부하며, 상태 자동 전환 및 알림
+   * 발송은 수행하지 않는다.
    */
   @Transactional
   public InspectionAssignmentResponse save(
@@ -53,20 +53,12 @@ public class InspectionAssignmentService {
       throw new BaseException(InspectionErrorCode.ALREADY_ASSIGNED);
     if (inspection.getStatus() != InspectionStatus.SCHEDULED)
       throw new BaseException(InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED);
-    var inspector =
-        users
-            .findById(request.inspectorId())
-            .orElseThrow(() -> new BaseException(InspectionErrorCode.INSPECTOR_NOT_FOUND));
-    if (inspector.getRole() != UserRole.ADMIN
-        || inspector.getJurisdiction() == null
-        || !operator.getJurisdiction().getId().equals(inspector.getJurisdiction().getId()))
-      throw new BaseException(InspectionErrorCode.INVALID_INSPECTOR);
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     LocalDateTime scheduledAt = LocalDateTime.of(request.visitDate(), request.visitTime());
     if (scheduledAt.isBefore(now)) throw new BaseException(InspectionErrorCode.PAST_VISIT_TIME);
     String notice = request.preVisitNotice() == null ? null : request.preVisitNotice().strip();
     if (notice != null && notice.isEmpty()) notice = null;
-    inspection.assign(inspector, scheduledAt, notice, operator, now);
+    inspection.assign(operator, scheduledAt, notice, now);
     inspections.flush();
     return InspectionAssignmentResponse.from(inspection);
   }

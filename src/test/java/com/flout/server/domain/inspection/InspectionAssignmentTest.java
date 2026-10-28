@@ -125,7 +125,6 @@ class InspectionAssignmentTest {
   private Map<String, Object> request() {
     return new java.util.LinkedHashMap<>(
         Map.of(
-            "inspectorId", operatorId,
             "visitDate", "2030-01-03",
             "visitTime", "14:00",
             "preVisitNotice", "  배수구 주변을 정리해주세요.  "));
@@ -153,6 +152,10 @@ class InspectionAssignmentTest {
     save(request())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("INSPECTION_200_2"))
+        .andExpect(
+            jsonPath("$.result.receiptNo")
+                .value(String.format(java.util.Locale.ROOT, "%06d", applicationId)))
+        .andExpect(jsonPath("$.result.applicantName").value("주민"))
         .andExpect(jsonPath("$.result.inspectorId").value(operatorId))
         .andExpect(jsonPath("$.result.inspectorName").value("김담당"))
         .andExpect(jsonPath("$.result.visitDate").value("2030-01-03"))
@@ -170,9 +173,9 @@ class InspectionAssignmentTest {
     assertThat(application.getStatus()).isEqualTo(InspectionApplicationStatus.RECEIVED);
   }
 
-  /** 담당자와 저장 운영자가 달라도 실제 인증 주체를 기록하고 자동 상태 변경 후에도 보존한다. */
+  /** 요청에 다른 운영자 ID가 있어도 로그인한 본인을 배정하고 자동 상태 변경 후에도 기록을 보존한다. */
   @Test
-  void recordsAuthenticatedOperatorSeparatelyFromInspectorAndKeepsAssignmentTimestamp()
+  void ignoresOtherInspectorIdAndRecordsAuthenticatedOperatorAndAssignmentTimestamp()
       throws Exception {
     jdbc.update(
         """
@@ -184,9 +187,12 @@ class InspectionAssignmentTest {
     schedule();
     var body = request();
     body.put("inspectorId", inspectorId);
-    save(body).andExpect(status().isOk());
+    save(body)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.inspectorId").value(operatorId))
+        .andExpect(jsonPath("$.result.inspectorName").value("김담당"));
     var row = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
-    assertThat(((Number) row.get("inspector_user_id")).longValue()).isEqualTo(inspectorId);
+    assertThat(((Number) row.get("inspector_user_id")).longValue()).isEqualTo(operatorId);
     assertThat(((Number) row.get("scheduled_by_user_id")).longValue()).isEqualTo(operatorId);
     assertThat(((Timestamp) row.get("assigned_at")).toLocalDateTime()).isEqualTo(NOW);
     when(inspectionClock.instant())
@@ -209,8 +215,8 @@ class InspectionAssignmentTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"inspectorId", "visitDate", "visitTime", "preVisitNotice"})
-  void requiresAllFourFields(String field) throws Exception {
+  @ValueSource(strings = {"visitDate", "visitTime", "preVisitNotice"})
+  void requiresDateTimeAndNotice(String field) throws Exception {
     schedule();
     var body = request();
     body.remove(field);
@@ -263,33 +269,24 @@ class InspectionAssignmentTest {
   }
 
   @Test
-  void rejectsResidentOrOtherJurisdictionAsInspector() throws Exception {
+  void ignoresSuppliedResidentIdAndUsesAuthenticatedOperator() throws Exception {
     schedule();
     var body = request();
     body.put("inspectorId", resident.getId());
     save(body)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INSPECTION_400_1"));
-    jdbc.update("INSERT INTO jurisdictions (name) VALUES ('서울시')");
-    jdbc.update(
-        "UPDATE users SET jurisdiction_id = (SELECT jurisdiction_id FROM jurisdictions WHERE name = '서울시') WHERE user_id = ?",
-        resident.getId());
-    jdbc.update("UPDATE users SET role = 'ADMIN' WHERE user_id = ?", resident.getId());
-    save(body)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INSPECTION_400_1"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.inspectorId").value(operatorId));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT inspector_user_id FROM inspections WHERE inspection_id = ?",
+                Long.class,
+                inspectionId))
+        .isEqualTo(operatorId);
   }
 
   @Test
-  void checksMissingInspectorInspectionAndPositiveIds() throws Exception {
+  void checksMissingInspectionAndPositiveIds() throws Exception {
     schedule();
-    var body = request();
-    body.put("inspectorId", Long.MAX_VALUE);
-    save(body)
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.code").value("INSPECTION_404_2"));
-    body.put("inspectorId", 0);
-    save(body).andExpect(status().isBadRequest());
     for (String id : List.of("0", "abc", "9223372036854775807")) {
       mvc.perform(
               post("/api/admin/inspections/" + id + "/assignment")
@@ -387,6 +384,9 @@ class InspectionAssignmentTest {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(
+            jsonPath("$.components.schemas.SaveInspectionAssignmentRequest.properties.inspectorId")
+                .doesNotExist())
+        .andExpect(
             jsonPath("$.paths['/api/admin/inspections/{inspectionId}/assignment'].post.tags[0]")
                 .value("운영자-현장점검 관리"))
         .andExpect(
@@ -403,7 +403,7 @@ class InspectionAssignmentTest {
     var gate = new CountDownLatch(1);
     var assignment =
         new com.flout.server.domain.inspection.dto.request.SaveInspectionAssignmentRequest(
-            operatorId, LocalDate.of(2030, 1, 3), LocalTime.of(14, 0), "방문 안내");
+            LocalDate.of(2030, 1, 3), LocalTime.of(14, 0), "방문 안내");
     try (var executor = Executors.newFixedThreadPool(2)) {
       Future<Boolean> saveResult =
           executor.submit(

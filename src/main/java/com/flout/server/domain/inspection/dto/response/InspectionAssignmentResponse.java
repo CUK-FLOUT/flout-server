@@ -4,9 +4,12 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.flout.server.domain.inspection.entity.Inspection;
 import com.flout.server.domain.inspection.entity.InspectionStatus;
 import java.time.*;
+import java.util.Locale;
 
 public record InspectionAssignmentResponse(
     Long inspectionId,
+    String receiptNo,
+    String applicantName,
     Long inspectorId,
     String inspectorName,
     LocalDate visitDate,
@@ -17,6 +20,8 @@ public record InspectionAssignmentResponse(
   public static InspectionAssignmentResponse from(Inspection inspection) {
     return new InspectionAssignmentResponse(
         inspection.getId(),
+        String.format(Locale.ROOT, "%06d", inspection.getApplication().getId()),
+        inspection.getApplication().getApplicant().getName(),
         inspection.getInspector().getId(),
         inspection.getInspector().getName(),
         inspection.getScheduledAt().toLocalDate(),

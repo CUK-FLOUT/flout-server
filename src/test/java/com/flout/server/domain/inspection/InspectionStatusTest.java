@@ -143,6 +143,9 @@ class InspectionStatusTest {
                 .content(body(target)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("INSPECTION_200_1"))
+        .andExpect(
+            jsonPath("$.result.receiptNo")
+                .value(String.format(java.util.Locale.ROOT, "%06d", applicationId)))
         .andExpect(jsonPath("$.result.status").value(target));
   }
 
