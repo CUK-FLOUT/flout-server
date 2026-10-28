@@ -403,6 +403,10 @@ public class OpenApiConfig {
         "applicationNotFound",
         InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
         null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

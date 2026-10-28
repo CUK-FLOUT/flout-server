@@ -335,8 +335,8 @@ class InternalMemoTest {
                     .exists())
             .andExpect(
                 jsonPath(
-                        "$.paths['/api/admin/applications/{applicationId}/internal-memo'].patch.responses['404']")
-                    .exists())
+                        "$.paths['/api/admin/applications/{applicationId}/internal-memo'].patch.responses['404'].description")
+                    .value("현장점검 신청을 찾을 수 없습니다."))
             .andReturn()
             .getResponse()
             .getContentAsString();
