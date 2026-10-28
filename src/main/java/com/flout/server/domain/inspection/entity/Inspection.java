@@ -3,6 +3,7 @@ package com.flout.server.domain.inspection.entity;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -51,7 +52,7 @@ public class Inspection {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+    createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.SECONDS);
     updatedAt = createdAt;
   }
 }
