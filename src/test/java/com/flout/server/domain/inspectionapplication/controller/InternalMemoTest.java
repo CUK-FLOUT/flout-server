@@ -113,7 +113,7 @@ class InternalMemoTest {
         applicationId);
   }
 
-  /** 기존 신청 상태와 처리 이력은 유지하며 메모만 작성·교체한다. */
+  // 신청 정보 변경 없이 메모 저장
   @ParameterizedTest
   @EnumSource(InspectionApplicationStatus.class)
   void savesAndReplacesMemoWithoutChangingApplication(InspectionApplicationStatus initialStatus)
@@ -294,7 +294,7 @@ class InternalMemoTest {
         .andExpect(jsonPath("$.code").value("APPLICATION_404_2"));
   }
 
-  /** 주민에게 반환하는 신청 DTO에는 저장된 내부 메모를 포함하지 않는다. */
+  // 주민 응답의 내부 메모 제외
   @Test
   void residentResponseDoesNotExposeMemo() {
     jdbc.update(

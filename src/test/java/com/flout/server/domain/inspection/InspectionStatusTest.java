@@ -66,6 +66,7 @@ class InspectionStatusTest {
   Long inspectionId;
   String token;
 
+  // 초기 접수 점검 준비
   @BeforeEach
   void setup() {
     when(inspectionClock.getZone()).thenReturn(SEOUL);
@@ -149,7 +150,7 @@ class InspectionStatusTest {
         .andExpect(jsonPath("$.result.status").value(target));
   }
 
-  /** 예정 전환에는 배정이나 방문 일정이 필요하지 않다. */
+  // 배정 전 예정 상태 변경
   @Test
   void canScheduleWithoutAssignmentOrVisitTime() throws Exception {
     change("SCHEDULED");
@@ -157,6 +158,7 @@ class InspectionStatusTest {
     assertThat(histories.count()).isEqualTo(1);
   }
 
+  // 상태 변경 후 신청 정보 유지
   @Test
   void recordsForwardTransitionsAndPreservesApplication() throws Exception {
     change("SCHEDULED");
@@ -222,6 +224,7 @@ class InspectionStatusTest {
         .isEqualTo(previous);
   }
 
+  // 방문 시각 전 수동 진행 차단
   @Test
   void cannotStartBeforeVisitTimeOrWithoutIt() throws Exception {
     for (LocalDateTime visitAt : new LocalDateTime[] {null, NOW.plusSeconds(1)}) {
@@ -239,7 +242,7 @@ class InspectionStatusTest {
     change("IN_PROGRESS");
   }
 
-  /** 시간을 진행시켜 자동 저장, 시스템 처리 이력과 중복 방지를 검증한다. */
+  // 방문 시각 이후 자동 전환과 이력 저장
   @Test
   void automaticallyStartsAtVisitTimeAndCatchesUpOverdueVisits() {
     var scheduler = new InspectionAutoStartScheduler(inspections, service, inspectionClock);
@@ -264,6 +267,7 @@ class InspectionStatusTest {
         .isEqualTo(InspectionStatus.IN_PROGRESS);
   }
 
+  // 자동 전환 대상 제한
   @Test
   void automaticStartSkipsMissingTimeAndOtherStates() {
     var scheduler = new InspectionAutoStartScheduler(inspections, service, inspectionClock);
@@ -278,6 +282,7 @@ class InspectionStatusTest {
     assertThat(histories.count()).isZero();
   }
 
+  // 수동·자동 전환 간 중복 이력 방지
   @Test
   void manualAndAutomaticStartRaceCreatesOneHistory() throws Exception {
     seed("SCHEDULED", NOW);
@@ -345,6 +350,7 @@ class InspectionStatusTest {
     assertThat(histories.count()).isZero();
   }
 
+  // 폐기한 상태와 잘못된 ID 거절
   @Test
   void validatesRequestAndInspectionId() throws Exception {
     for (String invalid :

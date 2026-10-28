@@ -26,7 +26,7 @@ public class InspectionStatusService {
   private final InspectionStatusHistoryRepository histories;
   private final Clock inspectionClock;
 
-  /** 점검 행을 잠가 상태 변경과 이력을 함께 저장하고 같은 상태 요청은 중복 기록하지 않는다. */
+  // 상태와 이력 저장 및 중복 기록 방지
   @Transactional
   public InspectionStatusResponse change(
       Long operatorId, Long inspectionId, InspectionStatus target) {
@@ -65,7 +65,7 @@ public class InspectionStatusService {
     return InspectionStatusResponse.from(inspection);
   }
 
-  /** 각 점검을 별도 트랜잭션으로 재확인하여 자동·수동 요청 경합에서도 이력을 한 번만 저장한다. */
+  // 자동·수동 전환 이력 중복 방지
   @Transactional
   public boolean startIfDue(Long inspectionId) {
     var inspection = inspections.findForStatusUpdate(inspectionId).orElse(null);

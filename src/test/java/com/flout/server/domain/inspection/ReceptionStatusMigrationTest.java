@@ -9,7 +9,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
 class ReceptionStatusMigrationTest {
-  /** 초기 상태와 이력을 변환하고 누락 점검만 생성하며 기존 일정·감사 시각·진행 상태를 보존한다. */
+  // 접수 상태 통일과 기존 점검 보존
   @Test
   void migratesLegacyReceptionStatusesAndPreservesProgressAndAuditData() throws Exception {
     String url = "jdbc:h2:mem:reception-status-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";

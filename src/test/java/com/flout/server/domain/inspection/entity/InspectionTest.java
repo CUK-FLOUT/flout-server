@@ -10,7 +10,7 @@ import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.Test;
 
 class InspectionTest {
-  /** JVM 기본 시간대와 관계없이 생성·최초 수정 시각을 서울 시각으로 기록한다. */
+  // JVM 시간대와 무관한 서울 시각 저장
   @Test
   void initializesAuditTimesUsingSeoulTime() {
     ZoneId seoul = ZoneId.of("Asia/Seoul");

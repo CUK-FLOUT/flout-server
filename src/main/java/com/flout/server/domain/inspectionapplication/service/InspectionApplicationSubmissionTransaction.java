@@ -34,7 +34,7 @@ public class InspectionApplicationSubmissionTransaction {
     this.inspections = inspections;
   }
 
-  /** 신청·점검을 모두 접수 상태로 생성하고 유입 위치·이력과 함께 저장하며 하나라도 실패하면 모두 롤백한다. */
+  // 접수번호 충돌 시 새 트랜잭션으로 재시도
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public CreateInspectionApplicationResponse create(
       User applicant, RiskAssessment assessment, CreateInspectionApplicationRequest request) {
@@ -52,6 +52,7 @@ public class InspectionApplicationSubmissionTransaction {
     return CreateInspectionApplicationResponse.from(application, inspection.getId());
   }
 
+  // 유입 위치 중복 제거
   private void saveInflowLocations(
       InspectionApplication application, List<InflowLocation> requestedLocations) {
     if (requestedLocations == null) {

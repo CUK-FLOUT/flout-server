@@ -25,10 +25,7 @@ public class InspectionAssignmentService {
   private final InspectionRepository inspections;
   private final Clock inspectionClock;
 
-  /**
-   * 관할과 최초 배정 여부를 행 잠금 안에서 검증하고 로그인한 운영자 본인을 담당자로 지정해 저장한다. 이미 배정된 점검은 상태와 무관하게 거부하며, 상태 자동 전환 및 알림
-   * 발송은 수행하지 않는다.
-   */
+  // 예정 점검에 본인 배정
   @Transactional
   public InspectionAssignmentResponse save(
       Long operatorId, Long inspectionId, SaveInspectionAssignmentRequest request) {
@@ -40,7 +37,7 @@ public class InspectionAssignmentService {
             .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
     if (operator.getRole() != UserRole.ADMIN)
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    // 상태 수동 변경 및 자동 진행 전환과 같은 행 잠금을 사용한다.
+    // 자동 전환과 배정 저장 간 충돌 방지
     var inspection =
         inspections
             .findForStatusUpdate(inspectionId)

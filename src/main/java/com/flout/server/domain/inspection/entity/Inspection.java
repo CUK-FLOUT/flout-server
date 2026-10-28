@@ -51,6 +51,7 @@ public class Inspection {
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
 
+  // 신청 직후 접수 상태
   public static Inspection received(InspectionApplication application) {
     Inspection inspection = new Inspection();
     inspection.application = application;
@@ -58,14 +59,14 @@ public class Inspection {
     return inspection;
   }
 
-  /** 배정 여부와 관계없이 허용된 순서로 상태를 변경한다. */
+  // 상태 변경 순서 검사
   public void changeStatus(InspectionStatus next, LocalDateTime changedAt) {
     if (!status.canTransitionTo(next)) throw new IllegalStateException("허용되지 않은 점검 상태 변경입니다.");
     status = next;
     updatedAt = changedAt;
   }
 
-  /** 예정 상태의 최초 배정만 허용하며 저장한 운영자 본인을 담당자로 기록하고 배정 시각을 보존한다. */
+  // 재배정 방지
   public void assign(User operator, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
     if (this.inspector != null) throw new IllegalStateException("이미 배정된 점검입니다.");
     if (status != InspectionStatus.SCHEDULED)

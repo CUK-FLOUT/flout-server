@@ -65,6 +65,7 @@ class InspectionAssignmentTest {
   Long inspectionId;
   String token;
 
+  // 미배정 접수 건 준비
   @BeforeEach
   void setup() {
     when(inspectionClock.getZone()).thenReturn(SEOUL);
@@ -173,7 +174,7 @@ class InspectionAssignmentTest {
     assertThat(application.getStatus()).isEqualTo(InspectionApplicationStatus.RECEIVED);
   }
 
-  /** 요청에 다른 운영자 ID가 있어도 로그인한 본인을 배정하고 자동 상태 변경 후에도 기록을 보존한다. */
+  // 본인 배정과 배정 기록 유지
   @Test
   void ignoresOtherInspectorIdAndRecordsAuthenticatedOperatorAndAssignmentTimestamp()
       throws Exception {
@@ -284,6 +285,7 @@ class InspectionAssignmentTest {
         .isEqualTo(operatorId);
   }
 
+  // ID 오류와 점검 없음 구분
   @Test
   void checksMissingInspectionAndPositiveIds() throws Exception {
     schedule();
@@ -357,6 +359,7 @@ class InspectionAssignmentTest {
     assertThat(histories.count()).isEqualTo(1);
   }
 
+  // 동시 요청의 중복 배정 방지
   @Test
   void concurrentAssignmentsSucceedOnlyOnce() throws Exception {
     schedule();
@@ -395,6 +398,7 @@ class InspectionAssignmentTest {
                 .value("INSPECTION_409_3"));
   }
 
+  // 배정 저장과 자동 전환 간 경합
   @Test
   void serializesAssignmentWithAutomaticStart() throws Exception {
     schedule();

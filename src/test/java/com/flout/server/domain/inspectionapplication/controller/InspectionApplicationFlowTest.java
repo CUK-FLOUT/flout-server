@@ -48,6 +48,7 @@ class InspectionApplicationFlowTest {
   Long assessmentId;
   String token;
 
+  // 주민과 분석 결과 준비
   @BeforeEach
   void setup() {
     for (String table :
@@ -146,6 +147,7 @@ class InspectionApplicationFlowTest {
         .andExpect(status().isOk());
   }
 
+  // 점검 생성 실패 시 신청 롤백
   @Test
   void inspectionFailureRollsBackApplicationLocationsAndHistory() throws Exception {
     doThrow(new IllegalStateException("simulated inspection persistence failure"))

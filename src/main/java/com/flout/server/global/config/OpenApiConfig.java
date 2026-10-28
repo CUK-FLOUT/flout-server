@@ -72,12 +72,7 @@ public class OpenApiConfig {
         .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH));
   }
 
-  /**
-   * 인증 관련 API와 운영자 계정 조회 API에 응답 예시 및 공통 오류 문서를 등록합니다.
-   *
-   * @param expiresIn 로그인 응답 예시에 사용할 Access Token 유효 시간(초)
-   * @return API 경로별 응답과 인증 요구 사항을 보완하는 문서 커스터마이저
-   */
+  // Swagger 응답 예시와 표시 순서 설정
   @Bean
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
@@ -93,8 +88,8 @@ public class OpenApiConfig {
                 }));
         api.setTags(tags);
       }
-      // 오류 응답의 참조와 스키마를 같은 문서 커스터마이징 단계에서 등록한다.
-      // 문서 생성 중 미참조 스키마 정리로 초기 등록이 제거된 경우에도 복구한다.
+      // 공통 오류 스키마 등록
+      // 문서 생성 중 누락된 스키마 복구
       if (api.getComponents() == null) {
         api.setComponents(new Components());
       }
@@ -376,6 +371,7 @@ public class OpenApiConfig {
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
   }
 
+  // 배정 저장 응답과 오류 예시
   private void describeInspectionAssignment(Operation operation) {
     var code = InspectionSuccessCode.ASSIGNMENT_SAVED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
@@ -442,6 +438,7 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
+  // 상태 변경 응답과 오류 예시
   private void describeInspectionStatus(Operation operation) {
     var code = InspectionSuccessCode.STATUS_CHANGED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
@@ -537,6 +534,7 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
+  // 신청 생성 201 응답과 점검 ID 예시
   private void describeInspectionApplication(Operation operation) {
     ApiResponse success = operation.getResponses().remove("200");
     if (success == null) {

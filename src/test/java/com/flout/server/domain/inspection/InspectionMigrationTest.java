@@ -9,7 +9,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
 class InspectionMigrationTest {
-  /** 기존 접수 완료 신청에만 대기 점검을 만들고 신청당 한 건 제약을 유지한다. */
+  // V13 점검 생성과 중복 생성 제한
   @Test
   void createsWaitingInspectionOnlyForReceivedApplications() throws Exception {
     String url = "jdbc:h2:mem:inspection-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
