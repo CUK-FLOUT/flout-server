@@ -14,13 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminAccountService {
   private final UserRepository users;
 
-  /**
-   * 현재 DB의 운영자 이름과 관할 지역을 반환합니다. 관할 지역이 없으면 해당 값은 null입니다.
-   *
-   * @param userId 인증된 사용자의 ID
-   * @return 운영자 계정 정보
-   * @throws BaseException 사용자가 없으면 인증 오류, 운영자가 아니면 접근 거부 오류
-   */
+  // 운영자 권한 확인 후 이름과 관할 지역 조회
   @Transactional(readOnly = true)
   public AdminAccountResponse getAccount(Long userId) {
     var user =

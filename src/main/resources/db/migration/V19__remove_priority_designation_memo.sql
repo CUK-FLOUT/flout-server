@@ -1,0 +1,1 @@
+ALTER TABLE priority_inspection_designations DROP COLUMN selection_memo;

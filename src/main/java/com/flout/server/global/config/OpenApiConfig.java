@@ -6,6 +6,8 @@ import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspection.response.code.InspectionSuccessCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
+import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
+import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -78,7 +80,8 @@ public class OpenApiConfig {
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
       if (api.getTags() != null) {
-        var tagOrder = List.of("인증/인가", "운영자-GIS 신청관리", "운영자-현장점검 관리", "주민 주소", "현장점검 신청");
+        var tagOrder =
+            List.of("인증/인가", "운영자-GIS 신청관리", "운영자-우선점검 관리", "운영자-현장점검 관리", "주민 주소", "현장점검 신청");
         var tags = new ArrayList<>(api.getTags());
         tags.sort(
             Comparator.comparingInt(
@@ -198,6 +201,12 @@ public class OpenApiConfig {
                             if (path.equals("/api/admin/inspections/{inspectionId}/assignment")
                                 && method == PathItem.HttpMethod.POST) {
                               describeInspectionAssignment(operation);
+                            }
+
+                            if (path.equals(
+                                    "/api/admin/priority-inspections/{applicationId}/designation")
+                                && method == PathItem.HttpMethod.PUT) {
+                              describePriorityDesignation(operation);
                             }
 
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
@@ -369,6 +378,67 @@ public class OpenApiConfig {
     addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+  }
+
+  // 우선점검 지정·취소 응답과 오류 예시
+  private void describePriorityDesignation(Operation operation) {
+    var code = PriorityInspectionSuccessCode.DESIGNATED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("우선점검 대상 지정 또는 취소 완료");
+    addExample(
+        success,
+        "priorityDesignated",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "applicationId",
+                1,
+                "receiptNo",
+                "000001",
+                "designated",
+                true,
+                "designatedAt",
+                "2026-10-29T10:00:00")));
+    var cancelled = new java.util.LinkedHashMap<String, Object>();
+    cancelled.put("applicationId", 1);
+    cancelled.put("receiptNo", "000001");
+    cancelled.put("designated", false);
+    cancelled.put("designatedAt", null);
+    addExample(
+        success,
+        "priorityCancelled",
+        envelope(
+            true,
+            PriorityInspectionSuccessCode.CANCELLED,
+            PriorityInspectionSuccessCode.CANCELLED.getMessage(),
+            cancelled));
+    addError(
+        operation,
+        "designationRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "우선점검 지정 여부를 선택해주세요.");
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   // 배정 저장 응답과 오류 예시
@@ -555,7 +625,7 @@ public class OpenApiConfig {
                 "inspectionId",
                 1,
                 "receiptNo",
-                "IA-A1B2C3D4E5F678901",
+                "000001",
                 "status",
                 "RECEIVED",
                 "submittedAt",

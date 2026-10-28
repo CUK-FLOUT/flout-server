@@ -20,7 +20,7 @@ public class InternalMemoService {
   private final UserRepository users;
   private final InspectionApplicationRepository applications;
 
-  /** 현재 운영자와 신청 주소의 관할을 확인한 뒤 메모 컬럼만 갱신한다. */
+  // 관할 확인 후 내부 메모 저장
   @Transactional
   public InternalMemoResponse save(Long operatorId, Long applicationId, String requestedMemo) {
     if (applicationId == null || applicationId <= 0) {
@@ -38,7 +38,7 @@ public class InternalMemoService {
             .findById(applicationId)
             .orElseThrow(
                 () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
-    // 현재 등록된 관할은 부천시다. 이름의 부분 일치나 불명확한 주소는 허용하지 않는다.
+    // 부천시 행정구역 일치 여부 확인
     if (operator.getJurisdiction() == null
         || !"부천시".equals(operator.getJurisdiction().getName())
         || !BUCHEON_ADDRESS.matcher(application.getAddress().strip()).find()) {

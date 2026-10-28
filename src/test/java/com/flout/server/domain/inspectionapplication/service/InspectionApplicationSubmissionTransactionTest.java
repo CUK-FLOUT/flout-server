@@ -68,6 +68,7 @@ class InspectionApplicationSubmissionTransactionTest {
 
     assertThat(response.applicationId()).isEqualTo(100L);
     assertThat(response.inspectionId()).isEqualTo(200L);
+    assertThat(response.receiptNo()).isEqualTo("000100");
     assertThat(response.status()).isEqualTo(InspectionApplicationStatus.RECEIVED);
     var inspection = ArgumentCaptor.forClass(Inspection.class);
     verify(inspections).saveAndFlush(inspection.capture());

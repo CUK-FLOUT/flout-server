@@ -118,6 +118,8 @@ class InspectionApplicationFlowTest {
             .getContentAsString();
     var result = mapper.readTree(response).get("result");
     Long applicationId = result.get("applicationId").asLong();
+    assertThat(result.get("receiptNo").asText())
+        .isEqualTo(String.format(java.util.Locale.ROOT, "%06d", applicationId));
     Long inspectionId = result.get("inspectionId").asLong();
     var row = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
     assertThat(((Number) row.get("application_id")).longValue()).isEqualTo(applicationId);

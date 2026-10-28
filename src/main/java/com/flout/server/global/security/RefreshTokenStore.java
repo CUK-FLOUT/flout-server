@@ -55,7 +55,7 @@ public class RefreshTokenStore {
     LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
     if (!token.getExpiresAt().isAfter(now)) throw invalid();
     Long userId = token.getUser().getId();
-    // 조건부 DELETE에 성공한 요청 하나만 새 토큰을 발급한다.
+    // 조건부 삭제에 성공한 요청만 새 토큰 발급
     if (tokens.consume(hash, now) != 1) throw invalid();
     return userId;
   }

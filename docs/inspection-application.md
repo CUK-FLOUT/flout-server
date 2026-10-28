@@ -26,7 +26,7 @@
   "result": {
     "applicationId": 1,
     "inspectionId": 2,
-    "receiptNo": "IA-A1B2C3D4E5F678901",
+    "receiptNo": "000001",
     "status": "RECEIVED",
     "submittedAt": "2026-10-29T01:00:00"
   },
@@ -36,6 +36,8 @@
 
 `applicationId`는 신청 내부 메모 등 신청 API에 사용하고,
 `inspectionId`는 점검 상태 변경과 배정·일정 저장 API에 사용합니다. 두 ID는 같다고 가정하지 않습니다.
+
+응답의 `receiptNo`는 신청 ID를 최소 6자리로 표시한 값입니다. 신청 ID가 1이면 `000001`이며 6자리를 초과해도 자르지 않습니다.
 
 신청 제출 → 접수(신청·점검 생성) → 상태 API로 점검 예정 저장 → 배정 저장 → 점검 진행 → 점검 완료 순서입니다.
 신청 성공 후 응답의 `inspectionId`로 `PATCH /api/admin/inspections/{inspectionId}/status`에
