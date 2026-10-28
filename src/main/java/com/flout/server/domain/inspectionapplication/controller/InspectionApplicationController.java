@@ -22,7 +22,10 @@ public class InspectionApplicationController {
   private final InspectionApplicationService inspectionApplicationService;
 
   @PostMapping
-  @Operation(summary = "현장점검 신청", description = "완료된 본인 침수 위험도 분석 결과를 바탕으로 현장점검을 신청합니다.")
+  @Operation(
+      summary = "현장점검 신청",
+      description =
+          "완료된 본인 침수 위험도 분석 결과로 신청하면 신청과 점검을 함께 접수(RECEIVED) 상태로 생성합니다. 응답의 inspectionId를 점검 상태·배정 API에 사용합니다.")
   public ResponseEntity<SuccessResponse<CreateInspectionApplicationResponse>> submit(
       @AuthenticationPrincipal Jwt jwt,
       @Valid @RequestBody CreateInspectionApplicationRequest request) {

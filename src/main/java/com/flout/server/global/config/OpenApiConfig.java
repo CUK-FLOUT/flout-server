@@ -72,12 +72,7 @@ public class OpenApiConfig {
         .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH));
   }
 
-  /**
-   * 인증 관련 API와 운영자 계정 조회 API에 응답 예시 및 공통 오류 문서를 등록합니다.
-   *
-   * @param expiresIn 로그인 응답 예시에 사용할 Access Token 유효 시간(초)
-   * @return API 경로별 응답과 인증 요구 사항을 보완하는 문서 커스터마이저
-   */
+  // Swagger 응답 예시와 표시 순서 설정
   @Bean
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
@@ -93,8 +88,8 @@ public class OpenApiConfig {
                 }));
         api.setTags(tags);
       }
-      // 오류 응답의 참조와 스키마를 같은 문서 커스터마이징 단계에서 등록한다.
-      // 문서 생성 중 미참조 스키마 정리로 초기 등록이 제거된 경우에도 복구한다.
+      // 공통 오류 스키마 등록
+      // 문서 생성 중 누락된 스키마 복구
       if (api.getComponents() == null) {
         api.setComponents(new Components());
       }
@@ -198,6 +193,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/admin/inspections/{inspectionId}/status")
                                 && method == PathItem.HttpMethod.PATCH) {
                               describeInspectionStatus(operation);
+                            }
+
+                            if (path.equals("/api/admin/inspections/{inspectionId}/assignment")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeInspectionAssignment(operation);
                             }
 
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
@@ -371,6 +371,74 @@ public class OpenApiConfig {
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
   }
 
+  // 배정 저장 응답과 오류 예시
+  private void describeInspectionAssignment(Operation operation) {
+    var code = InspectionSuccessCode.ASSIGNMENT_SAVED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "assignmentSaved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "inspectionId",
+                1,
+                "receiptNo",
+                "000001",
+                "applicantName",
+                "김주민",
+                "inspectorId",
+                2,
+                "inspectorName",
+                "김담당",
+                "visitDate",
+                "2030-01-03",
+                "visitTime",
+                "14:00",
+                "preVisitNotice",
+                "방문 전 배수구 주변을 정리해주세요.",
+                "status",
+                "SCHEDULED",
+                "updatedAt",
+                "2030-01-02T14:00:00")));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation, "dateRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "확정 방문일을 입력해주세요.");
+    addError(
+        operation, "timeRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "방문 시간을 입력해주세요.");
+    addError(
+        operation,
+        "noticeRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "주민 방문 전 안내를 입력해주세요.");
+    addError(
+        operation,
+        "noticeTooLong",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "주민 방문 전 안내는 2000자 이하여야 합니다.");
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "pastVisitTime", InspectionErrorCode.PAST_VISIT_TIME, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    operation.getResponses().get("404").setDescription("점검을 찾을 수 없습니다.");
+    addError(
+        operation, "scheduledRequired", InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED, null);
+    addError(operation, "alreadyAssigned", InspectionErrorCode.ALREADY_ASSIGNED, null);
+    operation.getResponses().get("409").setDescription("이미 배정된 점검이거나 예정 상태로 저장되지 않은 점검입니다.");
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  // 상태 변경 응답과 오류 예시
   private void describeInspectionStatus(Operation operation) {
     var code = InspectionSuccessCode.STATUS_CHANGED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
@@ -382,7 +450,15 @@ public class OpenApiConfig {
             true,
             code,
             code.getMessage(),
-            Map.of("inspectionId", 1, "status", "SCHEDULED", "updatedAt", "2026-10-28T19:00:00")));
+            Map.of(
+                "inspectionId",
+                1,
+                "receiptNo",
+                "000001",
+                "status",
+                "SCHEDULED",
+                "updatedAt",
+                "2026-10-28T19:00:00")));
     addError(
         operation, "statusRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "점검 상태를 선택해주세요.");
     addError(operation, "invalidStatusOrBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
@@ -458,6 +534,7 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
+  // 신청 생성 201 응답과 점검 ID 예시
   private void describeInspectionApplication(Operation operation) {
     ApiResponse success = operation.getResponses().remove("200");
     if (success == null) {
@@ -475,10 +552,12 @@ public class OpenApiConfig {
             Map.of(
                 "applicationId",
                 1,
+                "inspectionId",
+                1,
                 "receiptNo",
                 "IA-A1B2C3D4E5F678901",
                 "status",
-                "SUBMITTED",
+                "RECEIVED",
                 "submittedAt",
                 "2026-10-28T10:30:00")));
     operation.getResponses().addApiResponse("201", success);

@@ -66,6 +66,7 @@ class InspectionStatusTest {
   Long inspectionId;
   String token;
 
+  // 초기 접수 점검 준비
   @BeforeEach
   void setup() {
     when(inspectionClock.getZone()).thenReturn(SEOUL);
@@ -111,12 +112,12 @@ class InspectionStatusTest {
             null);
     var application =
         applications.saveAndFlush(
-            InspectionApplication.submitted(resident, assessment, request, "IA-STATUS-TEST"));
+            InspectionApplication.received(resident, assessment, request, "IA-STATUS-TEST"));
     applicationId = application.getId();
     jdbc.update(
         "UPDATE inspection_applications SET status = 'RECEIVED', internal_memo = '유지할 내부 메모' WHERE application_id = ?",
         applicationId);
-    inspectionId = inspections.saveAndFlush(Inspection.waiting(application)).getId();
+    inspectionId = inspections.saveAndFlush(Inspection.received(application)).getId();
   }
 
   private String path() {
@@ -143,10 +144,13 @@ class InspectionStatusTest {
                 .content(body(target)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("INSPECTION_200_1"))
+        .andExpect(
+            jsonPath("$.result.receiptNo")
+                .value(String.format(java.util.Locale.ROOT, "%06d", applicationId)))
         .andExpect(jsonPath("$.result.status").value(target));
   }
 
-  /** 예정 전환에는 배정이나 방문 일정이 필요하지 않다. */
+  // 배정 전 예정 상태 변경
   @Test
   void canScheduleWithoutAssignmentOrVisitTime() throws Exception {
     change("SCHEDULED");
@@ -154,6 +158,7 @@ class InspectionStatusTest {
     assertThat(histories.count()).isEqualTo(1);
   }
 
+  // 상태 변경 후 신청 정보 유지
   @Test
   void recordsForwardTransitionsAndPreservesApplication() throws Exception {
     change("SCHEDULED");
@@ -167,7 +172,7 @@ class InspectionStatusTest {
     assertThat(rows).hasSize(3);
     assertThat(rows)
         .extracting(row -> row.get("previous_status"))
-        .containsExactly("WAITING", "SCHEDULED", "IN_PROGRESS");
+        .containsExactly("RECEIVED", "SCHEDULED", "IN_PROGRESS");
     assertThat(rows)
         .extracting(row -> row.get("status"))
         .containsExactly("SCHEDULED", "IN_PROGRESS", "COMPLETED");
@@ -198,8 +203,8 @@ class InspectionStatusTest {
 
   @ParameterizedTest
   @CsvSource({
-    "WAITING,IN_PROGRESS",
-    "WAITING,COMPLETED",
+    "RECEIVED,IN_PROGRESS",
+    "RECEIVED,COMPLETED",
     "SCHEDULED,COMPLETED",
     "IN_PROGRESS,SCHEDULED",
     "COMPLETED,SCHEDULED",
@@ -219,6 +224,7 @@ class InspectionStatusTest {
         .isEqualTo(previous);
   }
 
+  // 방문 시각 전 수동 진행 차단
   @Test
   void cannotStartBeforeVisitTimeOrWithoutIt() throws Exception {
     for (LocalDateTime visitAt : new LocalDateTime[] {null, NOW.plusSeconds(1)}) {
@@ -236,7 +242,7 @@ class InspectionStatusTest {
     change("IN_PROGRESS");
   }
 
-  /** 시간을 진행시켜 자동 저장, 시스템 처리 이력과 중복 방지를 검증한다. */
+  // 방문 시각 이후 자동 전환과 이력 저장
   @Test
   void automaticallyStartsAtVisitTimeAndCatchesUpOverdueVisits() {
     var scheduler = new InspectionAutoStartScheduler(inspections, service, inspectionClock);
@@ -261,12 +267,13 @@ class InspectionStatusTest {
         .isEqualTo(InspectionStatus.IN_PROGRESS);
   }
 
+  // 자동 전환 대상 제한
   @Test
   void automaticStartSkipsMissingTimeAndOtherStates() {
     var scheduler = new InspectionAutoStartScheduler(inspections, service, inspectionClock);
     seed("SCHEDULED", null);
     scheduler.startDueInspections();
-    for (String state : List.of("WAITING", "IN_PROGRESS", "COMPLETED")) {
+    for (String state : List.of("RECEIVED", "IN_PROGRESS", "COMPLETED")) {
       seed(state, NOW.minusDays(1));
       scheduler.startDueInspections();
       assertThat(inspections.findById(inspectionId).orElseThrow().getStatus().name())
@@ -275,6 +282,7 @@ class InspectionStatusTest {
     assertThat(histories.count()).isZero();
   }
 
+  // 수동·자동 전환 간 중복 이력 방지
   @Test
   void manualAndAutomaticStartRaceCreatesOneHistory() throws Exception {
     seed("SCHEDULED", NOW);
@@ -338,15 +346,23 @@ class InspectionStatusTest {
                 .content(body("SCHEDULED")))
         .andExpect(status().isInternalServerError());
     assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
-        .isEqualTo(InspectionStatus.WAITING);
+        .isEqualTo(InspectionStatus.RECEIVED);
     assertThat(histories.count()).isZero();
   }
 
+  // 폐기한 상태와 잘못된 ID 거절
   @Test
   void validatesRequestAndInspectionId() throws Exception {
     for (String invalid :
         List.of(
-            "{}", "{\"status\":null}", body("WAITING"), body("UNKNOWN"), body("scheduled"), "{")) {
+            "{}",
+            "{\"status\":null}",
+            body("RECEIVED"),
+            body("WAITING"),
+            body("SUBMITTED"),
+            body("UNKNOWN"),
+            body("scheduled"),
+            "{")) {
       mvc.perform(
               patch(path())
                   .header("Authorization", "Bearer " + token)

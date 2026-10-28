@@ -9,7 +9,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
 class InspectionMigrationTest {
-  /** 기존 접수 완료 신청에만 대기 점검을 만들고 신청당 한 건 제약을 유지한다. */
+  // V13 점검 생성과 중복 생성 제한
   @Test
   void createsWaitingInspectionOnlyForReceivedApplications() throws Exception {
     String url = "jdbc:h2:mem:inspection-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -45,6 +45,41 @@ class InspectionMigrationTest {
         rows.next();
         assertThat(rows.getInt(1)).isEqualTo(2);
       }
+      statement.executeUpdate(
+          "UPDATE inspections SET status = 'SCHEDULED', scheduled_at = '2030-01-03 14:00:00'");
+      var assignmentMigration = Flyway.configure().dataSource(url, "sa", "").target("14").load();
+      assertThat(assignmentMigration.migrate().migrationsExecuted).isEqualTo(1);
+      assignmentMigration.validate();
+      try (var rows =
+          statement.executeQuery(
+              "SELECT status, scheduled_at, inspector_user_id, pre_visit_notice FROM inspections")) {
+        assertThat(rows.next()).isTrue();
+        assertThat(rows.getString("status")).isEqualTo("SCHEDULED");
+        assertThat(rows.getTimestamp("scheduled_at").toLocalDateTime())
+            .isEqualTo(java.time.LocalDateTime.of(2030, 1, 3, 14, 0));
+        assertThat(rows.getObject("inspector_user_id")).isNull();
+        assertThat(rows.getObject("pre_visit_notice")).isNull();
+      }
+      assertThatThrownBy(
+              () -> statement.executeUpdate("UPDATE inspections SET inspector_user_id = 999999"))
+          .isInstanceOf(SQLException.class);
+      statement.executeUpdate(
+          "UPDATE inspections SET inspector_user_id = 1, pre_visit_notice = '기존 안내'");
+      var auditMigration = Flyway.configure().dataSource(url, "sa", "").target("15").load();
+      assertThat(auditMigration.migrate().migrationsExecuted).isEqualTo(1);
+      auditMigration.validate();
+      try (var rows =
+          statement.executeQuery(
+              "SELECT inspector_user_id, pre_visit_notice, scheduled_by_user_id, assigned_at FROM inspections")) {
+        assertThat(rows.next()).isTrue();
+        assertThat(rows.getLong("inspector_user_id")).isEqualTo(1L);
+        assertThat(rows.getString("pre_visit_notice")).isEqualTo("기존 안내");
+        assertThat(rows.getObject("scheduled_by_user_id")).isNull();
+        assertThat(rows.getObject("assigned_at")).isNull();
+      }
+      assertThatThrownBy(
+              () -> statement.executeUpdate("UPDATE inspections SET scheduled_by_user_id = 999999"))
+          .isInstanceOf(SQLException.class);
     }
   }
 }

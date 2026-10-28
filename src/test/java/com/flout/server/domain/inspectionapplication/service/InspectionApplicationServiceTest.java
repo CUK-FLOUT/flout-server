@@ -67,7 +67,7 @@ class InspectionApplicationServiceTest {
 
     assertThat(response.applicationId()).isEqualTo(100L);
     assertThat(response.receiptNo()).hasSize(20);
-    assertThat(response.status()).isEqualTo(InspectionApplicationStatus.SUBMITTED);
+    assertThat(response.status()).isEqualTo(InspectionApplicationStatus.RECEIVED);
     verify(submissionTransaction).create(eq(applicant), eq(assessment), any());
   }
 
@@ -226,8 +226,9 @@ class InspectionApplicationServiceTest {
   private CreateInspectionApplicationResponse submissionResponse() {
     return new CreateInspectionApplicationResponse(
         100L,
+        200L,
         "IA-0123456789ABCDE12",
-        InspectionApplicationStatus.SUBMITTED,
+        InspectionApplicationStatus.RECEIVED,
         LocalDateTime.of(2026, 1, 1, 10, 0));
   }
 

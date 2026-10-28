@@ -27,10 +27,10 @@ public class ApplicationStatusHistory {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-  public static ApplicationStatusHistory submitted(InspectionApplication application) {
+  public static ApplicationStatusHistory received(InspectionApplication application) {
     ApplicationStatusHistory history = new ApplicationStatusHistory();
     history.application = application;
-    history.status = InspectionApplicationStatus.SUBMITTED;
+    history.status = InspectionApplicationStatus.RECEIVED;
     return history;
   }
 

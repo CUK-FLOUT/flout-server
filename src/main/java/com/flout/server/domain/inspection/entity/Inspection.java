@@ -1,6 +1,7 @@
 package com.flout.server.domain.inspection.entity;
 
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
+import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -26,6 +27,20 @@ public class Inspection {
   @Column(name = "scheduled_at")
   private LocalDateTime scheduledAt;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "inspector_user_id")
+  private User inspector;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "scheduled_by_user_id")
+  private User scheduledBy;
+
+  @Column(name = "assigned_at")
+  private LocalDateTime assignedAt;
+
+  @Column(name = "pre_visit_notice", columnDefinition = "TEXT")
+  private String preVisitNotice;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private InspectionStatus status;
@@ -36,18 +51,32 @@ public class Inspection {
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
 
-  public static Inspection waiting(InspectionApplication application) {
+  // 신청 직후 접수 상태
+  public static Inspection received(InspectionApplication application) {
     Inspection inspection = new Inspection();
     inspection.application = application;
-    inspection.status = InspectionStatus.WAITING;
+    inspection.status = InspectionStatus.RECEIVED;
     return inspection;
   }
 
-  /** 배정 여부와 관계없이 허용된 순서로 상태를 변경한다. */
+  // 상태 변경 순서 검사
   public void changeStatus(InspectionStatus next, LocalDateTime changedAt) {
     if (!status.canTransitionTo(next)) throw new IllegalStateException("허용되지 않은 점검 상태 변경입니다.");
     status = next;
     updatedAt = changedAt;
+  }
+
+  // 재배정 방지
+  public void assign(User operator, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
+    if (this.inspector != null) throw new IllegalStateException("이미 배정된 점검입니다.");
+    if (status != InspectionStatus.SCHEDULED)
+      throw new IllegalStateException("예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
+    this.inspector = operator;
+    this.scheduledAt = scheduledAt;
+    this.preVisitNotice = notice;
+    this.scheduledBy = operator;
+    this.assignedAt = now;
+    this.updatedAt = now;
   }
 
   @PrePersist

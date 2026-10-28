@@ -26,8 +26,9 @@ class InspectionApplicationControllerTest {
     CreateInspectionApplicationResponse expected =
         new CreateInspectionApplicationResponse(
             1L,
+            2L,
             "IA-20261028-0001",
-            InspectionApplicationStatus.SUBMITTED,
+            InspectionApplicationStatus.RECEIVED,
             LocalDateTime.of(2026, 10, 28, 10, 30));
     when(service.submit(eq(1L), any(CreateInspectionApplicationRequest.class)))
         .thenReturn(expected);

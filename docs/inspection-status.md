@@ -2,6 +2,9 @@
 
 ## PATCH /api/admin/inspections/{inspectionId}/status
 
+새 신청은 제출 즉시 신청·점검을 모두 `RECEIVED`(접수)로 생성합니다.
+점검 ID는 신청 성공 응답의 `inspectionId`로 확인합니다. [신청 흐름](inspection-application.md)을 참고하세요.
+
 Swagger 그룹은 `운영자-현장점검 관리`입니다. 운영자 Access Token을
 `Authorization: Bearer {accessToken}` 헤더로 전달합니다.
 `inspectionId`는 신청 ID가 아닌 `inspections.inspection_id`이며 양의 정수입니다.
@@ -18,13 +21,13 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다. 운영자 Access Tok
 | IN_PROGRESS | 점검 진행 |
 | COMPLETED | 점검 완료 |
 
-- 초기 `WAITING` 상태에서 `SCHEDULED → IN_PROGRESS → COMPLETED` 순서로 변경합니다.
+- 초기 `RECEIVED`(접수) 상태에서 `SCHEDULED`(점검 예정) → `IN_PROGRESS`(점검 진행) → `COMPLETED`(점검 완료) 순서로 변경합니다.
 - 단계 건너뛰기와 이전 상태로 되돌리기는 409를 반환합니다.
 - **담당자와 방문 일정을 배정하지 않아도 예정으로 변경할 수 있습니다.**
 - 진행으로 수동 변경하려면 `scheduled_at`에 확정 방문 일시가 있어야 하며, 한국 시간 기준 해당 일시 이상이어야 합니다. 미지정 또는 시간이 되기 전에는 409입니다.
 - 서버는 기본 5초 주기로 확정 방문 일시가 지난 예정 점검을 `IN_PROGRESS`로 저장합니다. 서버 중지 중 시간이 지난 경우에도 다음 실행 시 처리합니다.
 - 자동 처리에도 변경 이력을 남기며 `change_source=AUTO`, 처리자 ID는 NULL입니다. 수동 처리는 `MANUAL`과 운영자 ID를 저장합니다.
-- 별도 배정 API는 점검이 예정 상태일 때만 배정할 수 있도록 구현할 예정이며, 이번 변경에는 포함하지 않습니다.
+- `POST /api/admin/inspections/{inspectionId}/assignment`로 담당자·방문 일정·방문 전 안내를 저장합니다. DB에 예정 상태가 먼저 저장되어 있어야 합니다. [배정 API 설명](inspection-assignment.md)을 참고하세요.
 - 같은 상태로 재요청하면 200을 반환하고 시각을 갱신하거나 이력을 중복 저장하지 않습니다.
 - 점검 행 잠금으로 동시 요청을 순차 처리합니다. 동시에 같은 상태를 요청하면 모두 200이지만 실제 변경 이력은 한 건만 생성됩니다.
 - 변경 전후 상태, 처리자 ID, 처리 시각을 `inspection_status_histories`에 기록합니다.
@@ -48,6 +51,7 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다. 운영자 Access Tok
   "message": "점검 상태가 저장되었습니다.",
   "result": {
     "inspectionId": 1,
+    "receiptNo": "000001",
     "status": "SCHEDULED",
     "updatedAt": "2026-10-28T19:00:00"
   },
@@ -55,11 +59,16 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다. 운영자 Access Tok
 }
 ```
 
+저장 완료 화면에는 `result.receiptNo`(접수번호)와 `result.status`(처리 상태)를 사용합니다.
+`receiptNo`는 연결된 신청 ID를 최소 6자리로 표시합니다(신청 ID 1 → `000001`).
+점검 ID 기준이 아니며 6자리를 넘는 번호는 자르지 않습니다. 신청 테이블의 기존 접수번호는 변경하지 않습니다.
+상태는 `SCHEDULED` → 점검 예정, `IN_PROGRESS` → 점검 진행, `COMPLETED` → 점검 완료로 표시합니다.
+
 ### 오류
 
 | 상태 | 코드 | 의미 |
 | --- | --- | --- |
-| 400 | COMMON_400_2 | 상태 누락·null·알 수 없는 값·WAITING 요청 또는 잘못된 본문 |
+| 400 | COMMON_400_2 | 상태 누락·null·알 수 없는 값·RECEIVED 복귀 요청 또는 잘못된 본문 |
 | 400 | COMMON_400_3 | 점검 ID 형식·범위 오류 |
 | 401 | COMMON_401_1 | 토큰 누락 |
 | 401 | COMMON_401_3 | 유효하지 않거나 만료된 토큰 |
@@ -75,8 +84,10 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다. 운영자 Access Tok
 ### DB
 
 V13에서 점검과 점검 상태 이력 테이블을 생성합니다.
-기존 `RECEIVED` 신청에 대해 신청당 하나의 `WAITING` 점검을 생성하며 `SUBMITTED` 신청에는 생성하지 않습니다.
-이후 새 신청의 점검 생성은 향후 접수 처리 흐름에서 `Inspection.waiting(application)`을 저장하는 방식으로 연결해야 합니다.
+V16은 과거 `SUBMITTED` 신청과 `WAITING` 점검·이력을 `RECEIVED`(접수)로 통일합니다.
+기존 점검의 일정·변경 시각과 예정·진행·완료 상태는 보존합니다.
+점검이 없는 기존 신청에만 접수 점검을 생성합니다.
+새 신청은 제출 트랜잭션에서 `Inspection.received(application)`을 함께 저장합니다.
 이 상태 변경 API는 없는 점검을 자동 생성하지 않습니다.
 확정 방문 일시는 별도 배정·일정 저장 API에서 `inspections.scheduled_at`에 저장해야 합니다.
 
