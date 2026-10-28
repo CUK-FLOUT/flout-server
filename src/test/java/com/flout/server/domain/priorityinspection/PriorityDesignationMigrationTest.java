@@ -67,6 +67,20 @@ class PriorityDesignationMigrationTest {
         columns.next();
         assertThat(columns.getInt(1)).isZero();
       }
+      var order = Flyway.configure().dataSource(url, "sa", "").target("20").load();
+      assertThat(order.migrate().migrationsExecuted).isEqualTo(1);
+      order.validate();
+      assertThat(order.migrate().migrationsExecuted).isZero();
+      try (var row =
+          sql.executeQuery(
+              "SELECT selection_order, designated_by_user_id, designated_at, order_updated_at FROM priority_inspection_designations WHERE application_id = 1")) {
+        assertThat(row.next()).isTrue();
+        assertThat(row.getInt(1)).isEqualTo(1);
+        assertThat(row.getLong(2)).isEqualTo(2);
+        assertThat(row.getTimestamp(3).toLocalDateTime())
+            .isEqualTo(java.time.LocalDateTime.of(2030, 1, 2, 14, 0));
+        assertThat(row.getTimestamp(4)).isNull();
+      }
       try (var row =
           sql.executeQuery(
               "SELECT internal_memo FROM inspection_applications WHERE application_id = 1")) {
