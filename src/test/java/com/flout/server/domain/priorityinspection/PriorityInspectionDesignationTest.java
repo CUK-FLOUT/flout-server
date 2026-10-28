@@ -767,7 +767,12 @@ class PriorityInspectionDesignationTest {
                     "$.paths['/api/admin/priority-inspections/order'].put.responses['200'].content['application/json'].examples.orderSaved.value.code")
                 .value("PRIORITY_INSPECTION_200_3"))
         .andExpect(
-            jsonPath("$.paths['/api/admin/priority-inspections/order'].put.responses['409']")
-                .exists());
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/order'].put.responses['404'].description")
+                .value("현장점검 신청을 찾을 수 없습니다."))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/order'].put.responses['409'].description")
+                .value("우선점검 미지정 신청 포함 또는 전체 대상 목록 불일치"));
   }
 }

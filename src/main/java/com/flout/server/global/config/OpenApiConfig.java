@@ -417,6 +417,11 @@ public class OpenApiConfig {
         null);
     addError(operation, "notDesignated", PriorityInspectionErrorCode.NOT_DESIGNATED, null);
     addError(operation, "orderListChanged", PriorityInspectionErrorCode.ORDER_LIST_CHANGED, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    operation.getResponses().get("409").setDescription("우선점검 미지정 신청 포함 또는 전체 대상 목록 불일치");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
