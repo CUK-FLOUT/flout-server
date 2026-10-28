@@ -24,5 +24,6 @@ THIRD_PARTY_PROVISION, STATUS_NOTIFICATION 유형으로 버전·동의 시각과
 버전 설정은 Google 가입과 동일한 `THIRD_PARTY_PROVISION_VERSION`, `STATUS_NOTIFICATION_VERSION`을 사용합니다.
 기존 회원의 동의 이력은 V6에서 TERMS → THIRD_PARTY_PROVISION, PRIVACY → STATUS_NOTIFICATION으로 유형만 변경합니다.
 동의 여부·버전·시각은 유지하며 로그인 시 동의를 다시 받지 않습니다.
-같은 회원의 동일 버전 새 유형 기록과 충돌하면 새 기록은 유지하고, 옛 기록은
-`user_consent_migration_conflicts`에 원본 정보와 변환 대상 유형을 보존합니다.
+같은 회원의 동일 버전 새 유형 기록과 충돌하면 새 기록을 유지합니다.
+V6에서 사용했던 임시 보관 테이블 `user_consent_migration_conflicts`는 현재 기능에서 사용하지 않아 V17에서 삭제합니다.
+현재 사용하는 `user_consents`의 동의 여부·버전·시각은 변경하지 않습니다.

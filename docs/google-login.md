@@ -77,8 +77,9 @@ Workspace 이메일이 등록 주소와 일치할 때만 최초 로그인에서 
 운영자 계정은 주민 Google API에서 로그인할 수 없고, 주민 계정은 운영자 Google API에서 로그인할 수 없습니다.
 DB 변경은 Flyway V4에서 nullable 고유 `google_subject` 컬럼을 추가합니다.
 Flyway V5에서는 기존 동의 유형을 유지하면서 Google 가입용 두 동의 유형을 추가합니다.
-V6 변환 시 같은 회원·유형·버전의 새 기록이 이미 있으면 새 기록을 유지하고,
-충돌하는 옛 기록은 `user_consent_migration_conflicts`에 원본 유형·변환 대상·동의 여부·버전·시각과 함께 보존합니다.
+V6 변환 시 같은 회원·유형·버전의 새 기록이 이미 있으면 새 기록을 유지합니다.
+변환 당시 사용했던 임시 보관 테이블 `user_consent_migration_conflicts`는 현재 기능에서 사용하지 않아 V17에서 삭제합니다.
+현재 회원의 동의 정보는 `user_consents`에 유지됩니다.
 
 ## 참고
 

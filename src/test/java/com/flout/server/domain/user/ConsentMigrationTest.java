@@ -8,7 +8,8 @@ import org.junit.jupiter.api.Test;
 
 class ConsentMigrationTest {
   @Test
-  void preservesBothHistoriesWhenOldAndNewTypesHaveTheSameVersion() throws Exception {
+  void archivesLegacyCollisionsThenRemovesUnusedArchiveWithoutChangingCurrentConsents()
+      throws Exception {
     String url = "jdbc:h2:mem:consent-migration-collision;MODE=MySQL;DB_CLOSE_DELAY=-1";
     Flyway.configure().dataSource(url, "sa", "").target("5").load().migrate();
     try (var connection = DriverManager.getConnection(url, "sa", "");
@@ -26,7 +27,7 @@ class ConsentMigrationTest {
                  (1, 'THIRD_PARTY_PROVISION', '1.0', FALSE, '2026-02-01 12:00:00'),
                  (1, 'STATUS_NOTIFICATION', '1.0', TRUE, '2026-02-02 12:00:00')
           """);
-      var flyway = Flyway.configure().dataSource(url, "sa", "").load();
+      var flyway = Flyway.configure().dataSource(url, "sa", "").target("6").load();
       flyway.migrate();
       assertThat(flyway.migrate().migrationsExecuted).isZero();
       try (var archived =
@@ -50,6 +51,16 @@ class ConsentMigrationTest {
         assertThat(archived.getTimestamp("agreed_at").toLocalDateTime().toString())
             .isEqualTo("2026-01-02T12:00");
         assertThat(archived.next()).isFalse();
+      }
+      var latest = Flyway.configure().dataSource(url, "sa", "").load();
+      latest.migrate();
+      latest.validate();
+      assertThat(latest.migrate().migrationsExecuted).isZero();
+      try (var tables =
+          statement.executeQuery(
+              "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'USER_CONSENT_MIGRATION_CONFLICTS'")) {
+        tables.next();
+        assertThat(tables.getInt(1)).isZero();
       }
       try (var active = statement.executeQuery("SELECT * FROM user_consents ORDER BY consent_id")) {
         assertThat(active.next()).isTrue();
