@@ -54,6 +54,8 @@ public class AdminInspectionListController {
           int page,
       @Parameter(description = "페이지 크기 1~100", example = "10") @RequestParam(defaultValue = "10")
           int size) {
+    // ALL은 조회 전용 옵션이다. 저장된 점검 상태로 변환하지 않고 null로 전달해 상태 조건을 생략한다.
+    // 인증된 사용자 ID만 서비스에 전달하며 관할 정보는 요청 파라미터로 받지 않는다.
     return SuccessResponse.of(
         service.search(
             Long.valueOf(jwt.getSubject()),
