@@ -1,6 +1,8 @@
 package com.flout.server.domain.inspection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -86,6 +88,20 @@ class InspectionListTest {
   record Created(Long inspectionId, Long applicationId) {}
 
   @Test
+  void detailOpenApiDeclaresNullableFields() throws Exception {
+    var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+    for (String field :
+        List.of("detailAddress", "preferredVisitDate", "preferredTimeSlot", "inspectorName")) {
+      response.andExpect(
+          jsonPath("$.components.schemas.InspectionDetailResponse.properties." + field + ".type")
+              .value(hasItems("string", "null")));
+    }
+    response.andExpect(
+        jsonPath("$.components.schemas.InspectionDetailResponse.properties.inspectorId.type")
+            .value(hasItems("integer", "null")));
+  }
+
+  @Test
   void returnsAssignmentDetailWithResidentPreferencesAndAssignedInspector() throws Exception {
     var target =
         create(
@@ -123,10 +139,10 @@ class InspectionListTest {
             get("/api/admin/inspections/{inspectionId}", target.inspectionId())
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.preferredVisitDate").isEmpty())
-        .andExpect(jsonPath("$.result.preferredTimeSlot").isEmpty())
-        .andExpect(jsonPath("$.result.inspectorId").isEmpty())
-        .andExpect(jsonPath("$.result.inspectorName").isEmpty());
+        .andExpect(jsonPath("$.result.preferredVisitDate").value(nullValue()))
+        .andExpect(jsonPath("$.result.preferredTimeSlot").value(nullValue()))
+        .andExpect(jsonPath("$.result.inspectorId").value(nullValue()))
+        .andExpect(jsonPath("$.result.inspectorName").value(nullValue()));
   }
 
   @Test
