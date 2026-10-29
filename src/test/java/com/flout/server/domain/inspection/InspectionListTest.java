@@ -85,6 +85,80 @@ class InspectionListTest {
 
   record Created(Long inspectionId, Long applicationId) {}
 
+  @Test
+  void returnsAssignmentDetailWithResidentPreferencesAndAssignedInspector() throws Exception {
+    var target =
+        create(
+            "부천시 원미구 길주로 53",
+            InspectionStatus.SCHEDULED,
+            LocalDate.of(2026, 11, 3),
+            PreferredTimeSlot.MORNING,
+            secondOperator.getId());
+    var before = jdbc.queryForList("SELECT * FROM inspections");
+    mvc.perform(
+            get("/api/admin/inspections/{inspectionId}", target.inspectionId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("INSPECTION_200_4"))
+        .andExpect(jsonPath("$.result.inspectionId").value(target.inspectionId()))
+        .andExpect(jsonPath("$.result.applicationId").value(target.applicationId()))
+        .andExpect(
+            jsonPath("$.result.receiptNo")
+                .value(String.format(Locale.ROOT, "%06d", target.applicationId())))
+        .andExpect(jsonPath("$.result.applicantName").value("주민"))
+        .andExpect(jsonPath("$.result.address").value("부천시 원미구 길주로 53"))
+        .andExpect(jsonPath("$.result.detailAddress").value("101호"))
+        .andExpect(jsonPath("$.result.contact").value("010-0000-0000"))
+        .andExpect(jsonPath("$.result.preferredVisitDate").value("2026-11-03"))
+        .andExpect(jsonPath("$.result.preferredTimeSlot").value("MORNING"))
+        .andExpect(jsonPath("$.result.inspectorId").value(secondOperator.getId()))
+        .andExpect(jsonPath("$.result.inspectorName").value("이담당"));
+    assertThat(jdbc.queryForList("SELECT * FROM inspections")).isEqualTo(before);
+  }
+
+  @Test
+  void detailAllowsMissingPreferencesAndUnassignedInspector() throws Exception {
+    var target = create("부천시 소사구 경인로 1", InspectionStatus.RECEIVED, null, null, null);
+    mvc.perform(
+            get("/api/admin/inspections/{inspectionId}", target.inspectionId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.preferredVisitDate").isEmpty())
+        .andExpect(jsonPath("$.result.preferredTimeSlot").isEmpty())
+        .andExpect(jsonPath("$.result.inspectorId").isEmpty())
+        .andExpect(jsonPath("$.result.inspectorName").isEmpty());
+  }
+
+  @Test
+  void detailRejectsInvalidMissingUnauthorizedAndOutsideJurisdiction() throws Exception {
+    var outside = create("서울특별시 부천시 원미구 길주로 1", InspectionStatus.RECEIVED, null, null, null);
+    mvc.perform(
+            get("/api/admin/inspections/{inspectionId}", outside.inspectionId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("INSPECTION_403_2"));
+    mvc.perform(get("/api/admin/inspections/0").header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            get("/api/admin/inspections/not-a-number").header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            get("/api/admin/inspections/9223372036854775807")
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("INSPECTION_404_1"));
+    mvc.perform(get("/api/admin/inspections/1")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/inspections/1")
+                .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
+        .andExpect(status().isForbidden());
+    jdbc.update("UPDATE users SET jurisdiction_id = NULL WHERE user_id = ?", operator.getId());
+    mvc.perform(
+            get("/api/admin/inspections/{inspectionId}", outside.inspectionId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
   // 신청 ID와 점검 ID를 별도로 생성해 목록에 연결
   private Created create(
       String address,
