@@ -158,24 +158,29 @@ class InspectionListTest {
         jdbc.queryForList("SELECT * FROM inspection_applications ORDER BY application_id");
     var beforeInspections = jdbc.queryForList("SELECT * FROM inspections ORDER BY inspection_id");
     var beforeDesignations = jdbc.queryForList("SELECT * FROM priority_inspection_designations");
+    mvc.perform(list().param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.inspections[0].applicationId").value(first.applicationId()))
+        .andExpect(jsonPath("$.result.inspections[0].designated").value(true))
+        .andExpect(jsonPath("$.result.totalElements").value(3));
     var response =
         mvc.perform(list())
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("INSPECTION_200_3"))
             .andExpect(jsonPath("$.result.totalElements").value(3))
             .andExpect(
-                jsonPath("$.result.inspections[0].applicationId").value(last.applicationId()))
-            .andExpect(jsonPath("$.result.inspections[0].inspectionId").value(last.inspectionId()))
-            .andExpect(jsonPath("$.result.inspections[0].address").value("오정구"))
-            .andExpect(jsonPath("$.result.inspections[0].preferredVisitDate").isEmpty())
-            .andExpect(jsonPath("$.result.inspections[0].preferredTimeSlot").isEmpty())
-            .andExpect(jsonPath("$.result.inspections[0].inspectorName").isEmpty())
-            .andExpect(jsonPath("$.result.inspections[1].address").value("소사구"))
-            .andExpect(jsonPath("$.result.inspections[1].inspectorName").value("김담당"))
-            .andExpect(jsonPath("$.result.inspections[2].address").value("원미구"))
-            .andExpect(jsonPath("$.result.inspections[2].designated").value(true))
+                jsonPath("$.result.inspections[1].applicationId").value(last.applicationId()))
+            .andExpect(jsonPath("$.result.inspections[1].inspectionId").value(last.inspectionId()))
+            .andExpect(jsonPath("$.result.inspections[1].address").value("오정구"))
+            .andExpect(jsonPath("$.result.inspections[1].preferredVisitDate").isEmpty())
+            .andExpect(jsonPath("$.result.inspections[1].preferredTimeSlot").isEmpty())
+            .andExpect(jsonPath("$.result.inspections[1].inspectorName").isEmpty())
+            .andExpect(jsonPath("$.result.inspections[2].address").value("소사구"))
+            .andExpect(jsonPath("$.result.inspections[2].inspectorName").value("김담당"))
+            .andExpect(jsonPath("$.result.inspections[0].address").value("원미구"))
+            .andExpect(jsonPath("$.result.inspections[0].designated").value(true))
             .andExpect(
-                jsonPath("$.result.inspections[2].receiptNo")
+                jsonPath("$.result.inspections[0].receiptNo")
                     .value(String.format(Locale.ROOT, "%06d", first.applicationId())))
             .andReturn()
             .getResponse()

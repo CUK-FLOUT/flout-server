@@ -66,7 +66,7 @@ public class InspectionListRepository {
     }
     // 건수와 목록이 같은 JOIN·WHERE 절을 공유해야 필터 적용 후 페이지 수가 일치한다.
     long total = jdbc.queryForObject("SELECT COUNT(*) " + filter, params, Long.class);
-    // 신청 ID가 같아도 점검 ID로 순서를 결정해 동일 조건의 페이지 정렬을 일관되게 유지한다.
+    // 우선점검을 먼저 배치하고 신청 ID·점검 ID로 페이지 정렬을 일관되게 유지한다.
     var items =
         jdbc.query(
             """
@@ -74,7 +74,8 @@ public class InspectionListRepository {
           a.preferred_visit_date, a.preferred_time_slot, i.inspector_user_id, u.name AS inspector_name, i.status
         """
                 + filter
-                + " ORDER BY a.application_id DESC, i.inspection_id DESC LIMIT :limit OFFSET :offset",
+                + " ORDER BY CASE WHEN d.application_id IS NOT NULL THEN 0 ELSE 1 END,"
+                + " a.application_id DESC, i.inspection_id DESC LIMIT :limit OFFSET :offset",
             params,
             (rs, rowNum) -> {
               // 선택 입력값의 SQL NULL을 응답에도 유지한다. 화면용 대체 문구는 만들지 않는다.
