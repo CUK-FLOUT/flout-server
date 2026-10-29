@@ -530,6 +530,7 @@ public class OpenApiConfig {
         operation, "duplicateApplication", PriorityInspectionErrorCode.DUPLICATE_APPLICATION, null);
   }
 
+  // 일괄 요청 검증·권한·신청 오류 문서화
   private void describePriorityDesignationErrors(Operation operation) {
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription("우선점검 대상 일괄 지정 또는 취소 완료");
@@ -539,6 +540,11 @@ public class OpenApiConfig {
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "우선점검 지정 여부를 선택해주세요.");
     addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "batchLimitExceeded",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "신청 ID는 한 번에 최대 500개까지 전달할 수 있습니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(

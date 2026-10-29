@@ -3,6 +3,7 @@ package com.flout.server.domain.priorityinspection.service;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionDesignationsRequest;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationsResponse;
 import com.flout.server.domain.priorityinspection.entity.PriorityInspectionDesignation;
@@ -37,6 +38,7 @@ public class PriorityInspectionDesignationService {
       Long operatorId, List<Long> applicationIds, boolean designated) {
     if (applicationIds == null
         || applicationIds.isEmpty()
+        || applicationIds.size() > UpdatePriorityInspectionDesignationsRequest.MAX_APPLICATIONS
         || applicationIds.stream().anyMatch(id -> id == null || id <= 0))
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY);
     if (new HashSet<>(applicationIds).size() != applicationIds.size())

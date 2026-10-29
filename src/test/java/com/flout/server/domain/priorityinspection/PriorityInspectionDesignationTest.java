@@ -305,6 +305,34 @@ class PriorityInspectionDesignationTest {
                 .exists());
   }
 
+  // 최대 건수는 조회 페이지 크기와 독립적으로 검증
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void bulkAllowsFiveHundredIdsAndRejectsFiveHundredOne(boolean designated) throws Exception {
+    var ids = java.util.stream.LongStream.range(100000, 100500).boxed().toList();
+    bulk(ids, designated).andExpect(status().isNotFound());
+    var tooMany = java.util.stream.LongStream.range(100000, 100501).boxed().toList();
+    bulk(tooMany, designated)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON_400_2"))
+        .andExpect(jsonPath("$.message").value("신청 ID는 한 번에 최대 500개까지 전달할 수 있습니다."));
+    assertThat(designations.count()).isZero();
+  }
+
+  @Test
+  void swaggerDocumentsBulkLimitAndErrorExample() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.UpdatePriorityInspectionDesignationsRequest.properties.applicationIds.maxItems")
+                .value(500))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/designation'].put.responses['400'].content['application/json'].examples.batchLimitExceeded.value.message")
+                .value("신청 ID는 한 번에 최대 500개까지 전달할 수 있습니다."));
+  }
+
   private String path() {
     return "/api/admin/priority-inspections/designation";
   }
