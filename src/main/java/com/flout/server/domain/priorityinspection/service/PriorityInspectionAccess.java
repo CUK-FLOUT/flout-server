@@ -22,6 +22,12 @@ public class PriorityInspectionAccess {
 
   // 관할 잠금으로 지정·취소·순서 저장 직렬화
   public User lockJurisdiction(Long operatorId) {
+    var operator = requireJurisdiction(operatorId);
+    entityManager.lock(operator.getJurisdiction(), LockModeType.PESSIMISTIC_WRITE);
+    return operator;
+  }
+
+  public User requireJurisdiction(Long operatorId) {
     var operator =
         users
             .findById(operatorId)
@@ -30,7 +36,6 @@ public class PriorityInspectionAccess {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
       throw new BaseException(PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    entityManager.lock(operator.getJurisdiction(), LockModeType.PESSIMISTIC_WRITE);
     return operator;
   }
 

@@ -2,13 +2,17 @@ package com.flout.server.domain.priorityinspection.controller;
 
 import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionDesignationRequest;
 import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionOrderRequest;
+import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionCandidatesResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderResponse;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
+import com.flout.server.domain.priorityinspection.service.PriorityInspectionCandidateService;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionDesignationService;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionOrderService;
+import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,35 @@ import org.springframework.web.bind.annotation.*;
 public class AdminPriorityInspectionController {
   private final PriorityInspectionDesignationService service;
   private final PriorityInspectionOrderService orderService;
+  private final PriorityInspectionCandidateService candidateService;
+
+  @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "우선점검 후보 검색·목록 조회",
+      description =
+          "관할 신청을 접수번호·주소만 검색합니다. 지역·취약도·지정 여부 필터는 함께 적용되며 생략하면 전체입니다. page는 0부터, size는 1~100이며 기본 10건입니다. 신청 ID 내림차순입니다. 인근 신청은 검색·필터·페이지와 무관하게 같은 관할에서 본인을 제외한 직선거리 1km 이내의 전체 신청 건수입니다.")
+  public SuccessResponse<PriorityInspectionCandidatesResponse> candidates(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "접수번호·주소 검색어, 최대 255자") @RequestParam(defaultValue = "")
+          String keyword,
+      @Parameter(description = "지역: 원미구·소사구·오정구. 생략 또는 빈 값이면 지역 전체", example = "원미구")
+          @RequestParam(defaultValue = "")
+          String district,
+      @Parameter(description = "취약도: HIGH=높음, CAUTION=주의, LOW=낮음. 생략하면 전체", example = "HIGH")
+          @RequestParam(required = false)
+          RiskLevel riskLevel,
+      @Parameter(description = "우선점검 지정 여부: true=지정, false=미지정. 생략하면 전체", example = "true")
+          @RequestParam(required = false)
+          Boolean designated,
+      @Parameter(description = "0부터 시작하는 페이지", example = "0") @RequestParam(defaultValue = "0")
+          int page,
+      @Parameter(description = "페이지 크기, 1~100", example = "10") @RequestParam(defaultValue = "10")
+          int size) {
+    return SuccessResponse.of(
+        candidateService.search(
+            Long.valueOf(jwt.getSubject()), keyword, district, riskLevel, designated, page, size),
+        PriorityInspectionSuccessCode.CANDIDATES_FOUND);
+  }
 
   @PutMapping(
       value = "/order",

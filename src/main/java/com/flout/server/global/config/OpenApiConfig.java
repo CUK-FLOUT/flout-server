@@ -209,6 +209,11 @@ public class OpenApiConfig {
                               describePriorityDesignation(operation);
                             }
 
+                            if (path.equals("/api/admin/priority-inspections")
+                                && method == PathItem.HttpMethod.GET) {
+                              describePriorityCandidates(operation);
+                            }
+
                             if (path.equals("/api/admin/priority-inspections/order")
                                 && method == PathItem.HttpMethod.PUT) {
                               describePriorityOrder(operation);
@@ -217,6 +222,55 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  private void describePriorityCandidates(Operation operation) {
+    var code = PriorityInspectionSuccessCode.CANDIDATES_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "priorityCandidates",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "applications",
+                List.of(
+                    Map.of(
+                        "applicationId",
+                        1,
+                        "receiptNo",
+                        "000001",
+                        "address",
+                        "경기도 부천시 원미구 길주로 210",
+                        "riskLevel",
+                        "HIGH",
+                        "floodExperience",
+                        "YES",
+                        "requestReason",
+                        "최근 배수구 역류",
+                        "nearbyApplicationCount",
+                        3,
+                        "designated",
+                        false)),
+                "page",
+                0,
+                "size",
+                10,
+                "totalElements",
+                1,
+                "totalPages",
+                1)));
+    addError(
+        operation, "invalidSearchParameter", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeSignup(Operation operation) {

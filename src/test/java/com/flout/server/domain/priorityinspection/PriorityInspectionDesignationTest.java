@@ -126,6 +126,252 @@ class PriorityInspectionDesignationTest {
     return "/api/admin/priority-inspections/" + applicationId + "/designation";
   }
 
+  @Test
+  void candidatesCountWithinOneKilometerAcrossSearchAndPages() throws Exception {
+    additionalApplication("경기 부천시 같은 위치");
+    Long inside = additionalApplication("부천시 반경 안");
+    Long outside = additionalApplication("경기도 부천시 반경 밖");
+    additionalApplication("서울특별시 부천시 다른 관할");
+    additionalApplication("부천시민로 다른 관할");
+    jdbc.update(
+        "UPDATE inspection_applications SET latitude = ? WHERE application_id = ?",
+        new BigDecimal("37.4964750"),
+        inside); // 약 999.6m
+    jdbc.update(
+        "UPDATE inspection_applications SET latitude = ? WHERE application_id = ?",
+        new BigDecimal("37.4964850"),
+        outside); // 약 1000.8m
+    designate();
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", String.format(Locale.ROOT, "%06d", applicationId))
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(2))
+        .andExpect(jsonPath("$.result.applications[0].designated").value(true));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(4))
+        .andExpect(jsonPath("$.result.totalPages").value(4))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(outside));
+  }
+
+  @Test
+  void candidatesExcludeSelfAndReturnEmptySearch() throws Exception {
+    mvc.perform(get("/api/admin/priority-inspections").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(0))
+        .andExpect(jsonPath("$.result.applications[0].designated").value(false));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "없는검색어"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "101", "-1"})
+  void candidatesRejectInvalidSize(String size) throws Exception {
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("size", size))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void candidatesRequireAdminAndAuthentication() throws Exception {
+    mvc.perform(get("/api/admin/priority-inspections")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void candidatesUseLongitudeAsWellAsLatitude() throws Exception {
+    Long eastInside = additionalApplication("부천시 동쪽 인근");
+    Long eastOutside = additionalApplication("부천시 동쪽 외곽");
+    jdbc.update(
+        "UPDATE inspection_applications SET longitude = ? WHERE application_id = ?",
+        new BigDecimal("126.8085672"),
+        eastInside);
+    jdbc.update(
+        "UPDATE inspection_applications SET longitude = ? WHERE application_id = ?",
+        new BigDecimal("126.8105672"),
+        eastOutside);
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "길주로"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(1));
+  }
+
+  @Test
+  void candidatesValidatePageKeywordAndJurisdiction() throws Exception {
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("page", "-1"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "가".repeat(256)))
+        .andExpect(status().isBadRequest());
+    jdbc.update("UPDATE users SET jurisdiction_id = NULL WHERE user_id = ?", operatorId);
+    mvc.perform(get("/api/admin/priority-inspections").header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void candidatesExcludeReasonFromSearchAndHandlePageBeyondResults() throws Exception {
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "점검 요청"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0))
+        .andExpect(jsonPath("$.result.applications").isEmpty());
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "길주로"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].requestReason").value("점검 요청"));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("page", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty())
+        .andExpect(jsonPath("$.result.totalElements").value(1));
+  }
+
+  @Test
+  void candidatesSwaggerDocumentsOneKilometerCountAndResponses() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections'].get.summary")
+                .value("우선점검 후보 검색·목록 조회"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections'].get.responses['200'].content['application/json'].examples.priorityCandidates.value.code")
+                .value("PRIORITY_INSPECTION_200_4"))
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections'].get.responses['400']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections'].get.responses['403']").exists());
+  }
+
+  @Test
+  void candidatesCombineDistrictRiskAndDesignationWithoutChangingNearbyCounts() throws Exception {
+    Long caution = additionalApplication("경기 부천시 원미구 중앙로 1");
+    additionalApplication("부천시 소사구 중앙로 2");
+    Long low = additionalApplication("경기도 부천시 오정구 중앙로 3");
+    jdbc.update(
+        "UPDATE risk_assessments SET risk_level = 'CAUTION' WHERE assessment_id = "
+            + "(SELECT assessment_id FROM inspection_applications WHERE application_id = ?)",
+        caution);
+    jdbc.update(
+        "UPDATE risk_assessments SET risk_level = 'LOW' WHERE assessment_id = "
+            + "(SELECT assessment_id FROM inspection_applications WHERE application_id = ?)",
+        low);
+    designate();
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "원미구")
+                .param("riskLevel", "HIGH")
+                .param("designated", "true")
+                .param("keyword", "길주로")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.totalPages").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(3))
+        .andExpect(jsonPath("$.result.applications[0].designated").value(true));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "오정구")
+                .param("riskLevel", "LOW")
+                .param("designated", "false"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(low))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(3));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("riskLevel", "CAUTION"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(caution));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("designated", "false"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(3));
+    mvc.perform(get("/api/admin/priority-inspections").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(4));
+  }
+
+  @Test
+  void districtFilterMatchesAdministrativeDistrictNotRoadNames() throws Exception {
+    Long sosa = additionalApplication("부천시 소사구 원미구로 1");
+    additionalApplication("부천시 원미구로 2");
+    additionalApplication("서울특별시 원미구 중앙로 3");
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "원미구"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "소사구"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(sosa));
+  }
+
+  @Test
+  void candidatesRejectInvalidFiltersAndReturnEmptyForNoMatch() throws Exception {
+    for (var filter :
+        Map.of("district", "강남구", "riskLevel", "MEDIUM", "designated", "invalid").entrySet()) {
+      mvc.perform(
+              get("/api/admin/priority-inspections")
+                  .header("Authorization", "Bearer " + token)
+                  .param(filter.getKey(), filter.getValue()))
+          .andExpect(status().isBadRequest());
+    }
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("riskLevel", "LOW"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+  }
+
   private org.springframework.test.web.servlet.ResultActions designate() throws Exception {
     return updateDesignation(true);
   }
