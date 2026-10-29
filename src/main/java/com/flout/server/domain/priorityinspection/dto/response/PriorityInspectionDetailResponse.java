@@ -27,7 +27,7 @@ public record PriorityInspectionDetailResponse(
     @Schema(description = "기존 내부 메모 API로 저장한 메모", example = "출입구 누수 확인 필요", nullable = true)
         String internalMemo) {
 
-  // 신청에 연결된 취약도로 점검 필요도 표시
+  // 저장된 신청정보와 인근 건수를 응답으로 변환하고 연결된 취약도로 점검 필요도 결정
   public static PriorityInspectionDetailResponse from(
       InspectionApplication application, long nearbyCount) {
     var risk = application.getAssessment().getRiskLevel();

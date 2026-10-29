@@ -19,7 +19,7 @@ public class PriorityInspectionDetailService {
   private final InspectionApplicationRepository applications;
   private final PriorityInspectionCandidateRepository candidates;
 
-  // 관할 검증 후 저장된 신청정보와 기존 인근 집계 결과 조회
+  // 운영자·관할·신청 ID 검증 후 지정 여부와 무관하게 상세정보 반환
   @Transactional(readOnly = true)
   public PriorityInspectionDetailResponse get(Long operatorId, Long applicationId) {
     access.requireJurisdiction(operatorId);

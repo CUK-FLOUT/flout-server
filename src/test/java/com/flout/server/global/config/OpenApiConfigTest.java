@@ -102,6 +102,22 @@ class OpenApiConfigTest {
         responses, "400", "guideNotLinkedToAssessment", "가이드가 취약도 분석 결과에 연결되어 있지 않습니다.");
   }
 
+  @Test
+  void priorityDetailNotFoundDescriptionMatchesApplicationError() {
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths()
+        .addPathItem(
+            "/api/admin/priority-inspections/{applicationId}", new PathItem().get(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    var responses =
+        api.getPaths()
+            .get("/api/admin/priority-inspections/{applicationId}")
+            .getGet()
+            .getResponses();
+    assertThat(responses.get("404").getDescription()).isEqualTo("현장점검 신청을 찾을 수 없습니다.");
+    assertExampleMessage(responses, "404", "applicationNotFound", "현장점검 신청을 찾을 수 없습니다.");
+  }
+
   @SuppressWarnings("unchecked")
   private void assertExampleMessage(
       ApiResponses responses, String status, String exampleName, String message) {

@@ -477,6 +477,10 @@ class PriorityInspectionDesignationTest {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['404'].description")
+                .value("현장점검 신청을 찾을 수 없습니다."))
+        .andExpect(
             jsonPath("$.paths['/api/admin/priority-inspections/{applicationId}'].get.summary")
                 .value("우선점검 신청정보 조회"))
         .andExpect(
