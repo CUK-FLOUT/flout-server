@@ -99,6 +99,9 @@ class InspectionListTest {
     response.andExpect(
         jsonPath("$.components.schemas.InspectionDetailResponse.properties.inspectorId.type")
             .value(hasItems("integer", "null")));
+    response.andExpect(
+        jsonPath("$.components.schemas.InspectionDetailResponse.properties.preferredTimeSlot.enum")
+            .value(org.hamcrest.Matchers.containsInAnyOrder("MORNING", "AFTERNOON", "ANY", null)));
   }
 
   @Test

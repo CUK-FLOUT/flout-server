@@ -79,6 +79,20 @@ public class OpenApiConfig {
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
+      // OpenAPI 3.1에서는 nullable enum의 허용값에도 JSON null이 포함되어야 한다.
+      if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
+        var detail = api.getComponents().getSchemas().get("InspectionDetailResponse");
+        if (detail != null && detail.getProperties() != null) {
+          Schema timeSlot = (Schema) detail.getProperties().get("preferredTimeSlot");
+          if (timeSlot != null
+              && timeSlot.getEnum() != null
+              && !timeSlot.getEnum().contains(null)) {
+            var values = new ArrayList<>(timeSlot.getEnum());
+            values.add(null);
+            timeSlot.setEnum(values);
+          }
+        }
+      }
       if (api.getTags() != null) {
         var tagOrder =
             List.of("인증/인가", "운영자-GIS 신청관리", "운영자-우선점검 관리", "운영자-현장점검 관리", "주민 주소", "현장점검 신청");
