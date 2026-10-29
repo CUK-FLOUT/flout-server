@@ -27,6 +27,7 @@ public class PriorityInspectionAccess {
     return operator;
   }
 
+  // 운영자 권한과 부천시 관할 확인
   public User requireJurisdiction(Long operatorId) {
     var operator =
         users
@@ -39,6 +40,7 @@ public class PriorityInspectionAccess {
     return operator;
   }
 
+  // 부천시 관할 주소 판별
   public boolean includes(String address) {
     return address != null && BUCHEON_ADDRESS.matcher(address.strip()).find();
   }

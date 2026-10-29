@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class PriorityInspectionCandidateRepository {
   private static final int NEARBY_RADIUS_METERS = 1000;
+  // 행정구역 경계로 부천시 주소 판별
   private static final String JURISDICTION_PATTERN = "^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)";
   private static final String FILTER =
       """
@@ -33,6 +34,7 @@ public class PriorityInspectionCandidateRepository {
       """;
   private final NamedParameterJdbcTemplate jdbc;
 
+  // 검색·필터 조건으로 후보 목록과 인근 건수 조회
   public PriorityInspectionCandidatesResponse search(
       String keyword,
       String district,
@@ -52,6 +54,7 @@ public class PriorityInspectionCandidateRepository {
             .addValue("keyword", keyword)
             .addValue("limit", size)
             .addValue("offset", (long) page * size);
+    // 목록과 전체 건수에 동일한 검색 조건 적용
     long total = jdbc.queryForObject("SELECT COUNT(*) " + FILTER, params, Long.class);
     var rows =
         jdbc.query(
@@ -76,6 +79,7 @@ public class PriorityInspectionCandidateRepository {
       return new PriorityInspectionCandidatesResponse(
           List.of(), page, size, total, (total + size - 1) / size);
     }
+    // 현재 페이지의 인근 건수를 한 번에 조회
     var counts =
         nearbyCounts(
             rows.stream().map(PriorityInspectionCandidatesResponse.Item::applicationId).toList());
@@ -97,13 +101,14 @@ public class PriorityInspectionCandidateRepository {
         items, page, size, total, (total + size - 1) / size);
   }
 
-  // 검색·페이지 조건은 기준 신청에만 적용하고 인근 건수는 관할 전체 신청에서 집계한다.
+  // 필터와 무관하게 관할 내 본인 제외 1km 신청 집계
   private Map<Long, Long> nearbyCounts(List<Long> applicationIds) {
     var params =
         new MapSqlParameterSource()
             .addValue("ids", applicationIds)
             .addValue("jurisdiction", JURISDICTION_PATTERN)
             .addValue("radius", NEARBY_RADIUS_METERS);
+    // Haversine 공식으로 좌표 간 직선거리 계산
     return jdbc
         .query(
             """

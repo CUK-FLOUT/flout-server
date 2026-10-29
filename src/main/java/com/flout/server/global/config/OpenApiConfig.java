@@ -224,6 +224,7 @@ public class OpenApiConfig {
     };
   }
 
+  // 후보 조회 성공·오류 응답 예시
   private void describePriorityCandidates(Operation operation) {
     var code = PriorityInspectionSuccessCode.CANDIDATES_FOUND;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());

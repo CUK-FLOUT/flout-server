@@ -30,6 +30,7 @@ public class AdminPriorityInspectionController {
   private final PriorityInspectionOrderService orderService;
   private final PriorityInspectionCandidateService candidateService;
 
+  // 우선점검 후보 검색·목록 조회
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "우선점검 후보 검색·목록 조회",

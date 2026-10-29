@@ -16,6 +16,7 @@ public class PriorityInspectionCandidateService {
   private final PriorityInspectionAccess access;
   private final PriorityInspectionCandidateRepository candidates;
 
+  // 조회 권한과 검색 조건 검증
   @Transactional(readOnly = true)
   public PriorityInspectionCandidatesResponse search(
       Long operatorId,
