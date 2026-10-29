@@ -193,6 +193,11 @@ public class OpenApiConfig {
                               describeInternalMemo(operation);
                             }
 
+                            if (path.equals("/api/admin/inspections")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeInspectionList(operation);
+                            }
+
                             if (path.equals("/api/admin/inspections/{inspectionId}/status")
                                 && method == PathItem.HttpMethod.PATCH) {
                               describeInspectionStatus(operation);
@@ -226,6 +231,50 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  // 현장점검 목록의 구 단위 주소와 검색 오류 예시
+  private void describeInspectionList(Operation operation) {
+    var code = InspectionSuccessCode.LIST_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var item = new LinkedHashMap<String, Object>();
+    item.put("inspectionId", 2);
+    item.put("applicationId", 5);
+    item.put("receiptNo", "000005");
+    item.put("address", "원미구");
+    item.put("designated", true);
+    item.put("preferredVisitDate", "2026-11-03");
+    item.put("preferredTimeSlot", "MORNING");
+    item.put("inspectorUserId", null);
+    item.put("inspectorName", null);
+    item.put("status", "RECEIVED");
+    addExample(
+        success,
+        "inspectionList",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "inspections",
+                List.of(item),
+                "page",
+                0,
+                "size",
+                10,
+                "totalElements",
+                1,
+                "totalPages",
+                1)));
+    addError(
+        operation, "invalidSearchParameter", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED,
+        null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   // 신청 상세 조회 예시와 실제 오류 조건에 맞는 응답 설명 등록
