@@ -31,6 +31,8 @@ public class InspectionAssignmentService {
       Long operatorId, Long inspectionId, SaveInspectionAssignmentRequest request) {
     if (inspectionId == null || inspectionId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    if (request.preVisitNotice() == null || request.preVisitNotice().isBlank())
+      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY);
     var operator =
         users
             .findById(operatorId)
@@ -53,8 +55,7 @@ public class InspectionAssignmentService {
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     LocalDateTime scheduledAt = LocalDateTime.of(request.visitDate(), request.visitTime());
     if (scheduledAt.isBefore(now)) throw new BaseException(InspectionErrorCode.PAST_VISIT_TIME);
-    String notice = request.preVisitNotice() == null ? null : request.preVisitNotice().strip();
-    if (notice != null && notice.isEmpty()) notice = null;
+    String notice = request.preVisitNotice().strip();
     inspection.assign(operator, scheduledAt, notice, now);
     inspections.flush();
     return InspectionAssignmentResponse.from(inspection);

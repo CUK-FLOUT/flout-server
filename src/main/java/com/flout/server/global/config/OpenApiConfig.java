@@ -79,6 +79,20 @@ public class OpenApiConfig {
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
+      // OpenAPI 3.1에서는 nullable enum의 허용값에도 JSON null이 포함되어야 한다.
+      if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
+        var detail = api.getComponents().getSchemas().get("InspectionDetailResponse");
+        if (detail != null && detail.getProperties() != null) {
+          Schema timeSlot = (Schema) detail.getProperties().get("preferredTimeSlot");
+          if (timeSlot != null
+              && timeSlot.getEnum() != null
+              && !timeSlot.getEnum().contains(null)) {
+            var values = new ArrayList<>(timeSlot.getEnum());
+            values.add(null);
+            timeSlot.setEnum(values);
+          }
+        }
+      }
       if (api.getTags() != null) {
         var tagOrder =
             List.of("인증/인가", "운영자-GIS 신청관리", "운영자-우선점검 관리", "운영자-현장점검 관리", "주민 주소", "현장점검 신청");
@@ -198,6 +212,11 @@ public class OpenApiConfig {
                               describeInspectionList(operation);
                             }
 
+                            if (path.equals("/api/admin/inspections/{inspectionId}")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeInspectionDetail(operation);
+                            }
+
                             if (path.equals("/api/admin/inspections/{inspectionId}/status")
                                 && method == PathItem.HttpMethod.PATCH) {
                               describeInspectionStatus(operation);
@@ -231,6 +250,39 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  // 배정 상세 조회의 주민 정보와 관할 접근 오류 예시
+  private void describeInspectionDetail(Operation operation) {
+    var code = InspectionSuccessCode.DETAIL_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("inspectionId", 1);
+    result.put("applicationId", 5);
+    result.put("receiptNo", "000005");
+    result.put("applicantName", "김주민");
+    result.put("address", "경기도 부천시 원미구 길주로 53");
+    result.put("detailAddress", "101호");
+    result.put("contact", "010-1234-1234");
+    result.put("preferredVisitDate", "2026-11-03");
+    result.put("preferredTimeSlot", "MORNING");
+    result.put("inspectorId", null);
+    result.put("inspectorName", null);
+    addExample(success, "inspectionDetail", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   // 현장점검 목록의 구 단위 주소와 검색 오류 예시
