@@ -102,7 +102,8 @@ public class PriorityInspectionCandidateRepository {
   }
 
   // 필터와 무관하게 관할 내 본인 제외 1km 신청 집계
-  private Map<Long, Long> nearbyCounts(List<Long> applicationIds) {
+  public Map<Long, Long> nearbyCounts(List<Long> applicationIds) {
+    if (applicationIds.isEmpty()) return Map.of();
     var params =
         new MapSqlParameterSource()
             .addValue("ids", applicationIds)

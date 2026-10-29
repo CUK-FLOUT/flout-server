@@ -213,6 +213,11 @@ public class OpenApiConfig {
                               describePriorityCandidates(operation);
                             }
 
+                            if (path.equals("/api/admin/priority-inspections/{applicationId}")
+                                && method == PathItem.HttpMethod.GET) {
+                              describePriorityDetail(operation);
+                            }
+
                             if (path.equals("/api/admin/priority-inspections/order")
                                 && method == PathItem.HttpMethod.PUT) {
                               describePriorityOrder(operation);
@@ -221,6 +226,39 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  // 상세 조회 성공·오류 응답 예시
+  private void describePriorityDetail(Operation operation) {
+    var code = PriorityInspectionSuccessCode.DETAIL_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("applicationId", 5);
+    result.put("receiptNo", "000005");
+    result.put("applicantName", "김주민");
+    result.put("address", "경기도 부천시 원미구 길주로 53");
+    result.put("detailAddress", "101호");
+    result.put("inspectionNeed", "우선점검 권장");
+    result.put("riskLevel", "HIGH");
+    result.put("floodExperience", "YES");
+    result.put("requestReason", "최근 배수구 역류");
+    result.put("nearbyApplicationCount", 3);
+    result.put("internalMemo", "출입구 누수 확인 필요");
+    addExample(success, "priorityDetail", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   // 후보 조회 성공·오류 응답 예시
