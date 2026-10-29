@@ -121,6 +121,12 @@ class InspectionApplicationFlowTest {
     assertThat(result.get("receiptNo").asText())
         .isEqualTo(String.format(java.util.Locale.ROOT, "%06d", applicationId));
     Long inspectionId = result.get("inspectionId").asLong();
+    var application =
+        jdbc.queryForMap(
+            "SELECT address, detail_address FROM inspection_applications WHERE application_id = ?",
+            applicationId);
+    assertThat(application.get("address")).isEqualTo("경기도 부천시 원미구 길주로 210");
+    assertThat(application.get("detail_address")).isEqualTo("101호");
     var row = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
     assertThat(((Number) row.get("application_id")).longValue()).isEqualTo(applicationId);
     assertThat(row.get("status")).isEqualTo("RECEIVED");

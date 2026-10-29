@@ -4,10 +4,12 @@ import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInsp
 import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionOrderRequest;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionCandidatesResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationsResponse;
+import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDetailResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderResponse;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionCandidateService;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionDesignationService;
+import com.flout.server.domain.priorityinspection.service.PriorityInspectionDetailService;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionOrderService;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.global.response.SuccessResponse;
@@ -29,6 +31,23 @@ public class AdminPriorityInspectionController {
   private final PriorityInspectionDesignationService service;
   private final PriorityInspectionOrderService orderService;
   private final PriorityInspectionCandidateService candidateService;
+  private final PriorityInspectionDetailService detailService;
+
+  // 선택한 신청의 상세 패널 조회
+  @GetMapping(value = "/{applicationId}", produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "우선점검 신청정보 조회",
+      description =
+          "운영자 본인 관할 신청의 접수번호·신청자 이름·주소·점검 필요도·AI 취약도·침수 경험·주민 요청 사유·인근 신청 건수·저장된 내부 메모를 조회합니다. 미지정 신청도 조회합니다. HIGH=우선점검 권장, CAUTION=점검 검토, LOW=일반 점검입니다. 인근 신청은 목록 필터와 무관한 동일 관할 내 본인 제외 1km 이하 신청 건수입니다. 데이터를 변경하지 않습니다.")
+  public SuccessResponse<PriorityInspectionDetailResponse> detail(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "양의 정수인 현장점검 신청 ID. 점검 ID와 구분", example = "5", required = true)
+          @PathVariable
+          Long applicationId) {
+    return SuccessResponse.of(
+        detailService.get(Long.valueOf(jwt.getSubject()), applicationId),
+        PriorityInspectionSuccessCode.DETAIL_FOUND);
+  }
 
   // 우선점검 후보 검색·목록 조회
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)

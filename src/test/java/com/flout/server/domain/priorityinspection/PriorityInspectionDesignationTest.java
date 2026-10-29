@@ -333,6 +333,186 @@ class PriorityInspectionDesignationTest {
                 .value("신청 ID는 한 번에 최대 500개까지 전달할 수 있습니다."));
   }
 
+  // 신청 상세 조회 요청
+  private org.springframework.test.web.servlet.ResultActions detail(Long id) throws Exception {
+    return mvc.perform(
+        get("/api/admin/priority-inspections/" + id).header("Authorization", "Bearer " + token));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"HIGH", "CAUTION", "LOW"})
+  void detailReturnsSavedInformationAndMapsLinkedRiskWithoutMutations(String risk)
+      throws Exception {
+    jdbc.update(
+        "UPDATE risk_assessments SET risk_level = ? WHERE assessment_id = "
+            + "(SELECT assessment_id FROM inspection_applications WHERE application_id = ?)",
+        risk,
+        applicationId);
+    // 최신 분석이 아닌 신청에 연결된 분석을 사용
+    assessments.saveAndFlush(
+        RiskAssessment.completedDemo(resident, "부천시 다른 주소", null, RiskLevel.LOW));
+    var beforeApplication =
+        jdbc.queryForMap(
+            "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId);
+    var beforeInspection =
+        jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
+    var need = Map.of("HIGH", "우선점검 권장", "CAUTION", "점검 검토", "LOW", "일반 점검").get(risk);
+    detail(applicationId)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_200_5"))
+        .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+        .andExpect(
+            jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", applicationId)))
+        .andExpect(jsonPath("$.result.applicantName").value("주민"))
+        .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
+        .andExpect(jsonPath("$.result.detailAddress").value("101호"))
+        .andExpect(jsonPath("$.result.inspectionNeed").value(need))
+        .andExpect(jsonPath("$.result.riskLevel").value(risk))
+        .andExpect(jsonPath("$.result.floodExperience").value("YES"))
+        .andExpect(jsonPath("$.result.requestReason").value("점검 요청"))
+        .andExpect(jsonPath("$.result.internalMemo").value("유지할 내부 메모"))
+        .andExpect(jsonPath("$.result.nearbyApplicationCount").value(0));
+    assertThat(designations.count()).isZero();
+    bulk(List.of(applicationId), true).andExpect(status().isOk());
+    var beforeDesignation = jdbc.queryForList("SELECT * FROM priority_inspection_designations");
+    detail(applicationId).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId))
+        .isEqualTo(beforeApplication);
+    assertThat(jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId))
+        .isEqualTo(beforeInspection);
+    assertThat(jdbc.queryForList("SELECT * FROM priority_inspection_designations"))
+        .isEqualTo(beforeDesignation);
+    assertThat(applicationHistories.count()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_status_histories", Long.class))
+        .isZero();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"YES", "NO", "UNKNOWN"})
+  void detailPreservesNullFieldsAndFloodExperience(String experience) throws Exception {
+    jdbc.update(
+        "UPDATE inspection_applications SET flood_experience = ?, request_reason = NULL, internal_memo = NULL, detail_address = NULL WHERE application_id = ?",
+        experience,
+        applicationId);
+    detail(applicationId)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.floodExperience").value(experience))
+        .andExpect(jsonPath("$.result.requestReason").isEmpty())
+        .andExpect(jsonPath("$.result.internalMemo").isEmpty())
+        .andExpect(jsonPath("$.result.detailAddress").isEmpty());
+  }
+
+  @Test
+  void detailUsesSameNearbyCountsAsCandidateList() throws Exception {
+    additionalApplication("부천시 소사구 동일 좌표");
+    var inside = additionalApplication("경기 부천시 오정구 반경 안");
+    var outside = additionalApplication("경기도 부천시 원미구 반경 밖");
+    additionalApplication("서울특별시 부천시 다른 관할");
+    additionalApplication("부천시민로 다른 관할");
+    jdbc.update(
+        "UPDATE inspection_applications SET latitude = ? WHERE application_id = ?",
+        new BigDecimal("37.4964750"),
+        inside);
+    jdbc.update(
+        "UPDATE inspection_applications SET latitude = ? WHERE application_id = ?",
+        new BigDecimal("37.4964850"),
+        outside);
+    detail(applicationId)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.nearbyApplicationCount").value(2));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "원미구")
+                .param("designated", "false")
+                .param("keyword", "길주로 210")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(2));
+  }
+
+  @Test
+  void detailValidatesAuthenticationIdAndJurisdiction() throws Exception {
+    mvc.perform(get("/api/admin/priority-inspections/" + applicationId))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/priority-inspections/" + applicationId)
+                .header("Authorization", "Bearer invalid-token"))
+        .andExpect(status().isUnauthorized());
+    var adminToken = token;
+    token = jwt.issue(resident).accessToken();
+    detail(applicationId).andExpect(status().isForbidden());
+    token = adminToken;
+    for (String id : List.of("0", "-1", "abc", "9223372036854775808")) {
+      mvc.perform(
+              get("/api/admin/priority-inspections/" + id)
+                  .header("Authorization", "Bearer " + token))
+          .andExpect(status().isBadRequest());
+    }
+    detail(Long.MAX_VALUE)
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("APPLICATION_404_2"));
+    jdbc.update("UPDATE users SET jurisdiction_id = NULL WHERE user_id = ?", operatorId);
+    detail(applicationId)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_403_1"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"서울특별시 중구", "서울특별시 부천시 길주로", "부천시민로 1"})
+  void detailRejectsApplicationsOutsideJurisdiction(String address) throws Exception {
+    jdbc.update(
+        "UPDATE inspection_applications SET address = ? WHERE application_id = ?",
+        address,
+        applicationId);
+    detail(applicationId)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_403_1"));
+  }
+
+  @Test
+  void detailSwaggerAndResponseTypeAreDocumented() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['404'].description")
+                .value("현장점검 신청을 찾을 수 없습니다."))
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections/{applicationId}'].get.summary")
+                .value("우선점검 신청정보 조회"))
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections/{applicationId}'].get.tags[0]")
+                .value("운영자-우선점검 관리"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['200'].content['application/json'].examples.priorityDetail.value.code")
+                .value("PRIORITY_INSPECTION_200_5"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['400']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['401']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['403']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/{applicationId}'].get.responses['404']")
+                .exists());
+    mvc.perform(
+            get("/api/admin/priority-inspections/" + applicationId)
+                .header("Authorization", "Bearer " + token)
+                .accept(MediaType.APPLICATION_XML))
+        .andExpect(status().isNotAcceptable());
+  }
+
   private String path() {
     return "/api/admin/priority-inspections/designation";
   }
