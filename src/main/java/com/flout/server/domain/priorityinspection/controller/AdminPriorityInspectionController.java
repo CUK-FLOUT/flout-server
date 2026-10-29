@@ -1,9 +1,9 @@
 package com.flout.server.domain.priorityinspection.controller;
 
-import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionDesignationRequest;
+import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionDesignationsRequest;
 import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInspectionOrderRequest;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionCandidatesResponse;
-import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationResponse;
+import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationsResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderResponse;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionCandidateService;
@@ -59,6 +59,26 @@ public class AdminPriorityInspectionController {
         PriorityInspectionSuccessCode.CANDIDATES_FOUND);
   }
 
+  // 복수 신청 일괄 지정·취소
+  @PutMapping(
+      value = "/designation",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "우선점검 대상 일괄 지정·취소",
+      description =
+          "applicationIds 전체를 검증한 후 한 트랜잭션으로 지정·취소합니다. 한 건이라도 실패하면 전체 롤백합니다. 신규 지정은 요청 순서대로 마지막에 추가하고 기존 지정 정보는 유지합니다. 취소 후 남은 상대 순서를 유지하며 순위를 정리합니다. 응답은 요청 ID 순서입니다. 메모·신청·점검 상태는 변경하지 않습니다.")
+  public SuccessResponse<PriorityInspectionDesignationsResponse> designateAll(
+      @AuthenticationPrincipal Jwt jwt,
+      @Valid @RequestBody UpdatePriorityInspectionDesignationsRequest request) {
+    return SuccessResponse.of(
+        service.designateAll(
+            Long.valueOf(jwt.getSubject()), request.applicationIds(), request.designated()),
+        request.designated()
+            ? PriorityInspectionSuccessCode.DESIGNATED
+            : PriorityInspectionSuccessCode.CANCELLED);
+  }
+
   @PutMapping(
       value = "/order",
       consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -73,26 +93,5 @@ public class AdminPriorityInspectionController {
     return SuccessResponse.of(
         orderService.save(Long.valueOf(jwt.getSubject()), request.applicationIds()),
         PriorityInspectionSuccessCode.ORDER_SAVED);
-  }
-
-  @PutMapping(
-      value = "/{applicationId}/designation",
-      consumes = MediaType.APPLICATION_JSON_VALUE,
-      produces = MediaType.APPLICATION_JSON_VALUE)
-  @Operation(
-      summary = "우선점검 대상 지정·취소",
-      description =
-          "본인 관할의 신청을 designated가 true이면 우선점검 대상으로 지정하고 false이면 취소합니다. 같은 상태로 재요청하면 기존 상태를 유지합니다. 취소 후 재지정하면 지정 운영자와 시각을 새로 저장합니다. 메모·신청·점검 상태·담당자·방문 일정은 변경하지 않습니다.")
-  public SuccessResponse<PriorityInspectionDesignationResponse> designate(
-      @AuthenticationPrincipal Jwt jwt,
-      @PathVariable Long applicationId,
-      @Valid @RequestBody UpdatePriorityInspectionDesignationRequest request) {
-    var response =
-        service.designate(Long.valueOf(jwt.getSubject()), applicationId, request.designated());
-    return SuccessResponse.of(
-        response,
-        response.designated()
-            ? PriorityInspectionSuccessCode.DESIGNATED
-            : PriorityInspectionSuccessCode.CANCELLED);
   }
 }

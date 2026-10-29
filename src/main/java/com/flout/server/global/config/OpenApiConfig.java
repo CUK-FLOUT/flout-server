@@ -203,10 +203,9 @@ public class OpenApiConfig {
                               describeInspectionAssignment(operation);
                             }
 
-                            if (path.equals(
-                                    "/api/admin/priority-inspections/{applicationId}/designation")
+                            if (path.equals("/api/admin/priority-inspections/designation")
                                 && method == PathItem.HttpMethod.PUT) {
-                              describePriorityDesignation(operation);
+                              describePriorityDesignations(operation);
                             }
 
                             if (path.equals("/api/admin/priority-inspections")
@@ -482,30 +481,41 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
-  // 우선점검 지정·취소 응답과 오류 예시
-  private void describePriorityDesignation(Operation operation) {
-    var code = PriorityInspectionSuccessCode.DESIGNATED;
-    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
-    success.setDescription("우선점검 대상 지정 또는 취소 완료");
+  // 일괄 지정·취소 응답과 오류 예시
+  private void describePriorityDesignations(Operation operation) {
+    describePriorityDesignationErrors(operation);
+    var success = operation.getResponses().get("200");
     addExample(
         success,
         "priorityDesignated",
         envelope(
             true,
-            code,
-            code.getMessage(),
+            PriorityInspectionSuccessCode.DESIGNATED,
+            PriorityInspectionSuccessCode.DESIGNATED.getMessage(),
             Map.of(
-                "applicationId",
-                1,
-                "receiptNo",
-                "000001",
-                "designated",
-                true,
-                "designatedAt",
-                "2026-10-29T10:00:00")));
-    var cancelled = new java.util.LinkedHashMap<String, Object>();
-    cancelled.put("applicationId", 1);
-    cancelled.put("receiptNo", "000001");
+                "applications",
+                List.of(
+                    Map.of(
+                        "applicationId",
+                        5,
+                        "receiptNo",
+                        "000005",
+                        "designated",
+                        true,
+                        "designatedAt",
+                        "2026-10-29T10:00:00"),
+                    Map.of(
+                        "applicationId",
+                        6,
+                        "receiptNo",
+                        "000006",
+                        "designated",
+                        true,
+                        "designatedAt",
+                        "2026-10-29T10:00:00")))));
+    var cancelled = new LinkedHashMap<String, Object>();
+    cancelled.put("applicationId", 5);
+    cancelled.put("receiptNo", "000005");
     cancelled.put("designated", false);
     cancelled.put("designatedAt", null);
     addExample(
@@ -515,7 +525,14 @@ public class OpenApiConfig {
             true,
             PriorityInspectionSuccessCode.CANCELLED,
             PriorityInspectionSuccessCode.CANCELLED.getMessage(),
-            cancelled));
+            Map.of("applications", List.of(cancelled))));
+    addError(
+        operation, "duplicateApplication", PriorityInspectionErrorCode.DUPLICATE_APPLICATION, null);
+  }
+
+  private void describePriorityDesignationErrors(Operation operation) {
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("우선점검 대상 일괄 지정 또는 취소 완료");
     addError(
         operation,
         "designationRequired",
@@ -524,8 +541,6 @@ public class OpenApiConfig {
     addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
-    addError(
-        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
     addError(
         operation,
         "jurisdictionAccessDenied",

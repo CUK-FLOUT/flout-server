@@ -122,8 +122,207 @@ class PriorityInspectionDesignationTest {
         applicationId);
   }
 
+  // 일괄 지정·취소 요청
+  private org.springframework.test.web.servlet.ResultActions bulk(
+      List<Long> ids, boolean designated) throws Exception {
+    return mvc.perform(
+        put("/api/admin/priority-inspections/designation")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(
+                mapper.writeValueAsString(
+                    Map.of("applicationIds", ids, "designated", designated))));
+  }
+
+  @Test
+  void bulkAppendsInRequestOrderAndPreservesExistingDesignationOnRetry() throws Exception {
+    var second = additionalApplication("부천시 원미구 두번째");
+    var third = additionalApplication("경기 부천시 소사구 세번째");
+    designate();
+    var original =
+        jdbc.queryForMap(
+            "SELECT * FROM priority_inspection_designations WHERE application_id = ?",
+            applicationId);
+    var applicationBefore =
+        jdbc.queryForMap(
+            "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId);
+    when(inspectionClock.instant()).thenReturn(NOW.plusHours(1).atZone(SEOUL).toInstant());
+    var ids = List.of(third, applicationId, second);
+    bulk(ids, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(third))
+        .andExpect(
+            jsonPath("$.result.applications[0].receiptNo")
+                .value(String.format(Locale.ROOT, "%06d", third)))
+        .andExpect(jsonPath("$.result.applications[1].applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.applications[2].applicationId").value(second));
+    assertThat(savedOrder()).containsExactly(applicationId, third, second);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM priority_inspection_designations WHERE application_id = ?",
+                applicationId))
+        .isEqualTo(original);
+    var beforeRetry =
+        jdbc.queryForList(
+            "SELECT * FROM priority_inspection_designations ORDER BY selection_order");
+    when(inspectionClock.instant()).thenReturn(NOW.plusHours(2).atZone(SEOUL).toInstant());
+    bulk(ids, true).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY selection_order"))
+        .isEqualTo(beforeRetry);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId))
+        .isEqualTo(applicationBefore);
+  }
+
+  @Test
+  void bulkCancellationCompactsOrderAndIsIdempotent() throws Exception {
+    var second = additionalApplication("부천시 두번째");
+    var third = additionalApplication("부천시 세번째");
+    var fourth = additionalApplication("부천시 네번째");
+    var notDesignated = additionalApplication("부천시 미지정");
+    bulk(List.of(applicationId, second, third, fourth), true).andExpect(status().isOk());
+    var ids = List.of(third, applicationId, notDesignated);
+    bulk(ids, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_200_2"))
+        .andExpect(jsonPath("$.result.applications[0].designated").value(false))
+        .andExpect(jsonPath("$.result.applications[0].designatedAt").isEmpty());
+    assertThat(savedOrder()).containsExactly(second, fourth);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT selection_order FROM priority_inspection_designations ORDER BY selection_order",
+                Integer.class))
+        .containsExactly(1, 2);
+    var beforeRetry =
+        jdbc.queryForList(
+            "SELECT * FROM priority_inspection_designations ORDER BY selection_order");
+    when(inspectionClock.instant()).thenReturn(NOW.plusHours(1).atZone(SEOUL).toInstant());
+    bulk(ids, false).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY selection_order"))
+        .isEqualTo(beforeRetry);
+  }
+
+  @Test
+  void bulkValidatesAllApplicationsBeforeAnyChanges() throws Exception {
+    var outside = additionalApplication("서울특별시 부천시 관할밖");
+    bulk(List.of(applicationId, Long.MAX_VALUE), true).andExpect(status().isNotFound());
+    assertThat(designations.count()).isZero();
+    bulk(List.of(applicationId, outside), true).andExpect(status().isForbidden());
+    assertThat(designations.count()).isZero();
+    designate();
+    bulk(List.of(applicationId, Long.MAX_VALUE), false).andExpect(status().isNotFound());
+    bulk(List.of(applicationId, outside), false).andExpect(status().isForbidden());
+    assertThat(savedOrder()).containsExactly(applicationId);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{}",
+        "{\"applicationIds\":[],\"designated\":true}",
+        "{\"applicationIds\":null,\"designated\":true}",
+        "{\"applicationIds\":[null],\"designated\":true}",
+        "{\"applicationIds\":[0],\"designated\":true}",
+        "{\"applicationIds\":[-1],\"designated\":true}",
+        "{\"applicationIds\":[1]}",
+        "{\"applicationIds\":[1],\"designated\":null}",
+        "{\"applicationIds\":[1,1],\"designated\":true}"
+      })
+  void bulkRejectsInvalidBodies(String body) throws Exception {
+    mvc.perform(
+            put("/api/admin/priority-inspections/designation")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+    assertThat(designations.count()).isZero();
+  }
+
+  @Test
+  void bulkRollsBackEarlierInsertsWhenLaterInsertFails() throws Exception {
+    var second = additionalApplication("부천시 두번째");
+    var count = new java.util.concurrent.atomic.AtomicInteger();
+    doAnswer(
+            invocation -> {
+              var item = invocation.getArgument(0);
+              entityManager.persist(item);
+              entityManager.flush();
+              if (count.incrementAndGet() == 2)
+                throw new IllegalStateException("simulated batch failure");
+              return item;
+            })
+        .when(designations)
+        .saveAndFlush(any());
+    bulk(List.of(applicationId, second), true).andExpect(status().isInternalServerError());
+    assertThat(designations.count()).isZero();
+  }
+
+  @Test
+  void bulkRollsBackCancellationWhenFlushFails() throws Exception {
+    var second = additionalApplication("부천시 두번째");
+    bulk(List.of(applicationId, second), true).andExpect(status().isOk());
+    var before =
+        jdbc.queryForList(
+            "SELECT * FROM priority_inspection_designations ORDER BY selection_order");
+    doAnswer(
+            invocation -> {
+              entityManager.flush();
+              throw new IllegalStateException("simulated cancellation failure");
+            })
+        .when(designations)
+        .flush();
+    bulk(List.of(applicationId, second), false).andExpect(status().isInternalServerError());
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY selection_order"))
+        .isEqualTo(before);
+  }
+
+  @Test
+  void bulkRequiresAdminAuthenticationAndDocumentsListResponse() throws Exception {
+    mvc.perform(
+            put("/api/admin/priority-inspections/designation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"applicationIds\":[1],\"designated\":true}"))
+        .andExpect(status().isUnauthorized());
+    var adminToken = token;
+    token = jwt.issue(resident).accessToken();
+    bulk(List.of(applicationId), true).andExpect(status().isForbidden());
+    token = adminToken;
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/priority-inspections/designation'].put.responses['200'].content['application/json'].examples.priorityDesignated.value.result.applications[0].receiptNo")
+                .value("000005"))
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections/designation'].put.responses['404']")
+                .exists());
+  }
+
   private String path() {
-    return "/api/admin/priority-inspections/" + applicationId + "/designation";
+    return "/api/admin/priority-inspections/designation";
+  }
+
+  @Test
+  void singleDesignationRouteIsRemovedFromServerAndSwagger() throws Exception {
+    mvc.perform(
+            put("/api/admin/priority-inspections/" + applicationId + "/designation")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"designated\":true}"))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.paths['/api/admin/priority-inspections/{applicationId}/designation']")
+                .doesNotExist());
+    assertThat(designations.count()).isZero();
   }
 
   @Test
@@ -378,11 +577,7 @@ class PriorityInspectionDesignationTest {
 
   private org.springframework.test.web.servlet.ResultActions updateDesignation(boolean designated)
       throws Exception {
-    return mvc.perform(
-        put(path())
-            .header("Authorization", "Bearer " + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"designated\":" + designated + "}"));
+    return bulk(List.of(applicationId), designated);
   }
 
   @Test
@@ -395,12 +590,13 @@ class PriorityInspectionDesignationTest {
     designate()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_200_1"))
-        .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))
         .andExpect(
-            jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", applicationId)))
-        .andExpect(jsonPath("$.result.designated").value(true))
-        .andExpect(jsonPath("$.result.selectionMemo").doesNotExist())
-        .andExpect(jsonPath("$.result.designatedAt").value("2030-01-02T14:00:00"));
+            jsonPath("$.result.applications[0].receiptNo")
+                .value(String.format(Locale.ROOT, "%06d", applicationId)))
+        .andExpect(jsonPath("$.result.applications[0].designated").value(true))
+        .andExpect(jsonPath("$.result.applications[0].selectionMemo").doesNotExist())
+        .andExpect(jsonPath("$.result.applications[0].designatedAt").value("2030-01-02T14:00:00"));
     var row =
         jdbc.queryForMap(
             "SELECT * FROM priority_inspection_designations WHERE application_id = ?",
@@ -424,9 +620,12 @@ class PriorityInspectionDesignationTest {
             put(path())
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"designated\":true,\"selectionMemo\":\"저장하지 않을 메모\"}"))
+                .content(
+                    "{\"applicationIds\":["
+                        + applicationId
+                        + "],\"designated\":true,\"selectionMemo\":\"저장하지 않을 메모\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.selectionMemo").doesNotExist());
+        .andExpect(jsonPath("$.result.applications[0].selectionMemo").doesNotExist());
     assertThat(applications.findById(applicationId).orElseThrow().getInternalMemo())
         .isEqualTo("유지할 내부 메모");
   }
@@ -528,10 +727,10 @@ class PriorityInspectionDesignationTest {
   void validatesApplicationId() throws Exception {
     for (String id : List.of("0", "-1", "abc", "9223372036854775808", "9223372036854775807")) {
       mvc.perform(
-              put("/api/admin/priority-inspections/" + id + "/designation")
+              put(path())
                   .header("Authorization", "Bearer " + token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"designated\":true}"))
+                  .content("{\"applicationIds\":[" + id + "],\"designated\":true}"))
           .andExpect(status().is(id.equals("9223372036854775807") ? 404 : 400));
     }
     assertThat(designations.count()).isZero();
@@ -612,24 +811,22 @@ class PriorityInspectionDesignationTest {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/priority-inspections/{applicationId}/designation'].put.requestBody")
+            jsonPath("$.paths['/api/admin/priority-inspections/designation'].put.requestBody")
                 .exists())
         .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/priority-inspections/{applicationId}/designation'].put.tags[0]")
+            jsonPath("$.paths['/api/admin/priority-inspections/designation'].put.tags[0]")
                 .value("운영자-우선점검 관리"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/priority-inspections/{applicationId}/designation'].put.responses['200'].content['application/json'].examples.priorityDesignated.value.code")
+                    "$.paths['/api/admin/priority-inspections/designation'].put.responses['200'].content['application/json'].examples.priorityDesignated.value.code")
                 .value("PRIORITY_INSPECTION_200_1"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/priority-inspections/{applicationId}/designation'].put.responses['200'].content['application/json'].examples.priorityCancelled.value.code")
+                    "$.paths['/api/admin/priority-inspections/designation'].put.responses['200'].content['application/json'].examples.priorityCancelled.value.code")
                 .value("PRIORITY_INSPECTION_200_2"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/priority-inspections/{applicationId}/designation'].put.responses['404'].description")
+                    "$.paths['/api/admin/priority-inspections/designation'].put.responses['404'].description")
                 .value("현장점검 신청을 찾을 수 없습니다."));
   }
 
@@ -646,12 +843,12 @@ class PriorityInspectionDesignationTest {
       updateDesignation(false)
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_200_2"))
-          .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+          .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))
           .andExpect(
-              jsonPath("$.result.receiptNo")
+              jsonPath("$.result.applications[0].receiptNo")
                   .value(String.format(Locale.ROOT, "%06d", applicationId)))
-          .andExpect(jsonPath("$.result.designated").value(false))
-          .andExpect(jsonPath("$.result.designatedAt").isEmpty());
+          .andExpect(jsonPath("$.result.applications[0].designated").value(false))
+          .andExpect(jsonPath("$.result.applications[0].designatedAt").isEmpty());
     }
     assertThat(designations.count()).isZero();
     assertThat(
@@ -674,8 +871,8 @@ class PriorityInspectionDesignationTest {
     when(inspectionClock.instant()).thenReturn(NOW.plusDays(1).atZone(SEOUL).toInstant());
     designate()
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.designated").value(true))
-        .andExpect(jsonPath("$.result.designatedAt").value("2030-01-03T14:00:00"));
+        .andExpect(jsonPath("$.result.applications[0].designated").value(true))
+        .andExpect(jsonPath("$.result.applications[0].designatedAt").value("2030-01-03T14:00:00"));
     assertThat(designations.count()).isEqualTo(1);
   }
 
@@ -790,12 +987,7 @@ class PriorityInspectionDesignationTest {
   }
 
   private void designateApplication(Long id) throws Exception {
-    mvc.perform(
-            put("/api/admin/priority-inspections/" + id + "/designation")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"designated\":true}"))
-        .andExpect(status().isOk());
+    bulk(List.of(id), true).andExpect(status().isOk());
   }
 
   private org.springframework.test.web.servlet.ResultActions saveOrder(List<Long> ids)
