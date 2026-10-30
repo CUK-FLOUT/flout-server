@@ -18,6 +18,7 @@ public enum GeneralErrorCode implements BaseResponseCode {
   NOT_FOUND_ENDPOINT(NOT_FOUND, "COMMON_404_1", "존재하지 않는 요청 경로입니다. 요청 주소를 확인해주세요."),
   UNSUPPORTED_HTTP_METHOD(METHOD_NOT_ALLOWED, "COMMON_405_1", "지원하지 않는 요청 방식입니다."),
   NOT_ACCEPTABLE_ERROR(406, "COMMON_406_1", "지원하지 않는 응답 형식입니다."),
+  PAYLOAD_TOO_LARGE(413, "COMMON_413_1", "업로드 허용 용량을 초과했습니다."),
   UNSUPPORTED_MEDIA_TYPE_ERROR(415, "COMMON_415_1", "지원하지 않는 요청 본문 형식입니다."),
   SERVER_ERROR(INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부에서 알 수 없는 에러가 발생했습니다.");
 

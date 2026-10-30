@@ -210,6 +210,12 @@ public class OpenApiConfig {
                               describeApplicationDetail(operation);
                             }
 
+                            if (path.equals(
+                                    "/api/resident/applications/{applicationId}/attachments")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeAttachmentUpload(operation);
+                            }
+
                             if (path.equals("/api/admin/applications/{applicationId}/internal-memo")
                                 && method == PathItem.HttpMethod.PATCH) {
                               describeInternalMemo(operation);
@@ -986,6 +992,59 @@ public class OpenApiConfig {
         operation,
         "receiptNumberGenerationFailed",
         InspectionApplicationErrorCode.RECEIPT_NUMBER_GENERATION_FAILED,
+        null);
+  }
+
+  private void describeAttachmentUpload(Operation operation) {
+    operation.getResponses().remove("200");
+    var success = operation.getResponses().computeIfAbsent("201", key -> new ApiResponse());
+    var code = InspectionApplicationSuccessCode.ATTACHMENTS_CREATED;
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "attachmentsCreated",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            List.of(
+                Map.of(
+                    "attachmentId",
+                    1,
+                    "filename",
+                    "photo.jpg",
+                    "size",
+                    12345,
+                    "contentType",
+                    "image/jpeg"))));
+    addError(
+        operation, "invalidAttachments", InspectionApplicationErrorCode.INVALID_ATTACHMENTS, null);
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "missingFiles", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(
+        operation,
+        "idempotencyConflict",
+        InspectionApplicationErrorCode.ATTACHMENT_IDEMPOTENCY_CONFLICT,
+        null);
+    addError(operation, "payloadTooLarge", GeneralErrorCode.PAYLOAD_TOO_LARGE, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    addError(
+        operation,
+        "attachmentUploadFailed",
+        InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED,
         null);
   }
 

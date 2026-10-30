@@ -5,6 +5,10 @@ spring:
     default: local
   jpa:
     open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 80MB
 
 management:
   endpoints:
@@ -13,6 +17,9 @@ management:
         include: health,info
 
 app:
+  s3:
+    region: ${AWS_REGION:}
+    bucket: ${AWS_S3_BUCKET:}
   inspection:
     auto-start:
       enabled: ${INSPECTION_AUTO_START_ENABLED:true}

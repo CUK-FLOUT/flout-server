@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
@@ -25,6 +26,13 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ErrorResponse<?>> handleMaxUploadSizeExceededException(
+      MaxUploadSizeExceededException e) {
+    ErrorResponse<?> response = ErrorResponse.from(GeneralErrorCode.PAYLOAD_TOO_LARGE);
+    return ResponseEntity.status(response.getStatus()).body(response);
+  }
 
   // 요청 본문 검증 실패
   @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -2,7 +2,10 @@ package com.flout.server.global.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
+import com.flout.server.global.response.code.BaseResponseCode;
+import com.flout.server.global.response.code.GeneralErrorCode;
 import io.swagger.v3.oas.models.*;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import java.util.Set;
@@ -116,6 +119,56 @@ class OpenApiConfigTest {
             .getResponses();
     assertThat(responses.get("404").getDescription()).isEqualTo("현장점검 신청을 찾을 수 없습니다.");
     assertExampleMessage(responses, "404", "applicationNotFound", "현장점검 신청을 찾을 수 없습니다.");
+  }
+
+  @Test
+  void attachmentUploadExamplesMatchActualErrorCodesAndMessages() {
+    String path = "/api/resident/applications/{applicationId}/attachments";
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths().addPathItem(path, new PathItem().post(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    var responses = api.getPaths().get(path).getPost().getResponses();
+    var examples =
+        java.util.Map.<String, BaseResponseCode>ofEntries(
+            java.util.Map.entry(
+                "invalidAttachments", InspectionApplicationErrorCode.INVALID_ATTACHMENTS),
+            java.util.Map.entry("missingFiles", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER),
+            java.util.Map.entry(
+                "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER),
+            java.util.Map.entry("authenticationRequired", GeneralErrorCode.UNAUTHORIZED_ERROR),
+            java.util.Map.entry("invalidOrExpiredToken", GeneralErrorCode.INVALID_ACCESS_TOKEN),
+            java.util.Map.entry(
+                "applicationAccessDenied",
+                InspectionApplicationErrorCode.APPLICATION_ACCESS_DENIED),
+            java.util.Map.entry(
+                "applicationNotFound", InspectionApplicationErrorCode.APPLICATION_NOT_FOUND),
+            java.util.Map.entry(
+                "idempotencyConflict",
+                InspectionApplicationErrorCode.ATTACHMENT_IDEMPOTENCY_CONFLICT),
+            java.util.Map.entry("payloadTooLarge", GeneralErrorCode.PAYLOAD_TOO_LARGE),
+            java.util.Map.entry(
+                "attachmentUploadFailed", InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED),
+            java.util.Map.entry("serverError", GeneralErrorCode.SERVER_ERROR));
+    examples.forEach(
+        (name, code) -> {
+          var content =
+              responses
+                  .get(Integer.toString(code.getStatus()))
+                  .getContent()
+                  .get("application/json");
+          assertThat(content.getSchema().get$ref())
+              .isEqualTo("#/components/schemas/CommonErrorResponse");
+          assertThat(content.getExamples().get(name).getValue())
+              .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+              .containsEntry("isSuccess", false)
+              .containsEntry("status", code.getStatus())
+              .containsEntry("code", code.getCode())
+              .containsEntry("message", code.getMessage())
+              .containsEntry("result", null);
+        });
+    assertThat(responses)
+        .containsKeys("201", "400", "401", "403", "404", "409", "413", "415", "500");
+    assertThat(responses).doesNotContainKey("200");
   }
 
   @SuppressWarnings("unchecked")
