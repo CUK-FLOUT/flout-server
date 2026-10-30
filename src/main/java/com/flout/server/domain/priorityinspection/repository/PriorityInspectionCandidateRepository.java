@@ -24,6 +24,9 @@ public class PriorityInspectionCandidateRepository {
       JOIN risk_assessments r ON r.assessment_id = a.assessment_id
       LEFT JOIN priority_inspection_designations d ON d.application_id = a.application_id
       WHERE TRIM(a.address) REGEXP :region
+        AND NOT EXISTS (
+          SELECT 1 FROM inspections i
+          WHERE i.application_id = a.application_id AND i.status = 'COMPLETED')
         AND (:riskLevel = '' OR r.risk_level = :riskLevel)
         AND (:designated IS NULL
           OR (:designated = TRUE AND d.application_id IS NOT NULL)
@@ -63,7 +66,8 @@ public class PriorityInspectionCandidateRepository {
           a.request_reason, d.application_id AS designated_id
         """
                 + FILTER
-                + " ORDER BY a.application_id DESC LIMIT :limit OFFSET :offset",
+                + " ORDER BY CASE WHEN d.application_id IS NOT NULL THEN 0 ELSE 1 END,"
+                + " a.application_id DESC LIMIT :limit OFFSET :offset",
             params,
             (rs, rowNum) ->
                 new PriorityInspectionCandidatesResponse.Item(
