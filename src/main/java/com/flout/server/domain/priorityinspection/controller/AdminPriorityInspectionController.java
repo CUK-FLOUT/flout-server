@@ -49,7 +49,11 @@ public class AdminPriorityInspectionController {
         PriorityInspectionSuccessCode.DETAIL_FOUND);
   }
 
-  // 우선점검 후보 검색·목록 조회
+  /**
+   * 인증된 운영자의 관할 후보를 검색하여 공통 성공 응답으로 반환한다.
+   *
+   * <p>운영자·관할 권한 및 검색 조건은 서비스에서 검증한다. 완료 점검은 제외하며, 지정 항목 우선 정렬과 페이지 처리는 저장소에서 수행한다.
+   */
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "우선점검 후보 검색·목록 조회",
