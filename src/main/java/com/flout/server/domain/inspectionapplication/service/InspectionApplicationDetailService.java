@@ -22,11 +22,13 @@ public class InspectionApplicationDetailService {
   private final InspectionApplicationRepository applications;
   private final ApplicationInflowLocationRepository locations;
 
-  /** 운영자 역할과 신청 주소의 관할을 검증한 뒤 신청·주민·분석·유입 위치를 읽기 전용으로 조회한다. */
+  // 운영자·관할 검증 후 신청 상세 읽기 전용 조회
   @Transactional(readOnly = true)
   public InspectionApplicationDetailResponse get(Long operatorId, Long applicationId) {
+    // 잘못된 신청 ID 거부
     if (applicationId == null || applicationId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    // 현재 사용자 역할과 관할 확인
     var operator =
         users
             .findById(operatorId)
@@ -35,11 +37,13 @@ public class InspectionApplicationDetailService {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
       throw new BaseException(InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED);
+    // 신청자·분석 결과 함께 조회
     var application =
         applications
             .findForAdminDetail(applicationId)
             .orElseThrow(
                 () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
+    // 신청 주소의 행정구역으로 관할 판별
     if (!BUCHEON_ADDRESS.matcher(application.getAddress().strip()).find())
       throw new BaseException(InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED);
     return InspectionApplicationDetailResponse.from(

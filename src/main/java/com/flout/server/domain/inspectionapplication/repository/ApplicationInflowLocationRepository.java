@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface ApplicationInflowLocationRepository
     extends JpaRepository<ApplicationInflowLocation, Long> {
-  /** 저장된 위치 순서로 반환하며 입력이 없으면 빈 목록을 반환한다. */
+  // 유입 위치 저장 순서 조회, 미입력 시 빈 목록 반환
   @Query(
       "select l.inflowLocation from ApplicationInflowLocation l where l.application.id = :applicationId order by l.id")
   List<InflowLocation> findLocationsByApplicationId(@Param("applicationId") Long applicationId);

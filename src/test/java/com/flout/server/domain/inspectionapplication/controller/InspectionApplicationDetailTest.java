@@ -48,6 +48,7 @@ class InspectionApplicationDetailTest {
   Long assessmentId;
   String token;
 
+  // 관할 운영자와 신청·분석·유입 위치 준비
   @BeforeEach
   void setup() {
     for (String table :
@@ -99,12 +100,13 @@ class InspectionApplicationDetailTest {
     locations.saveAndFlush(ApplicationInflowLocation.of(application, InflowLocation.DRAIN));
   }
 
+  // 운영자 토큰으로 상세 조회 요청 생성
   private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder detail() {
     return get("/api/admin/applications/{applicationId}", applicationId)
         .header("Authorization", "Bearer " + token);
   }
 
-  /** 화면에 필요한 정보의 출처를 확인하며 조회가 신청·주민·분석·유입 위치를 변경하지 않는지 검증한다. */
+  // 화면 필드 출처와 신청·주민·분석·유입 위치 보존 검증
   @Test
   void returnsScreenFieldsAndPreservesStoredData() throws Exception {
     var tables =
@@ -135,7 +137,7 @@ class InspectionApplicationDetailTest {
       assertThat(jdbc.queryForList("SELECT * FROM " + table)).isEqualTo(before.get(table));
   }
 
-  /** 기존 nullable 데이터는 null로, 미입력 유입 위치는 빈 배열로 반환한다. */
+  // 선택값 null 및 유입 위치 빈 배열 반환 검증
   @Test
   void returnsNullsAndEmptyLocations() throws Exception {
     jdbc.update("DELETE FROM application_inflow_locations");
@@ -151,6 +153,7 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.result.inflowLocations").isEmpty());
   }
 
+  // 다른 시와 유사 도로명의 관할 오인 방지
   @ParameterizedTest
   @ValueSource(strings = {"서울특별시 부천시 원미구 길주로 53", "부천시민로 1", "인천광역시 부평구 1"})
   void rejectsOutsideAddresses(String address) throws Exception {
@@ -163,6 +166,7 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.code").value("APPLICATION_403_4"));
   }
 
+  // 미설정·미지원 관할 접근 거부 확인
   @Test
   void rejectsMissingAndUnsupportedJurisdiction() throws Exception {
     jdbc.update("UPDATE users SET jurisdiction_id = NULL WHERE user_id = ?", operatorId);
@@ -177,6 +181,7 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.code").value("APPLICATION_403_4"));
   }
 
+  // 신청 ID 형식·범위 오류 확인
   @ParameterizedTest
   @ValueSource(strings = {"0", "-1", "abc", "9223372036854775808"})
   void rejectsInvalidId(String id) throws Exception {
@@ -185,6 +190,7 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.code").value("COMMON_400_3"));
   }
 
+  // 신청 미존재·인증 실패·주민 접근 거부 확인
   @Test
   void rejectsMissingApplicationAndUnauthorizedAccess() throws Exception {
     mvc.perform(
@@ -204,7 +210,7 @@ class InspectionApplicationDetailTest {
         .andExpect(status().isForbidden());
   }
 
-  /** 시간대 enum의 JSON null 허용을 포함하여 생성된 OpenAPI 명세를 검증한다. */
+  // 시간대 enum의 null 허용 및 OpenAPI 명세 검증
   @Test
   void documentsFieldsNullEnumAndErrors() throws Exception {
     mvc.perform(get("/v3/api-docs"))

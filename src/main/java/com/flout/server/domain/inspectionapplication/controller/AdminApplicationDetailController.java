@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminApplicationDetailController {
   private final InspectionApplicationDetailService service;
 
-  /** GIS 신청 정보 탭에 표시할 기본 정보와 주민 입력값을 반환한다. */
+  // GIS 신청 정보 탭에 표시할 기본 정보와 주민 입력값을 반환
   @GetMapping(value = "/{applicationId}", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "신청 상세정보 조회",

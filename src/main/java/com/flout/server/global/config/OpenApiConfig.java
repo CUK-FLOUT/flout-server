@@ -79,7 +79,7 @@ public class OpenApiConfig {
   OpenApiCustomizer authDocumentation(
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn) {
     return api -> {
-      // OpenAPI 3.1에서는 nullable enum의 허용값에도 JSON null이 포함되어야 한다.
+      // OpenAPI 3.1 nullable enum 허용값에 JSON null 포함
       if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
         for (String schemaName :
             List.of("InspectionDetailResponse", "InspectionApplicationDetailResponse")) {
@@ -830,7 +830,7 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
-  /** GIS 신청 정보 탭의 응답 예시와 신청 ID·관할 오류를 문서화한다. */
+  // GIS 신청 응답 예시와 ID·관할 오류 문서화
   private void describeApplicationDetail(Operation operation) {
     var code = InspectionApplicationSuccessCode.DETAIL_FOUND;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());

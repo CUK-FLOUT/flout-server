@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 
-/** GIS 신청 정보 탭의 기본 정보와 주민 입력 정보를 반환한다. 층수는 별도로 제공하지 않는다. */
+// GIS 신청 기본 정보와 주민 입력값 반환, 층수 제외
 public record InspectionApplicationDetailResponse(
     @Schema(description = "현장점검 신청 ID", example = "1") Long applicationId,
     @Schema(description = "신청 ID를 최소 6자리로 표시한 접수번호", example = "000001") String receiptNo,
@@ -49,6 +49,7 @@ public record InspectionApplicationDetailResponse(
             types = {"string", "null"})
         PreferredTimeSlot preferredTimeSlot) {
 
+  // 신청 정보와 유입 위치를 화면 응답으로 변환
   public static InspectionApplicationDetailResponse from(
       InspectionApplication application, List<InflowLocation> inflowLocations) {
     return new InspectionApplicationDetailResponse(
