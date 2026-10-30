@@ -206,12 +206,13 @@ public class OpenApiConfig {
                             }
 
                             if (path.equals("/api/admin/applications/{applicationId}")
-                                    && method == PathItem.HttpMethod.GET) {
+                                && method == PathItem.HttpMethod.GET) {
                               describeApplicationDetail(operation);
                             }
 
-                            if (path.equals("/api/resident/applications/{applicationId}/attachments")
-                                    && method == PathItem.HttpMethod.POST) {
+                            if (path.equals(
+                                    "/api/resident/applications/{applicationId}/attachments")
+                                && method == PathItem.HttpMethod.POST) {
                               describeAttachmentUpload(operation);
                             }
 

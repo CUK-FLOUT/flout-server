@@ -480,7 +480,7 @@ class AttachmentControllerTest {
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/applications/{applicationId}/attachments'].post.responses['403'].content['application/json'].examples.applicationAccessDenied.value.code")
-                .value("APPLICATION_403_4"))
+                .value("APPLICATION_403_5"))
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/applications/{applicationId}/attachments'].post.responses['404'].content['application/json'].examples.applicationNotFound.value.code")
