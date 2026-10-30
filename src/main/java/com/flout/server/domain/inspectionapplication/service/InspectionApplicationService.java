@@ -12,6 +12,7 @@ import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import java.sql.SQLException;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -75,22 +76,45 @@ public class InspectionApplicationService {
       throw new BaseException(InspectionApplicationErrorCode.GUIDE_NOT_FOUND);
     }
 
-    validateJurisdiction(request.address());
-    validateAssessmentAddress(assessment, request);
+    // 신청 주소의 앞뒤 공백을 제거
+    String normalizedAddress = request.address() == null ? null : request.address().strip();
 
-    return submitWithReceiptNumberRetry(applicant, assessment, request);
+    // 정규화된 주소로 관할 및 취약도 분석 주소 검증
+    validateJurisdiction(normalizedAddress);
+    validateAssessmentAddress(assessment, normalizedAddress, request.detailAddress());
+
+    // 실제 저장에도 정규화된 주소를 사용
+    CreateInspectionApplicationRequest normalizedRequest =
+        new CreateInspectionApplicationRequest(
+            request.assessmentId(),
+            request.guideId(),
+            normalizedAddress,
+            request.detailAddress(),
+            request.latitude(),
+            request.longitude(),
+            request.contact(),
+            request.occupancyType(),
+            request.floodExperience(),
+            request.existingFacility(),
+            request.requestReason(),
+            request.preferredVisitDate(),
+            request.preferredTimeSlot(),
+            request.inflowLocations());
+
+    return submitWithReceiptNumberRetry(applicant, assessment, normalizedRequest);
   }
 
   private void validateJurisdiction(String address) {
-    if (address == null || !BUCHEON_ADDRESS.matcher(address.strip()).find()) {
+    if (address == null || !BUCHEON_ADDRESS.matcher(address).find()) {
       throw new BaseException(InspectionApplicationErrorCode.INVALID_APPLICATION_ADDRESS);
     }
   }
 
   private void validateAssessmentAddress(
-      RiskAssessment assessment, CreateInspectionApplicationRequest request) {
+      RiskAssessment assessment, String address, String detailAddress) {
 
-    if (assessment.getAddress() == null || !assessment.getAddress().equals(request.address())) {
+    if (!Objects.equals(assessment.getAddress(), address)
+        || !Objects.equals(assessment.getDetailAddress(), detailAddress)) {
       throw new BaseException(InspectionApplicationErrorCode.ASSESSMENT_ADDRESS_MISMATCH);
     }
   }
