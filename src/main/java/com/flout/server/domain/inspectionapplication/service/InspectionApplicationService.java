@@ -113,7 +113,11 @@ public class InspectionApplicationService {
   private void validateAssessmentAddress(
       RiskAssessment assessment, String address, String detailAddress) {
 
-    if (!Objects.equals(assessment.getAddress(), address)
+    // 취약도 분석 주소에도 동일하게 앞뒤 공백 제거
+    String assessmentAddress =
+        assessment.getAddress() == null ? null : assessment.getAddress().strip();
+
+    if (!Objects.equals(assessmentAddress, address)
         || !Objects.equals(assessment.getDetailAddress(), detailAddress)) {
       throw new BaseException(InspectionApplicationErrorCode.ASSESSMENT_ADDRESS_MISMATCH);
     }
