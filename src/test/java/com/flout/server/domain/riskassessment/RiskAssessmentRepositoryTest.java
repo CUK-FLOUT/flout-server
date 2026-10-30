@@ -62,7 +62,7 @@ class RiskAssessmentRepositoryTest {
 
     RiskAssessment saved =
         riskAssessments.saveAndFlush(
-            RiskAssessment.completedDemo(user, "서울특별시 중구 세종대로 110", null, riskLevel));
+            RiskAssessment.completedDemo(user, "서울특별시 중구 세종대로 110", "101호", riskLevel));
 
     assertThat(saved.getRiskLevel()).isEqualTo(riskLevel);
     assertThat(saved.getStatus()).isEqualTo(RiskAssessmentStatus.COMPLETED);

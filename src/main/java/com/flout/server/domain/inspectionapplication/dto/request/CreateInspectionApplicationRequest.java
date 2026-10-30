@@ -13,10 +13,20 @@ import java.util.List;
 public record CreateInspectionApplicationRequest(
     @NotNull(message = "취약도 분석 결과 ID는 필수입니다.") @Schema(
             description = "점검을 신청할 완료 상태의 침수 위험도 분석 ID",
-            example = "1",
+            example = "5",
             requiredMode = Schema.RequiredMode.REQUIRED)
         Long assessmentId,
     @Schema(description = "분석 결과에 연결된 예방 가이드 ID", example = "1") Long guideId,
+    @NotBlank(message = "점검 주소는 필수입니다.") @Size(max = 255, message = "점검 주소는 255자 이하여야 합니다.") @Schema(
+            description = "점검 주소 (필수, 최대 255자)",
+            example = "경기도 부천시 원미구 지봉로 43",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String address,
+    @NotBlank(message = "상세 주소는 필수입니다.") @Size(max = 255, message = "상세 주소는 255자 이하여야 합니다.") @Schema(
+            description = "상세 주소 (필수, 최대 255자)",
+            example = "101호",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String detailAddress,
     @NotNull(message = "위도는 필수입니다.") @DecimalMin(value = "-90.0000000", message = "위도는 -90 이상이어야 합니다.") @DecimalMax(value = "90.0000000", message = "위도는 90 이하여야 합니다.") @Schema(
             description = "점검 위치 위도(-90.0000000~90.0000000)",
             example = "37.4874850",
@@ -49,7 +59,8 @@ public record CreateInspectionApplicationRequest(
             example = "false",
             requiredMode = Schema.RequiredMode.REQUIRED)
         Boolean existingFacility,
-    @Schema(description = "현장점검 요청 사유", example = "최근 배수구 역류가 있어 점검을 희망합니다.") String requestReason,
+    @Size(max = 2000) @Schema(description = "현장점검 요청 사유 (최대 2000자)", example = "최근 배수구 역류가 있어 점검을 희망합니다.")
+        String requestReason,
     @FutureOrPresent @Schema(description = "희망 방문일(오늘 이후)", format = "date", example = "2026-11-03")
         LocalDate preferredVisitDate,
     @Schema(
@@ -61,4 +72,4 @@ public record CreateInspectionApplicationRequest(
             description = "침수 유입 위치 목록",
             allowableValues = {"WINDOW", "ENTRANCE", "BATHROOM", "DRAIN", "ETC", "UNKNOWN"},
             example = "[\"WINDOW\", \"DRAIN\"]")
-        List<InflowLocation> inflowLocations) {}
+        List<@NotNull InflowLocation> inflowLocations) {}

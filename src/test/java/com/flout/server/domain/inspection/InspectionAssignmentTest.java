@@ -99,6 +99,8 @@ class InspectionAssignmentTest {
         new CreateInspectionApplicationRequest(
             assessment.getId(),
             null,
+            assessment.getAddress(),
+            assessment.getDetailAddress(),
             new BigDecimal("37.4874850"),
             new BigDecimal("126.7985672"),
             "010-1234-5678",

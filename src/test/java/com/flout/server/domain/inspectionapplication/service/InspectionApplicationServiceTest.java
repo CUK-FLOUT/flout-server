@@ -156,6 +156,8 @@ class InspectionApplicationServiceTest {
         new CreateInspectionApplicationRequest(
             null,
             null,
+            "경기도 부천시 원미구 길주로 211",
+            "202호",
             new BigDecimal("90.0000001"),
             new BigDecimal("180.0000001"),
             "",
@@ -170,6 +172,68 @@ class InspectionApplicationServiceTest {
     assertThat(validator.validate(invalid)).hasSizeGreaterThanOrEqualTo(7);
   }
 
+  @Test
+  void rejectsAddressOutsideBucheon() {
+    stubValidSubmissionPrerequisites();
+
+    var request = validRequest(List.of());
+
+    var invalidRequest =
+        new CreateInspectionApplicationRequest(
+            request.assessmentId(),
+            request.guideId(),
+            "서울특별시 강남구 테헤란로 123",
+            request.detailAddress(),
+            request.latitude(),
+            request.longitude(),
+            request.contact(),
+            request.occupancyType(),
+            request.floodExperience(),
+            request.existingFacility(),
+            request.requestReason(),
+            request.preferredVisitDate(),
+            request.preferredTimeSlot(),
+            request.inflowLocations());
+
+    assertThatThrownBy(() -> service.submit(1L, invalidRequest))
+        .isInstanceOf(BaseException.class)
+        .extracting(error -> ((BaseException) error).getBaseResponseCode())
+        .isEqualTo(InspectionApplicationErrorCode.INVALID_APPLICATION_ADDRESS);
+
+    verifyNoInteractions(submissionTransaction);
+  }
+
+  @Test
+  void rejectsAddressDifferentFromAssessment() {
+    stubValidSubmissionPrerequisites();
+
+    var request = validRequest(List.of());
+
+    var mismatchedRequest =
+        new CreateInspectionApplicationRequest(
+            request.assessmentId(),
+            request.guideId(),
+            "경기도 부천시 원미구 지봉로 43",
+            request.detailAddress(),
+            request.latitude(),
+            request.longitude(),
+            request.contact(),
+            request.occupancyType(),
+            request.floodExperience(),
+            request.existingFacility(),
+            request.requestReason(),
+            request.preferredVisitDate(),
+            request.preferredTimeSlot(),
+            request.inflowLocations());
+
+    assertThatThrownBy(() -> service.submit(1L, mismatchedRequest))
+        .isInstanceOf(BaseException.class)
+        .extracting(error -> ((BaseException) error).getBaseResponseCode())
+        .isEqualTo(InspectionApplicationErrorCode.ASSESSMENT_ADDRESS_MISMATCH);
+
+    verifyNoInteractions(submissionTransaction);
+  }
+
   private void assertError(InspectionApplicationErrorCode expected) {
     assertThatThrownBy(() -> service.submit(1L, validRequest(List.of())))
         .isInstanceOf(BaseException.class)
@@ -181,6 +245,8 @@ class InspectionApplicationServiceTest {
     return new CreateInspectionApplicationRequest(
         10L,
         null,
+        "경기도 부천시 원미구 길주로 211",
+        "202호",
         new BigDecimal("37.5665000"),
         new BigDecimal("126.9780000"),
         "010-1234-5678",
@@ -198,6 +264,8 @@ class InspectionApplicationServiceTest {
     return new CreateInspectionApplicationRequest(
         request.assessmentId(),
         guideId,
+        request.address(),
+        request.detailAddress(),
         request.latitude(),
         request.longitude(),
         request.contact(),
@@ -218,7 +286,7 @@ class InspectionApplicationServiceTest {
 
   private RiskAssessment completedAssessment(User user, Long id) {
     RiskAssessment assessment =
-        RiskAssessment.completedDemo(user, "Seoul address", "101", RiskLevel.HIGH);
+        RiskAssessment.completedDemo(user, "경기도 부천시 원미구 길주로 211", "202호", RiskLevel.HIGH);
     ReflectionTestUtils.setField(assessment, "id", id);
     return assessment;
   }

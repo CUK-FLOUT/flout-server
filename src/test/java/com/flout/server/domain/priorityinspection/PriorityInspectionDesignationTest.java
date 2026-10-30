@@ -101,6 +101,8 @@ class PriorityInspectionDesignationTest {
         new CreateInspectionApplicationRequest(
             assessment.getId(),
             null,
+            assessment.getAddress(),
+            assessment.getDetailAddress(),
             new BigDecimal("37.4874850"),
             new BigDecimal("126.7985672"),
             "010-1234-5678",
@@ -350,7 +352,7 @@ class PriorityInspectionDesignationTest {
         applicationId);
     // 최신 분석이 아닌 신청에 연결된 분석을 사용
     assessments.saveAndFlush(
-        RiskAssessment.completedDemo(resident, "부천시 다른 주소", null, RiskLevel.LOW));
+        RiskAssessment.completedDemo(resident, "부천시 다른 주소", "101호", RiskLevel.LOW));
     var beforeApplication =
         jdbc.queryForMap(
             "SELECT * FROM inspection_applications WHERE application_id = ?", applicationId);
@@ -1285,6 +1287,8 @@ class PriorityInspectionDesignationTest {
         new CreateInspectionApplicationRequest(
             assessment.getId(),
             null,
+            assessment.getAddress(),
+            assessment.getDetailAddress(),
             new BigDecimal("37.4874850"),
             new BigDecimal("126.7985672"),
             "010-1234-5678",

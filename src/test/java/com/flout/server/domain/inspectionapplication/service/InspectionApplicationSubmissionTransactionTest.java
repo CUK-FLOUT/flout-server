@@ -102,6 +102,8 @@ class InspectionApplicationSubmissionTransactionTest {
     return new CreateInspectionApplicationRequest(
         10L,
         null,
+        "경기도 부천시 원미구 길주로 211",
+        "202호",
         new BigDecimal("37.5665000"),
         new BigDecimal("126.9780000"),
         "010-1234-5678",

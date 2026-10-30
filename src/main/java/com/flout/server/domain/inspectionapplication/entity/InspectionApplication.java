@@ -92,8 +92,8 @@ public class InspectionApplication {
     application.assessment = assessment;
     application.guideId = request.guideId();
     application.receiptNo = receiptNo;
-    application.address = assessment.getAddress();
-    application.detailAddress = assessment.getDetailAddress();
+    application.address = request.address();
+    application.detailAddress = request.detailAddress();
     application.latitude = request.latitude();
     application.longitude = request.longitude();
     application.contact = request.contact().strip();
