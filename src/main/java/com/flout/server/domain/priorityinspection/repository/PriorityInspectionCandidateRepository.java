@@ -24,6 +24,9 @@ public class PriorityInspectionCandidateRepository {
       JOIN risk_assessments r ON r.assessment_id = a.assessment_id
       LEFT JOIN priority_inspection_designations d ON d.application_id = a.application_id
       WHERE TRIM(a.address) REGEXP :region
+        AND NOT EXISTS (
+          SELECT 1 FROM inspections i
+          WHERE i.application_id = a.application_id AND i.status = 'COMPLETED')
         AND (:riskLevel = '' OR r.risk_level = :riskLevel)
         AND (:designated IS NULL
           OR (:designated = TRUE AND d.application_id IS NOT NULL)
@@ -34,7 +37,20 @@ public class PriorityInspectionCandidateRepository {
       """;
   private final NamedParameterJdbcTemplate jdbc;
 
-  // 검색·필터 조건으로 후보 목록과 인근 건수 조회
+  /**
+   * 완료된 점검의 신청을 제외한 관할 후보를 지정 여부 우선·신청 ID 내림차순으로 조회한다.
+   *
+   * <p>목록과 전체 건수에 동일한 검색·필터 조건을 적용하고, 정렬 후 페이지를 나눈다. 인근 신청 건수에는 완료 신청도 포함하며, 저장된 지정 정보와 선정 순서는 변경하지
+   * 않는다.
+   *
+   * @param keyword 주소·접수번호 부분 검색어. 빈 문자열이면 검색 조건 생략
+   * @param district 조회할 구. 빈 문자열이면 관할 전체
+   * @param riskLevel 취약도. null이면 전체
+   * @param designated 지정 여부. null이면 지정·미지정 모두 조회
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 페이지 크기
+   * @return 후보 목록과 인근 신청 건수, 완료 신청을 제외한 전체 건수·페이지 수
+   */
   public PriorityInspectionCandidatesResponse search(
       String keyword,
       String district,
@@ -63,7 +79,8 @@ public class PriorityInspectionCandidateRepository {
           a.request_reason, d.application_id AS designated_id
         """
                 + FILTER
-                + " ORDER BY a.application_id DESC LIMIT :limit OFFSET :offset",
+                + " ORDER BY CASE WHEN d.application_id IS NOT NULL THEN 0 ELSE 1 END,"
+                + " a.application_id DESC LIMIT :limit OFFSET :offset",
             params,
             (rs, rowNum) ->
                 new PriorityInspectionCandidatesResponse.Item(

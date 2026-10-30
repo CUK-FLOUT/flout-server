@@ -533,6 +533,117 @@ class PriorityInspectionDesignationTest {
     assertThat(designations.count()).isZero();
   }
 
+  /** 지정·미지정 완료 신청의 제외, 나머지 상태 유지, 페이지 집계와 원본 데이터 보존을 검증한다. */
+  @Test
+  void candidatesExcludeCompletedRegardlessOfDesignationAndKeepOtherStates() throws Exception {
+    var scheduled = additionalApplication("부천시 원미구 예정");
+    var inProgress = additionalApplication("부천시 원미구 진행");
+    var completed = additionalApplication("부천시 원미구 완료");
+    var noInspection = additionalApplication("부천시 원미구 점검없음");
+    for (var entry :
+        Map.of(scheduled, "SCHEDULED", inProgress, "IN_PROGRESS", completed, "COMPLETED")
+            .entrySet()) {
+      var inspection =
+          inspections.saveAndFlush(
+              Inspection.received(applications.findById(entry.getKey()).orElseThrow()));
+      jdbc.update(
+          "UPDATE inspections SET status = ? WHERE inspection_id = ?",
+          entry.getValue(),
+          inspection.getId());
+    }
+    jdbc.update(
+        "UPDATE inspections SET status = 'COMPLETED' WHERE inspection_id = ?", inspectionId);
+    bulk(List.of(applicationId, scheduled), true).andExpect(status().isOk());
+    var before =
+        jdbc.queryForList("SELECT * FROM priority_inspection_designations ORDER BY application_id");
+    mvc.perform(get("/api/admin/priority-inspections").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(3))
+        .andExpect(jsonPath("$.result.applications.length()").value(3))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(scheduled))
+        .andExpect(jsonPath("$.result.applications[1].applicationId").value(noInspection))
+        .andExpect(jsonPath("$.result.applications[2].applicationId").value(inProgress))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(4));
+    for (boolean designated : List.of(true, false)) {
+      mvc.perform(
+              get("/api/admin/priority-inspections")
+                  .header("Authorization", "Bearer " + token)
+                  .param("designated", String.valueOf(designated))
+                  .param("size", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.totalElements").value(designated ? 1 : 2))
+          .andExpect(jsonPath("$.result.totalPages").value(designated ? 1 : 2));
+    }
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "완료"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+    mvc.perform(
+            get("/api/admin/priority-inspections")
+                .header("Authorization", "Bearer " + token)
+                .param("page", "3")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty())
+        .andExpect(jsonPath("$.result.totalElements").value(3))
+        .andExpect(jsonPath("$.result.totalPages").value(3));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY application_id"))
+        .isEqualTo(before);
+    assertThat(inspections.count()).isEqualTo(4);
+  }
+
+  /** 검색·필터 및 페이지 경계에서도 지정 우선·신청 ID 내림차순을 유지하고 저장된 선정 순서는 보존하는지 검증한다. */
+  @Test
+  void candidatesPutDesignatedFirstBeforePaginationAndPreserveSelectionOrder() throws Exception {
+    Long olderUndesignated = additionalApplication("부천시 원미구 길주로 211");
+    Long newerDesignated = additionalApplication("부천시 원미구 길주로 212");
+    Long newestUndesignated = additionalApplication("부천시 원미구 길주로 213");
+    bulk(List.of(applicationId, newerDesignated), true).andExpect(status().isOk());
+    var before =
+        jdbc.queryForList("SELECT * FROM priority_inspection_designations ORDER BY application_id");
+    List<Long> expected =
+        List.of(newerDesignated, applicationId, newestUndesignated, olderUndesignated);
+    for (int page = 0; page < expected.size(); page++) {
+      mvc.perform(
+              get("/api/admin/priority-inspections")
+                  .header("Authorization", "Bearer " + token)
+                  .param("keyword", "길주로")
+                  .param("district", "원미구")
+                  .param("riskLevel", "HIGH")
+                  .param("page", String.valueOf(page))
+                  .param("size", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.applications[0].applicationId").value(expected.get(page)))
+          .andExpect(jsonPath("$.result.applications[0].designated").value(page < 2))
+          .andExpect(jsonPath("$.result.totalElements").value(4))
+          .andExpect(jsonPath("$.result.totalPages").value(4));
+    }
+    for (boolean designated : List.of(true, false)) {
+      var ids =
+          designated
+              ? List.of(newerDesignated, applicationId)
+              : List.of(newestUndesignated, olderUndesignated);
+      mvc.perform(
+              get("/api/admin/priority-inspections")
+                  .header("Authorization", "Bearer " + token)
+                  .param("designated", String.valueOf(designated)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.applications[0].applicationId").value(ids.get(0)))
+          .andExpect(jsonPath("$.result.applications[1].applicationId").value(ids.get(1)))
+          .andExpect(jsonPath("$.result.totalElements").value(2));
+    }
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY application_id"))
+        .isEqualTo(before);
+  }
+
+  /** 인근 건수는 검색·페이지와 독립적으로 계산하고, 첫 페이지에는 지정 항목을 우선 표시하는지 검증한다. */
   @Test
   void candidatesCountWithinOneKilometerAcrossSearchAndPages() throws Exception {
     additionalApplication("경기 부천시 같은 위치");
@@ -566,7 +677,7 @@ class PriorityInspectionDesignationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(4))
         .andExpect(jsonPath("$.result.totalPages").value(4))
-        .andExpect(jsonPath("$.result.applications[0].applicationId").value(outside));
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId));
   }
 
   @Test

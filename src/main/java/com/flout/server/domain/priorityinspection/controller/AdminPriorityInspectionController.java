@@ -49,12 +49,16 @@ public class AdminPriorityInspectionController {
         PriorityInspectionSuccessCode.DETAIL_FOUND);
   }
 
-  // 우선점검 후보 검색·목록 조회
+  /**
+   * 인증된 운영자의 관할 후보를 검색하여 공통 성공 응답으로 반환한다.
+   *
+   * <p>운영자·관할 권한 및 검색 조건은 서비스에서 검증한다. 완료 점검은 제외하며, 지정 항목 우선 정렬과 페이지 처리는 저장소에서 수행한다.
+   */
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "우선점검 후보 검색·목록 조회",
       description =
-          "관할 신청을 접수번호·주소만 검색합니다. 지역·취약도·지정 여부 필터는 함께 적용되며 생략하면 전체입니다. page는 0부터, size는 1~100이며 기본 10건입니다. 신청 ID 내림차순입니다. 인근 신청은 검색·필터·페이지와 무관하게 같은 관할에서 본인을 제외한 직선거리 1km 이내의 전체 신청 건수입니다.")
+          "관할 신청을 접수번호·주소만 검색합니다. 연결된 점검이 완료(COMPLETED)된 신청은 목록과 전체 건수·페이지 수에서 제외합니다. 지역·취약도·지정 여부 필터는 함께 적용되며 생략하면 전체입니다. page는 0부터, size는 1~100이며 기본 10건입니다. 우선점검 지정 항목을 먼저 표시하고 같은 지정 여부 안에서는 신청 ID 내림차순이며 페이지 분할 전에 정렬합니다. 저장된 선정 순서는 변경하지 않습니다. 인근 신청은 검색·필터·페이지와 무관하게 같은 관할에서 본인을 제외한 직선거리 1km 이내의 전체 신청 건수입니다.")
   public SuccessResponse<PriorityInspectionCandidatesResponse> candidates(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "접수번호·주소 검색어, 최대 255자") @RequestParam(defaultValue = "")
