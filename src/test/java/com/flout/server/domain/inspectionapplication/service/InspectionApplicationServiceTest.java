@@ -156,6 +156,8 @@ class InspectionApplicationServiceTest {
         new CreateInspectionApplicationRequest(
             null,
             null,
+            "경기도 부천시 원미구 길주로 211",
+            "202호",
             new BigDecimal("90.0000001"),
             new BigDecimal("180.0000001"),
             "",
@@ -181,6 +183,8 @@ class InspectionApplicationServiceTest {
     return new CreateInspectionApplicationRequest(
         10L,
         null,
+        "경기도 부천시 원미구 길주로 211",
+        "202호",
         new BigDecimal("37.5665000"),
         new BigDecimal("126.9780000"),
         "010-1234-5678",
@@ -198,6 +202,8 @@ class InspectionApplicationServiceTest {
     return new CreateInspectionApplicationRequest(
         request.assessmentId(),
         guideId,
+        request.address(),
+        request.detailAddress(),
         request.latitude(),
         request.longitude(),
         request.contact(),

@@ -17,6 +17,9 @@ public record CreateInspectionApplicationRequest(
             requiredMode = Schema.RequiredMode.REQUIRED)
         Long assessmentId,
     @Schema(description = "분석 결과에 연결된 예방 가이드 ID", example = "1") Long guideId,
+    @NotBlank @Size(max = 255) @Schema(description = "점검 주소 (필수, 최대 255자)", requiredMode = Schema.RequiredMode.REQUIRED)
+        String address,
+    @Size(max = 255) @Schema(description = "상세 주소 (선택, 최대 255자)") String detailAddress,
     @NotNull(message = "위도는 필수입니다.") @DecimalMin(value = "-90.0000000", message = "위도는 -90 이상이어야 합니다.") @DecimalMax(value = "90.0000000", message = "위도는 90 이하여야 합니다.") @Schema(
             description = "점검 위치 위도(-90.0000000~90.0000000)",
             example = "37.4874850",
@@ -49,7 +52,8 @@ public record CreateInspectionApplicationRequest(
             example = "false",
             requiredMode = Schema.RequiredMode.REQUIRED)
         Boolean existingFacility,
-    @Schema(description = "현장점검 요청 사유", example = "최근 배수구 역류가 있어 점검을 희망합니다.") String requestReason,
+    @Size(max = 2000) @Schema(description = "현장점검 요청 사유 (최대 2000자)", example = "최근 배수구 역류가 있어 점검을 희망합니다.")
+        String requestReason,
     @FutureOrPresent @Schema(description = "희망 방문일(오늘 이후)", format = "date", example = "2026-11-03")
         LocalDate preferredVisitDate,
     @Schema(
@@ -61,4 +65,4 @@ public record CreateInspectionApplicationRequest(
             description = "침수 유입 위치 목록",
             allowableValues = {"WINDOW", "ENTRANCE", "BATHROOM", "DRAIN", "ETC", "UNKNOWN"},
             example = "[\"WINDOW\", \"DRAIN\"]")
-        List<InflowLocation> inflowLocations) {}
+        List<@NotNull InflowLocation> inflowLocations) {}

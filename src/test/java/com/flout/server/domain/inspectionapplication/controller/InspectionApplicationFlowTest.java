@@ -74,27 +74,32 @@ class InspectionApplicationFlowTest {
   }
 
   private Map<String, Object> request() {
-    return Map.of(
-        "assessmentId",
-        assessmentId,
-        "latitude",
-        37.487485,
-        "longitude",
-        126.7985672,
-        "contact",
-        "010-1234-5678",
-        "occupancyType",
-        "OWNER",
-        "floodExperience",
-        "YES",
-        "existingFacility",
-        false,
-        "preferredVisitDate",
-        LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1).toString(),
-        "preferredTimeSlot",
-        "MORNING",
-        "inflowLocations",
-        List.of("WINDOW", "DRAIN"));
+    var body =
+        new java.util.HashMap<String, Object>(
+            Map.of(
+                "assessmentId",
+                assessmentId,
+                "latitude",
+                37.487485,
+                "longitude",
+                126.7985672,
+                "contact",
+                "010-1234-5678",
+                "occupancyType",
+                "OWNER",
+                "floodExperience",
+                "YES",
+                "existingFacility",
+                false,
+                "preferredVisitDate",
+                LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1).toString(),
+                "preferredTimeSlot",
+                "MORNING",
+                "inflowLocations",
+                List.of("WINDOW", "DRAIN")));
+    body.put("address", "경기도 부천시 원미구 길주로 211");
+    body.put("detailAddress", "202호");
+    return body;
   }
 
   private org.springframework.test.web.servlet.ResultActions submit() throws Exception {
@@ -125,8 +130,8 @@ class InspectionApplicationFlowTest {
         jdbc.queryForMap(
             "SELECT address, detail_address FROM inspection_applications WHERE application_id = ?",
             applicationId);
-    assertThat(application.get("address")).isEqualTo("경기도 부천시 원미구 길주로 210");
-    assertThat(application.get("detail_address")).isEqualTo("101호");
+    assertThat(application.get("address")).isEqualTo("경기도 부천시 원미구 길주로 211");
+    assertThat(application.get("detail_address")).isEqualTo("202호");
     var row = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
     assertThat(((Number) row.get("application_id")).longValue()).isEqualTo(applicationId);
     assertThat(row.get("status")).isEqualTo("RECEIVED");
@@ -153,6 +158,26 @@ class InspectionApplicationFlowTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"SCHEDULED\"}"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void rejectsOverlongReasonAndNullInflowLocation() throws Exception {
+    var body = request();
+    body.put("requestReason", "가".repeat(2001));
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isBadRequest());
+    body.remove("requestReason");
+    body.put("inflowLocations", java.util.Collections.singletonList(null));
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isBadRequest());
   }
 
   // 점검 생성 실패 시 신청 롤백

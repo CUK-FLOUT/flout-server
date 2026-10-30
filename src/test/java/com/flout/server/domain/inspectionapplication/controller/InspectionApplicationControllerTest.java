@@ -58,6 +58,8 @@ class InspectionApplicationControllerTest {
     return new CreateInspectionApplicationRequest(
         1L,
         null,
+        "경기도 부천시 원미구 길주로 211",
+        "202호",
         new BigDecimal("37.4874850"),
         new BigDecimal("126.7985672"),
         "010-1234-5678",
