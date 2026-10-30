@@ -25,7 +25,8 @@ public enum InspectionApplicationErrorCode implements BaseResponseCode {
 
   APPLICATION_NOT_FOUND(404, "APPLICATION_404_2", "현장점검 신청을 찾을 수 없습니다."),
 
-  JURISDICTION_ACCESS_DENIED(403, "APPLICATION_403_3", "본인 관할 지역의 신청만 수정할 수 있습니다.");
+  JURISDICTION_ACCESS_DENIED(403, "APPLICATION_403_3", "본인 관할 지역의 신청만 수정할 수 있습니다."),
+  JURISDICTION_READ_ACCESS_DENIED(403, "APPLICATION_403_4", "본인 관할 지역의 신청만 조회할 수 있습니다.");
 
   private final int status;
   private final String code;

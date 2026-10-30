@@ -81,15 +81,18 @@ public class OpenApiConfig {
     return api -> {
       // OpenAPI 3.1에서는 nullable enum의 허용값에도 JSON null이 포함되어야 한다.
       if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
-        var detail = api.getComponents().getSchemas().get("InspectionDetailResponse");
-        if (detail != null && detail.getProperties() != null) {
-          Schema timeSlot = (Schema) detail.getProperties().get("preferredTimeSlot");
-          if (timeSlot != null
-              && timeSlot.getEnum() != null
-              && !timeSlot.getEnum().contains(null)) {
-            var values = new ArrayList<>(timeSlot.getEnum());
-            values.add(null);
-            timeSlot.setEnum(values);
+        for (String schemaName :
+            List.of("InspectionDetailResponse", "InspectionApplicationDetailResponse")) {
+          var detail = api.getComponents().getSchemas().get(schemaName);
+          if (detail != null && detail.getProperties() != null) {
+            Schema timeSlot = (Schema) detail.getProperties().get("preferredTimeSlot");
+            if (timeSlot != null
+                && timeSlot.getEnum() != null
+                && !timeSlot.getEnum().contains(null)) {
+              var values = new ArrayList<>(timeSlot.getEnum());
+              values.add(null);
+              timeSlot.setEnum(values);
+            }
           }
         }
       }
@@ -200,6 +203,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeInspectionApplication(operation);
+                            }
+
+                            if (path.equals("/api/admin/applications/{applicationId}")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeApplicationDetail(operation);
                             }
 
                             if (path.equals("/api/admin/applications/{applicationId}/internal-memo")
@@ -819,6 +827,46 @@ public class OpenApiConfig {
         .setDescription(InspectionErrorCode.INVALID_STATUS_TRANSITION.getMessage());
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  /** GIS 신청 정보 탭의 응답 예시와 신청 ID·관할 오류를 문서화한다. */
+  private void describeApplicationDetail(Operation operation) {
+    var code = InspectionApplicationSuccessCode.DETAIL_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("applicationId", 1);
+    result.put("receiptNo", "000001");
+    result.put("applicantName", "김주민");
+    result.put("contact", "010-1234-1234");
+    result.put("address", "경기도 부천시 원미구 길주로 53");
+    result.put("detailAddress", "101호");
+    result.put("occupancyType", "TENANT");
+    result.put("riskLevel", "HIGH");
+    result.put("floodExperience", "YES");
+    result.put("inflowLocations", List.of("BATHROOM", "DRAIN"));
+    result.put("existingFacility", false);
+    result.put("preferredVisitDate", "2026-11-03");
+    result.put("requestReason", "최근 배수구 역류가 있어 점검을 희망합니다.");
+    result.put("preferredTimeSlot", "MORNING");
+    addExample(success, "applicationDetail", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
