@@ -69,7 +69,7 @@ class InspectionApplicationFlowTest {
         assessments
             .saveAndFlush(
                 RiskAssessment.completedDemo(
-                    resident, "경기도 부천시 원미구 길주로 210", "101호", RiskLevel.HIGH))
+                    resident, "경기도 부천시 원미구 길주로 211", "202호", RiskLevel.HIGH))
             .getId();
   }
 
