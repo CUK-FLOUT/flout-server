@@ -535,7 +535,7 @@ class PriorityInspectionDesignationTest {
     assertThat(designations.count()).isZero();
   }
 
-  /** 지정·미지정 완료 신청의 제외, 나머지 상태 유지, 페이지 집계와 원본 데이터 보존을 검증한다. */
+  // 완료 신청 제외·다른 상태 유지·페이지 집계·데이터 보존 검증
   @Test
   void candidatesExcludeCompletedRegardlessOfDesignationAndKeepOtherStates() throws Exception {
     var scheduled = additionalApplication("부천시 원미구 예정");
@@ -599,7 +599,7 @@ class PriorityInspectionDesignationTest {
     assertThat(inspections.count()).isEqualTo(4);
   }
 
-  /** 검색·필터 및 페이지 경계에서도 지정 우선·신청 ID 내림차순을 유지하고 저장된 선정 순서는 보존하는지 검증한다. */
+  // 검색·필터·페이지별 지정 우선 정렬과 선정 순서 보존 검증
   @Test
   void candidatesPutDesignatedFirstBeforePaginationAndPreserveSelectionOrder() throws Exception {
     Long olderUndesignated = additionalApplication("부천시 원미구 길주로 211");
@@ -645,7 +645,7 @@ class PriorityInspectionDesignationTest {
         .isEqualTo(before);
   }
 
-  /** 인근 건수는 검색·페이지와 독립적으로 계산하고, 첫 페이지에는 지정 항목을 우선 표시하는지 검증한다. */
+  // 검색·페이지와 독립적인 인근 집계 및 지정 우선 표시 검증
   @Test
   void candidatesCountWithinOneKilometerAcrossSearchAndPages() throws Exception {
     additionalApplication("경기 부천시 같은 위치");

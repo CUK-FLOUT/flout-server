@@ -22,18 +22,18 @@ public class InspectionListService {
   // 운영자 관할과 검색 조건 검증 후 읽기 전용 조회
   @Transactional(readOnly = true)
   public InspectionListResponse search(Long operatorId, SearchInspectionsRequest request) {
-    // 토큰의 사용자 ID로 현재 사용자 정보를 다시 읽어 실제 역할과 관할을 확인한다.
+    // 토큰 사용자 ID로 현재 역할·관할 재확인
     var operator =
         users
             .findById(operatorId)
             .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
     if (operator.getRole() != UserRole.ADMIN)
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    // 저장소의 주소 기반 관할 조건이 부천시를 전제로 하므로 미지원 관할은 조회 전에 거부한다.
+    // 부천시 기준 조회를 위한 미지원 관할 거부
     if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
       throw new BaseException(InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED);
-    // 형식 변환 이후의 값 범위를 검증하고 잘못된 조건은 공통 400 응답으로 통일한다.
-    // 빈 지역은 전체 구 조회를 의미하지만 관할 제한까지 해제하지는 않는다.
+    // 조건 범위 검증 및 공통 400 오류 반환
+    // 빈 지역은 관할 내 전체 구 조회
     if (request.page() < 0
         || request.size() < 1
         || request.size() > 100
