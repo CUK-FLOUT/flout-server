@@ -39,6 +39,11 @@ app:
     base-url: https://dapi.kakao.com
     connect-timeout-millis: 3000
     read-timeout-millis: 3000
+  juso:
+    confirm-key: ${JUSO_CONFIRM_KEY:}
+    base-url: https://business.juso.go.kr
+    connect-timeout-millis: 3000
+    read-timeout-millis: 3000
 
 springdoc:
   swagger-ui:

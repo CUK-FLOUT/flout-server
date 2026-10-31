@@ -2,6 +2,7 @@ package com.flout.server.global.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -12,6 +13,71 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class OpenApiConfigTest {
+  @Test
+  void addressEndpointsDocumentSearchAndCoordinateErrorsSeparately() {
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths()
+        .addPathItem("/api/resident/addresses/search", new PathItem().get(new Operation()));
+    api.getPaths()
+        .addPathItem("/api/resident/addresses/coordinates", new PathItem().get(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    var search = api.getPaths().get("/api/resident/addresses/search").getGet().getResponses();
+    var coordinates =
+        api.getPaths().get("/api/resident/addresses/coordinates").getGet().getResponses();
+    assertThat(search).containsKeys("200", "400", "401", "500", "502", "503");
+    assertThat(coordinates).containsKeys("200", "400", "401", "404", "500", "502", "503");
+    assertThat(search.get("400").getDescription()).isEqualTo("검색어 누락 또는 잘못된 검색 조건");
+    assertThat(search.get("502").getDescription()).isEqualTo("외부 주소 검색 서비스 호출 실패");
+    assertThat(search.get("503").getDescription()).isEqualTo("외부 주소 검색 서비스 응답 시간 초과");
+    assertThat(coordinates.get("400").getDescription()).isEqualTo("부천시 외 주소 또는 유효하지 않은 주소 입력");
+    assertThat(coordinates.get("404").getDescription()).isEqualTo("선택한 주소와 일치하는 좌표를 찾을 수 없음");
+    assertThat(coordinates.get("502").getDescription()).isEqualTo("외부 주소 좌표 조회 서비스 호출 실패");
+    assertThat(coordinates.get("503").getDescription()).isEqualTo("외부 주소 좌표 조회 서비스 응답 시간 초과");
+    assertAddressExample(search, "jusoApiError", AddressErrorCode.JUSO_API_ERROR);
+    assertAddressExample(search, "jusoApiTimeout", AddressErrorCode.JUSO_API_TIMEOUT);
+    assertAddressExample(
+        coordinates, "invalidAddress", AddressErrorCode.INVALID_COORDINATE_ADDRESS);
+    assertAddressExample(
+        coordinates, "addressMismatch", AddressErrorCode.COORDINATE_ADDRESS_MISMATCH);
+    assertAddressExample(coordinates, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR);
+    assertAddressExample(coordinates, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT);
+    for (var responses : java.util.List.of(search, coordinates)) {
+      assertAddressExample(
+          responses, "authenticationRequired", GeneralErrorCode.UNAUTHORIZED_ERROR);
+      assertAddressExample(
+          responses, "invalidOrExpiredToken", GeneralErrorCode.INVALID_ACCESS_TOKEN);
+      assertAddressExample(responses, "serverError", GeneralErrorCode.SERVER_ERROR);
+    }
+    assertThat(AddressErrorCode.KAKAO_API_ERROR.getMessage()).isEqualTo("주소 좌표 조회 서비스 호출에 실패했습니다.");
+    assertThat(AddressErrorCode.KAKAO_API_TIMEOUT.getMessage())
+        .isEqualTo("주소 좌표 조회 서비스 응답 시간이 초과되었습니다.");
+    assertThat(search.get("200").getContent().get("application/json").getExamples())
+        .containsKey("addressSearchSuccess");
+    assertThat(search.get("502").getContent().get("application/json").getExamples())
+        .containsKey("jusoApiError");
+    assertThat(coordinates.get("502").getContent().get("application/json").getExamples())
+        .containsKey("kakaoApiError");
+    assertThat(coordinates.get("404").getContent().get("application/json").getExamples())
+        .containsKey("addressMismatch");
+  }
+
+  private void assertAddressExample(ApiResponses responses, String name, BaseResponseCode code) {
+    assertThat(
+            responses
+                .get(Integer.toString(code.getStatus()))
+                .getContent()
+                .get("application/json")
+                .getExamples()
+                .get(name)
+                .getValue())
+        .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+        .containsEntry("isSuccess", false)
+        .containsEntry("status", code.getStatus())
+        .containsEntry("code", code.getCode())
+        .containsEntry("message", code.getMessage())
+        .containsEntry("result", null);
+  }
+
   @Test
   void applicationAttachmentsDocumentEmptyListAndActualErrors() {
     String path = "/api/admin/applications/{applicationId}/attachments";
