@@ -34,6 +34,13 @@ public class ApplicationStatusHistory {
     return history;
   }
 
+  public static ApplicationStatusHistory inspectionCompleted(InspectionApplication application) {
+    ApplicationStatusHistory history = new ApplicationStatusHistory();
+    history.application = application;
+    history.status = InspectionApplicationStatus.INSPECTION_COMPLETED;
+    return history;
+  }
+
   @PrePersist
   void onCreate() {
     createdAt = LocalDateTime.now();

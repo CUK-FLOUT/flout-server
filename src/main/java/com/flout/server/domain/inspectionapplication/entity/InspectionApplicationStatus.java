@@ -1,5 +1,6 @@
 package com.flout.server.domain.inspectionapplication.entity;
 
 public enum InspectionApplicationStatus {
-  RECEIVED
+  RECEIVED,
+  INSPECTION_COMPLETED
 }
