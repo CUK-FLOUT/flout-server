@@ -111,4 +111,14 @@ public class InspectionApplication {
   void onCreate() {
     createdAt = LocalDateTime.now();
   }
+
+  public void completeInspection() {
+    if (this.status != InspectionApplicationStatus.RECEIVED) {
+      throw new IllegalStateException(
+              "점검 완료로 변경할 수 없는 신청 상태입니다."
+      );
+    }
+
+    this.status = InspectionApplicationStatus.INSPECTION_COMPLETED;
+  }
 }

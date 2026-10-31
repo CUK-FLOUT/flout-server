@@ -58,4 +58,30 @@ public class InspectionResult {
     void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public static InspectionResult draft(Inspection inspection) {
+        InspectionResult result = new InspectionResult();
+        result.inspection = inspection;
+        result.resultStatus = ResultStatus.DRAFT;
+        return result;
+    }
+
+    public void updateContent(
+            String summary,
+            String followUpType,
+            String internalMemo
+    ) {
+        this.summary = summary;
+        this.followUpType = followUpType;
+        this.internalMemo = internalMemo;
+    }
+
+    public void publish(LocalDateTime publishedAt) {
+        if (this.resultStatus == ResultStatus.PUBLISHED) {
+            throw new IllegalStateException("이미 공개된 점검 결과입니다.");
+        }
+
+        this.resultStatus = ResultStatus.PUBLISHED;
+        this.publishedAt = publishedAt;
+    }
 }
