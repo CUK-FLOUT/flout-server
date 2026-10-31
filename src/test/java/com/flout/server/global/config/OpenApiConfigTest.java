@@ -111,7 +111,8 @@ class OpenApiConfigTest {
         .containsKeys("assessmentAccessDenied", "residentOnly");
     assertThat(responses.get("403").getDescription()).isEqualTo("취약도 분석 결과에 대한 접근 권한이 없습니다.");
     assertThat(responses.get("404").getDescription()).isEqualTo("취약도 분석 결과를 찾을 수 없습니다.");
-    assertThat(responses.get("409").getDescription()).isEqualTo("취약도 분석이 완료되지 않았습니다.");
+    assertThat(responses.get("409").getDescription())
+        .isEqualTo("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했습니다.");
     assertExampleMessage(responses, "403", "assessmentAccessDenied", "본인의 취약도 분석 결과만 사용할 수 있습니다.");
     assertExampleMessage(responses, "404", "assessmentNotFound", "취약도 분석 결과를 찾을 수 없습니다.");
     assertExampleMessage(
@@ -119,6 +120,37 @@ class OpenApiConfigTest {
     assertExampleMessage(responses, "500", "receiptNumberGenerationFailed", "접수번호 생성에 실패했습니다.");
     assertExampleMessage(
         responses, "400", "guideNotLinkedToAssessment", "가이드가 취약도 분석 결과에 연결되어 있지 않습니다.");
+  }
+
+  @Test
+  void inspectionApplicationConflictExamplesMatchErrorCodes() {
+    String path = "/api/resident/applications";
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths().addPathItem(path, new PathItem().post(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+
+    var examples =
+        api.getPaths()
+            .get(path)
+            .getPost()
+            .getResponses()
+            .get("409")
+            .getContent()
+            .get("application/json")
+            .getExamples();
+    var expected =
+        java.util.Map.of(
+            "assessmentNotCompleted", InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED,
+            "duplicateAssessmentApplication",
+                InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+    assertThat(examples).containsKeys(expected.keySet().toArray(String[]::new));
+    expected.forEach(
+        (name, code) ->
+            assertThat(examples.get(name).getValue())
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("status", code.getStatus())
+                .containsEntry("code", code.getCode())
+                .containsEntry("message", code.getMessage()));
   }
 
   @Test

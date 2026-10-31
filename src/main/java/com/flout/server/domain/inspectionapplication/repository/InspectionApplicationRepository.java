@@ -14,6 +14,8 @@ public interface InspectionApplicationRepository
     extends JpaRepository<InspectionApplication, Long> {
   boolean existsByReceiptNo(String receiptNo);
 
+  boolean existsByAssessmentId(Long assessmentId);
+
   // 신청자와 취약도 분석 함께 조회
   @EntityGraph(attributePaths = {"applicant", "assessment"})
   @Query("select a from InspectionApplication a where a.id = :applicationId")

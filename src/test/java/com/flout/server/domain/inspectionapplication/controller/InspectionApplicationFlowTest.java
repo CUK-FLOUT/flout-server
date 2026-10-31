@@ -198,43 +198,55 @@ class InspectionApplicationFlowTest {
   }
 
   @Test
-  void repeatSubmissionAndReceiptNumberRetryCreateExactlyOneInspectionPerApplication()
-      throws Exception {
-    doReturn("IA-FLOW-000000000001", "IA-FLOW-000000000001", "IA-FLOW-000000000002")
+  void duplicateSubmissionReturnsConflict() throws Exception {
+    submit().andExpect(status().isCreated());
+    submit().andExpect(status().isConflict());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
+        .isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isEqualTo(1);
+  }
+
+  @Test
+  void concurrentSubmissionsCreateOnlyOneApplication() throws Exception {
+    var checked = new java.util.concurrent.CyclicBarrier(2);
+    doAnswer(
+            invocation -> {
+              checked.await(10, java.util.concurrent.TimeUnit.SECONDS);
+              return invocation.callRealMethod();
+            })
         .when(receiptNumbers)
         .next();
-    var first =
-        mapper
-            .readTree(
-                submit()
-                    .andExpect(status().isCreated())
-                    .andReturn()
-                    .getResponse()
-                    .getContentAsString())
-            .get("result");
-    var second =
-        mapper
-            .readTree(
-                submit()
-                    .andExpect(status().isCreated())
-                    .andReturn()
-                    .getResponse()
-                    .getContentAsString())
-            .get("result");
-    assertThat(first.get("applicationId").asLong())
-        .isNotEqualTo(second.get("applicationId").asLong());
-    assertThat(first.get("inspectionId").asLong())
-        .isNotEqualTo(second.get("inspectionId").asLong());
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM inspection_applications WHERE status = 'RECEIVED'",
-                Long.class))
-        .isEqualTo(2);
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM inspections WHERE status = 'RECEIVED'", Long.class))
-        .isEqualTo(2);
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_status_histories", Long.class))
-        .isEqualTo(2);
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    var ready = new java.util.concurrent.CountDownLatch(2);
+    var start = new java.util.concurrent.CountDownLatch(1);
+    try {
+      java.util.concurrent.Callable<Integer> task =
+          () -> {
+            ready.countDown();
+            start.await();
+            var result = submit().andReturn();
+            var response = result.getResponse();
+            if (response.getStatus() == 500) {
+              throw new AssertionError(
+                  "Unexpected response: " + response.getContentAsString(),
+                  result.getResolvedException());
+            }
+            return response.getStatus();
+          };
+      var first = executor.submit(task);
+      var second = executor.submit(task);
+      assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      assertThat(
+              List.of(
+                  first.get(30, java.util.concurrent.TimeUnit.SECONDS),
+                  second.get(30, java.util.concurrent.TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(201, 409);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
+          .isEqualTo(1);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isEqualTo(1);
+    } finally {
+      executor.shutdownNow();
+    }
   }
 }

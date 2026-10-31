@@ -1037,7 +1037,12 @@ public class OpenApiConfig {
         "assessmentNotCompleted",
         InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED,
         null);
-    operation.getResponses().get("409").setDescription("취약도 분석이 완료되지 않았습니다.");
+    addError(
+        operation,
+        "duplicateAssessmentApplication",
+        InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION,
+        null);
+    operation.getResponses().get("409").setDescription("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했습니다.");
     addError(
         operation,
         "receiptNumberGenerationFailed",
