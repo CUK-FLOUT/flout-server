@@ -122,6 +122,37 @@ class OpenApiConfigTest {
   }
 
   @Test
+  void inspectionApplicationConflictExamplesMatchErrorCodes() {
+    String path = "/api/resident/applications";
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths().addPathItem(path, new PathItem().post(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+
+    var examples =
+        api.getPaths()
+            .get(path)
+            .getPost()
+            .getResponses()
+            .get("409")
+            .getContent()
+            .get("application/json")
+            .getExamples();
+    var expected =
+        java.util.Map.of(
+            "assessmentNotCompleted", InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED,
+            "duplicateAssessmentApplication",
+                InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+    assertThat(examples).containsKeys(expected.keySet().toArray(String[]::new));
+    expected.forEach(
+        (name, code) ->
+            assertThat(examples.get(name).getValue())
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("status", code.getStatus())
+                .containsEntry("code", code.getCode())
+                .containsEntry("message", code.getMessage()));
+  }
+
+  @Test
   void priorityDetailNotFoundDescriptionMatchesApplicationError() {
     var api = new OpenAPI().paths(new Paths());
     api.getPaths()

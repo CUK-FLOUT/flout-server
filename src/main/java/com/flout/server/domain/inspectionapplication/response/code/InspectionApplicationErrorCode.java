@@ -13,7 +13,7 @@ public enum InspectionApplicationErrorCode implements BaseResponseCode {
 
   ASSESSMENT_NOT_COMPLETED(409, "APPLICATION_409_1", "취약도 분석이 완료되지 않아 현장점검을 신청할 수 없습니다."),
 
-  DUPLICATE_ASSESSMENT_APPLICATION(409, "APPLICATION_409_3", "?? ????? ??? ??? ?? ?????."),
+  DUPLICATE_ASSESSMENT_APPLICATION(409, "APPLICATION_409_3", "이미 현장점검을 신청한 취약도 분석 결과입니다."),
 
   GUIDE_NOT_FOUND(400, "APPLICATION_400_1", "가이드가 취약도 분석 결과에 연결되어 있지 않습니다."),
 
