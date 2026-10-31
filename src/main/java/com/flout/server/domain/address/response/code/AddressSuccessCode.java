@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum AddressSuccessCode implements BaseResponseCode {
-  ADDRESS_SEARCH_SUCCESS(OK, "ADDRESS_200_1", "주소 검색에 성공했습니다.");
+  ADDRESS_SEARCH_SUCCESS(OK, "ADDRESS_200_1", "주소 검색에 성공했습니다."),
+  ADDRESS_COORDINATES_SUCCESS(OK, "ADDRESS_200_2", "주소 좌표 조회에 성공했습니다.");
 
   private final int status;
   private final String code;

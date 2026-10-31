@@ -183,6 +183,9 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
                             }
+                            if (path.equals("/api/resident/addresses/coordinates")) {
+                              describeAddressCoordinates(operation);
+                            }
                             if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
                               var success =
                                   operation
@@ -563,8 +566,7 @@ public class OpenApiConfig {
   }
 
   private void describeAddressSearch(Operation operation) {
-    operation.setDescription(
-        "Kakao Local API로 도로명 또는 지번 주소를 검색합니다. Kakao의 x(경도), y(위도)를 각각 longitude, latitude로 변환해 반환합니다.");
+    operation.setDescription("행정안전부 API로 부천시 주소를 검색합니다. 필터링 후 빈 페이지에도 다음 페이지가 있을 수 있습니다.");
     ApiResponse success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(AddressSuccessCode.ADDRESS_SEARCH_SUCCESS.getMessage());
     addExample(
@@ -585,20 +587,47 @@ public class OpenApiConfig {
                         "buildingName",
                         "가톨릭대학교 성심교정",
                         "zipCode",
-                        "14662",
-                        "addressType",
-                        "ROAD_ADDR",
-                        "isSelectable",
-                        true,
-                        "latitude",
-                        37.4874849962478,
-                        "longitude",
-                        126.79856716311)))));
+                        "14662")),
+                "currentPage",
+                1,
+                "countPerPage",
+                10,
+                "hasMore",
+                true,
+                "nextPage",
+                2)));
     addError(
         operation, "keywordRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "검색어를 입력해주세요.");
-    addError(operation, "addressNotFound", AddressErrorCode.ADDRESS_NOT_FOUND, null);
+    addError(operation, "jusoApiError", AddressErrorCode.JUSO_API_ERROR, null);
+    addError(operation, "jusoApiTimeout", AddressErrorCode.JUSO_API_TIMEOUT, null);
+    operation.getResponses().get("400").setDescription("검색어 누락 또는 잘못된 검색 조건");
+    operation.getResponses().get("502").setDescription("외부 주소 검색 서비스 호출 실패");
+    operation.getResponses().get("503").setDescription("외부 주소 검색 서비스 응답 시간 초과");
+  }
+
+  private void describeAddressCoordinates(Operation operation) {
+    operation.setDescription("선택한 부천시 주소의 위도와 경도를 조회합니다.");
+    var code = AddressSuccessCode.ADDRESS_COORDINATES_SUCCESS;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "coordinates",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of("latitude", 37.4874849962478, "longitude", 126.79856716311)));
+    addError(
+        operation, "addressRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "주소를 입력해주세요.");
+    addError(operation, "invalidAddress", AddressErrorCode.INVALID_COORDINATE_ADDRESS, null);
+    addError(operation, "addressMismatch", AddressErrorCode.COORDINATE_ADDRESS_MISMATCH, null);
     addError(operation, "kakaoApiError", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "kakaoApiTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+    operation.getResponses().get("400").setDescription("부천시 외 주소 또는 유효하지 않은 주소 입력");
+    operation.getResponses().get("404").setDescription("선택한 주소와 일치하는 좌표를 찾을 수 없음");
+    operation.getResponses().get("502").setDescription("외부 주소 좌표 조회 서비스 호출 실패");
+    operation.getResponses().get("503").setDescription("외부 주소 좌표 조회 서비스 응답 시간 초과");
   }
 
   // 우선점검 순서 저장 응답과 오류 예시
