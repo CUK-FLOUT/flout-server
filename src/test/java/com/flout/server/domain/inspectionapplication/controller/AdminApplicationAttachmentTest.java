@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.entity.*;
 import com.flout.server.domain.inspectionapplication.repository.*;
+import com.flout.server.domain.inspectionapplication.service.ApplicationAttachmentQueryService;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.riskassessment.entity.*;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
@@ -29,6 +30,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(
     properties = {
@@ -48,6 +52,8 @@ class AdminApplicationAttachmentTest {
   @Autowired JwtService jwt;
   @MockitoBean AttachmentStorage storage;
   @Autowired ApplicationAttachmentRepository attachments;
+  @Autowired ApplicationAttachmentQueryService queryService;
+  @Autowired PlatformTransactionManager transactionManager;
   User resident;
   Long operatorId;
   Long applicationId;
@@ -184,6 +190,38 @@ class AdminApplicationAttachmentTest {
                 "$.result[*].attachmentId",
                 contains(first.getId().intValue(), second.getId().intValue())))
         .andExpect(jsonPath("$.result[*].originalFilename", contains("z.jpg", "a.jpg")));
+  }
+
+  // 상위 트랜잭션이 있어도 URL 발급 시 DB 트랜잭션 중단 검증
+  @Test
+  void signsOutsideTransactionAndResumesCallerTransaction() {
+    var photo =
+        attachments.saveAndFlush(
+            ApplicationAttachment.create(
+                applications.findById(applicationId).orElseThrow(),
+                "photos/transaction",
+                "사진.jpg",
+                10,
+                "image/jpeg",
+                null,
+                null));
+    when(storage.readUrl("photos/transaction"))
+        .thenAnswer(
+            call -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              return "https://images.example/photo";
+            });
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+              var result = queryService.get(operatorId, applicationId);
+              assertThat(result).hasSize(1);
+              assertThat(result.getFirst().attachmentId()).isEqualTo(photo.getId());
+              assertThat(result.getFirst().imageUrl()).isEqualTo("https://images.example/photo");
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+            });
+    verify(storage).readUrl("photos/transaction");
   }
 
   // 사진 미등록 시 빈 배열 반환
