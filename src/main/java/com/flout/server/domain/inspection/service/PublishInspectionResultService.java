@@ -5,6 +5,8 @@ import com.flout.server.domain.inspection.dto.response.PublishInspectionResultRe
 import com.flout.server.domain.inspection.entity.*;
 import com.flout.server.domain.inspection.repository.*;
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
+import com.flout.server.domain.inspectionapplication.entity.ApplicationStatusHistory;
+import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
@@ -33,6 +35,7 @@ public class PublishInspectionResultService {
   private final PreventionRecommendationRepository recommendations;
   private final InspectionStatusHistoryRepository histories;
   private final Clock inspectionClock;
+  private final ApplicationStatusHistoryRepository applicationStatusHistories;
 
   @Transactional
   public PublishInspectionResultResponse publish(
@@ -120,6 +123,9 @@ public class PublishInspectionResultService {
     InspectionStatus previous = inspection.getStatus();
     inspection.changeStatus(InspectionStatus.COMPLETED, now);
     inspection.getApplication().completeInspection();
+
+    applicationStatusHistories.save(
+        ApplicationStatusHistory.inspectionCompleted(inspection.getApplication()));
 
     histories.saveAndFlush(InspectionStatusHistory.changed(inspection, previous, operator, now));
 

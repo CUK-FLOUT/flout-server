@@ -8,22 +8,22 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public record PublishInspectionResultRequest(
-    @NotBlank String summary,
-    @NotEmpty List<@NotNull @Valid VulnerabilityRequest> vulnerabilities,
-    @NotEmpty List<@NotNull @Valid RecommendedActionRequest> recommendedActions,
+    @NotBlank @Size(max = 4000) String summary,
+    @NotEmpty @Size(max = 20) List<@NotNull @Valid VulnerabilityRequest> vulnerabilities,
+    @NotEmpty @Size(max = 20) List<@NotNull @Valid RecommendedActionRequest> recommendedActions,
     @NotNull FollowUpType followUpType,
-    @NotBlank String internalMemo) {
+    @NotBlank @Size(max = 4000) String internalMemo) {
 
   public record VulnerabilityRequest(
       @NotNull VulnerabilityType type,
       @NotBlank @Size(max = 255) String title,
-      @NotBlank String expertOpinion,
-      String fieldFindings) {}
+      @NotBlank @Size(max = 4000) String expertOpinion,
+      @Size(max = 4000) String fieldFindings) {}
 
   public record RecommendedActionRequest(
       @NotBlank @Size(max = 255) String title,
       @NotNull VulnerabilityType relatedTarget,
-      @NotBlank String description) {}
+      @NotBlank @Size(max = 4000) String description) {}
 
   public enum VulnerabilityType {
     ENTRANCE,
