@@ -5,10 +5,9 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PreventionRecommendationRepository
-        extends JpaRepository<PreventionRecommendation, Long> {
+    extends JpaRepository<PreventionRecommendation, Long> {
 
-    List<PreventionRecommendation> findByResultIdOrderBySortOrderAsc(
-            Long resultId
-    );
-    void deleteByResultId(Long resultId);
+  List<PreventionRecommendation> findByResultIdOrderBySortOrderAsc(Long resultId);
+
+  void deleteByResultId(Long resultId);
 }

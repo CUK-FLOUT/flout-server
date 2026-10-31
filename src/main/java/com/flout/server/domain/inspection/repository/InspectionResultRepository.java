@@ -5,11 +5,8 @@ import com.flout.server.domain.inspection.entity.ResultStatus;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface InspectionResultRepository
-        extends JpaRepository<InspectionResult, Long> {
+public interface InspectionResultRepository extends JpaRepository<InspectionResult, Long> {
 
-    Optional<InspectionResult> findByInspectionIdAndResultStatus(
-            Long inspectionId,
-            ResultStatus resultStatus
-    );
+  Optional<InspectionResult> findByInspectionIdAndResultStatus(
+      Long inspectionId, ResultStatus resultStatus);
 }

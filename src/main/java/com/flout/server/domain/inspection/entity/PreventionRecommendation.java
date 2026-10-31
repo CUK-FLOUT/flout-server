@@ -10,42 +10,43 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PreventionRecommendation {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "recommendation_id")
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @Column(name = "recommendation_id")
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "result_id", nullable = false)
-    private InspectionResult result;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "result_id", nullable = false)
+  private InspectionResult result;
 
-    @Column(name = "title", length = 255)
-    private String title;
+  @Column(name = "title", length = 255)
+  private String title;
 
-    @Column(name = "related_target")
-    private String relatedTarget;
+  @Column(
+      name = "related_target",
+      columnDefinition = "enum('ENTRANCE','WINDOW_OPENING','DRAIN','OTHER_STRUCTURE')")
+  private String relatedTarget;
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
 
-    @Column(name = "sort_order", nullable = false)
-    private int sortOrder;
+  @Column(name = "sort_order", nullable = false)
+  private int sortOrder;
 
-    public static PreventionRecommendation create(
-            InspectionResult result,
-            String title,
-            String relatedTarget,
-            String description,
-            int sortOrder
-    ) {
-        PreventionRecommendation recommendation = new PreventionRecommendation();
+  public static PreventionRecommendation create(
+      InspectionResult result,
+      String title,
+      String relatedTarget,
+      String description,
+      int sortOrder) {
+    PreventionRecommendation recommendation = new PreventionRecommendation();
 
-        recommendation.result = result;
-        recommendation.title = title;
-        recommendation.relatedTarget = relatedTarget;
-        recommendation.description = description;
-        recommendation.sortOrder = sortOrder;
+    recommendation.result = result;
+    recommendation.title = title;
+    recommendation.relatedTarget = relatedTarget;
+    recommendation.description = description;
+    recommendation.sortOrder = sortOrder;
 
-        return recommendation;
-    }
+    return recommendation;
+  }
 }
