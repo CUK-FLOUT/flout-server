@@ -393,6 +393,10 @@ class AttachmentControllerTest {
     var release = new CountDownLatch(1);
     doAnswer(
             invocation -> {
+              assertThat(
+                      org.springframework.transaction.support.TransactionSynchronizationManager
+                          .isActualTransactionActive())
+                  .isFalse();
               started.countDown();
               if (!release.await(15, TimeUnit.SECONDS))
                 throw new IllegalStateException("upload timed out");

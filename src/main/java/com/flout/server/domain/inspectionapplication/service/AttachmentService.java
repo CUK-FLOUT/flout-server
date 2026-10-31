@@ -25,6 +25,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,6 +35,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class AttachmentService {
   private static final long MAX_FILE_SIZE = 15L * 1024 * 1024;
   private static final long MAX_DECODED_PIXELS = 1_000_000L;
+  private static final long MAX_SOURCE_PIXELS = 100_000_000L;
+  private static final int MAX_DIMENSION = 20_000;
   private final InspectionApplicationRepository applications;
   private final ApplicationAttachmentRepository attachments;
   private final AttachmentStorage storage;
@@ -53,10 +57,12 @@ public class AttachmentService {
     this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public List<AttachmentResult> upload(Long userId, Long applicationId, List<MultipartFile> files) {
     return upload(userId, applicationId, files, null);
   }
 
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public List<AttachmentResult> upload(
       Long userId, Long applicationId, List<MultipartFile> files, String requestKey) {
     if (files == null || files.isEmpty() || files.size() > 5) throw invalid();
@@ -89,17 +95,16 @@ public class AttachmentService {
             .toList();
     try {
       cleanup.register(attemptedKeys);
+      for (int i = 0; i < validated.size(); i++) {
+        ValidatedFile file = validated.get(i);
+        byte[] bytes = readFile(file.file());
+        if (bytes.length != file.size() || !digest(bytes).equals(file.hash())) throw invalid();
+        storage.upload(attemptedKeys.get(i), bytes, file.contentType());
+      }
       List<AttachmentResult> result =
           transactions.execute(
               status -> {
                 for (String key : attemptedKeys) cleanup.lock(key);
-                for (int i = 0; i < validated.size(); i++) {
-                  ValidatedFile file = validated.get(i);
-                  byte[] bytes = readFile(file.file());
-                  if (bytes.length != file.size() || !digest(bytes).equals(file.hash()))
-                    throw invalid();
-                  storage.upload(attemptedKeys.get(i), bytes, file.contentType());
-                }
                 InspectionApplication application =
                     applications
                         .findForAttachmentUpload(applicationId)
@@ -232,7 +237,10 @@ public class AttachmentService {
               && !(png && format.equalsIgnoreCase("png"))) throw invalid();
           int width = reader.getWidth(0);
           int height = reader.getHeight(0);
+          if (width <= 0 || height <= 0 || width > MAX_DIMENSION || height > MAX_DIMENSION)
+            throw invalid();
           long pixels = (long) width * height;
+          if (pixels > MAX_SOURCE_PIXELS) throw invalid();
           int subsampling =
               Math.max(1, (int) Math.ceil(Math.sqrt((double) pixels / MAX_DECODED_PIXELS)));
           while (((width + (long) subsampling - 1) / subsampling)
