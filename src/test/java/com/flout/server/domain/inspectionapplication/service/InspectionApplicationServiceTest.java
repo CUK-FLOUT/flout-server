@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.dto.response.CreateInspectionApplicationResponse;
 import com.flout.server.domain.inspectionapplication.entity.*;
+import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.preventionguide.repository.PreventionGuideRepository;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
@@ -36,6 +37,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class InspectionApplicationServiceTest {
+  @Mock InspectionApplicationRepository applications;
   @Mock UserRepository users;
   @Mock RiskAssessmentRepository assessments;
   @Mock PreventionGuideRepository guides;
@@ -69,6 +71,29 @@ class InspectionApplicationServiceTest {
     assertThat(response.receiptNo()).isEqualTo("000100");
     assertThat(response.status()).isEqualTo(InspectionApplicationStatus.RECEIVED);
     verify(submissionTransaction).create(eq(applicant), eq(assessment), any());
+  }
+
+  @Test
+  void rejectsDuplicateAssessment() {
+    stubValidSubmissionPrerequisites();
+    when(applications.existsByAssessmentId(10L)).thenReturn(true);
+    assertError(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+    verifyNoInteractions(submissionTransaction);
+  }
+
+  @Test
+  void convertsConcurrentAssessmentConstraintViolationToConflict() {
+    stubValidSubmissionPrerequisites();
+    when(submissionTransaction.create(any(), any(), any()))
+        .thenThrow(
+            new DataIntegrityViolationException(
+                "duplicate",
+                new ConstraintViolationException(
+                    "duplicate",
+                    new SQLException("duplicate", "23000"),
+                    "uk_inspection_applications_assessment_id")));
+    assertError(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+    verify(submissionTransaction).create(any(), any(), any());
   }
 
   @Test
