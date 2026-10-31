@@ -163,6 +163,29 @@ class AdminApplicationAttachmentTest {
         .isEqualTo(applicationBefore);
   }
 
+  // 파일명과 무관한 DB 등록 ID 순서 검증
+  @Test
+  void registrationOrderUsesGeneratedIdsInsteadOfFilename() throws Exception {
+    var application = applications.findById(applicationId).orElseThrow();
+    var first =
+        attachments.saveAndFlush(
+            ApplicationAttachment.create(
+                application, "photos/z", "z.jpg", 10, "image/jpeg", null, null));
+    var second =
+        attachments.saveAndFlush(
+            ApplicationAttachment.create(
+                application, "photos/a", "a.jpg", 10, "image/jpeg", null, null));
+    assertThat(first.getId()).isLessThan(second.getId());
+    when(storage.readUrl(anyString())).thenReturn("https://images.example/photo");
+    mvc.perform(detail())
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.result[*].attachmentId",
+                contains(first.getId().intValue(), second.getId().intValue())))
+        .andExpect(jsonPath("$.result[*].originalFilename", contains("z.jpg", "a.jpg")));
+  }
+
   // 사진 미등록 시 빈 배열 반환
   @Test
   void returnsEmptyList() throws Exception {

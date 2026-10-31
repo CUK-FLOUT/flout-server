@@ -28,6 +28,7 @@ public class S3AttachmentStorage implements AttachmentStorage {
     this.bucket = bucket;
   }
 
+  // 설정 검증 후 공용 S3 클라이언트 지연 생성
   private synchronized S3Client client() {
     if (closed) throw new IllegalStateException("S3 storage is closed");
     if (client != null) return client;
@@ -47,6 +48,7 @@ public class S3AttachmentStorage implements AttachmentStorage {
     return client;
   }
 
+  // 저장소 종료 및 클라이언트·서명기 자원 해제
   @PreDestroy
   synchronized void close() {
     closed = true;
