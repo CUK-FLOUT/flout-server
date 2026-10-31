@@ -31,6 +31,7 @@ public enum InspectionApplicationErrorCode implements BaseResponseCode {
   APPLICATION_ACCESS_DENIED(403, "APPLICATION_403_5", "본인의 신청서에만 사진을 등록할 수 있습니다."),
   INVALID_ATTACHMENTS(400, "APPLICATION_400_4", "사진은 신청서당 최대 5장, 파일당 15MB 이하의 JPG 또는 PNG여야 합니다."),
   ATTACHMENT_UPLOAD_FAILED(500, "APPLICATION_500_2", "사진 등록에 실패했습니다."),
+  ATTACHMENT_READ_FAILED(500, "APPLICATION_500_3", "첨부사진 조회에 실패했습니다."),
   ATTACHMENT_IDEMPOTENCY_CONFLICT(409, "APPLICATION_409_2", "동일한 요청 키를 다른 사진에 사용할 수 없습니다.");
 
   private final int status;

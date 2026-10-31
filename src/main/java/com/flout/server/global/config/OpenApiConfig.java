@@ -210,6 +210,11 @@ public class OpenApiConfig {
                               describeApplicationDetail(operation);
                             }
 
+                            if (path.equals("/api/admin/applications/{applicationId}/attachments")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeAttachmentQuery(operation);
+                            }
+
                             if (path.equals(
                                     "/api/resident/applications/{applicationId}/attachments")
                                 && method == PathItem.HttpMethod.POST) {
@@ -873,6 +878,51 @@ public class OpenApiConfig {
         .getResponses()
         .get("404")
         .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  // 첨부사진 목록과 조회 오류 문서화
+  private void describeAttachmentQuery(Operation operation) {
+    var code = InspectionApplicationSuccessCode.ATTACHMENTS_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "attachmentsFound",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            List.of(
+                Map.of(
+                    "attachmentId",
+                    1,
+                    "originalFilename",
+                    "출입구.jpg",
+                    "imageUrl",
+                    "https://bucket.s3.ap-northeast-2.amazonaws.com/photo.jpg?X-Amz-Signature=..."))));
+    addExample(success, "noAttachments", envelope(true, code, code.getMessage(), List.of()));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    addError(
+        operation,
+        "attachmentReadFailed",
+        InspectionApplicationErrorCode.ATTACHMENT_READ_FAILED,
+        null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 

@@ -8,6 +8,8 @@ public interface ApplicationAttachmentRepository
     extends JpaRepository<ApplicationAttachment, Long> {
   long countByApplicationId(Long applicationId);
 
+  List<ApplicationAttachment> findAllByApplicationIdOrderByIdAsc(Long applicationId);
+
   List<ApplicationAttachment> findAllByApplicationIdAndUploadRequestKeyOrderByIdAsc(
       Long applicationId, String uploadRequestKey);
 }

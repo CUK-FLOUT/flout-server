@@ -13,6 +13,22 @@ import org.junit.jupiter.api.Test;
 
 class OpenApiConfigTest {
   @Test
+  void applicationAttachmentsDocumentEmptyListAndActualErrors() {
+    String path = "/api/admin/applications/{applicationId}/attachments";
+    OpenAPI api =
+        new OpenAPI().paths(new Paths().addPathItem(path, new PathItem().get(new Operation())));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    var responses = api.getPaths().get(path).getGet().getResponses();
+    assertThat(responses).containsKeys("200", "400", "401", "403", "404", "406", "500");
+    assertThat(responses.get("200").getContent().get("application/json").getExamples())
+        .containsKeys("attachmentsFound", "noAttachments");
+    assertThat(responses.get("404").getDescription())
+        .isEqualTo(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    assertThat(responses.get("500").getContent().get("application/json").getExamples())
+        .containsKey("attachmentReadFailed");
+  }
+
+  @Test
   void googleConflictDescriptionDiffersFromDuplicateSignupEmail() {
     OpenAPI api = new OpenAPI().paths(new Paths());
     for (String path : Set.of("/api/auth/google", "/api/auth/admin/google", "/api/auth/signup")) {
