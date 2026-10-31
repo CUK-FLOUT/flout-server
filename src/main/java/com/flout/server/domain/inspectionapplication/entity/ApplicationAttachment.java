@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ApplicationAttachment {
+  // DB 저장 시 자동 발급되는 등록 순서 기준
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   @Column(name = "attachment_id")
@@ -37,6 +38,7 @@ public class ApplicationAttachment {
   @Column(name = "upload_request_hash", length = 64)
   private String uploadRequestHash;
 
+  // 신청 사진 메타데이터 생성
   public static ApplicationAttachment create(
       InspectionApplication application,
       String key,

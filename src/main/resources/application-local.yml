@@ -2,8 +2,8 @@ app:
   google:
     client-ids: ${GOOGLE_CLIENT_IDS:256860334030-f3od5skin0p2cqrpu9ui222g6pv4aeai.apps.googleusercontent.com}
   s3:
-    region: ${AWS_REGION:ap-northeast-2}
-    bucket: ${AWS_S3_BUCKET:}
+    region: ${AWS_REGION:ap-southeast-2}
+    bucket: ${AWS_S3_BUCKET:flout-dev-files}
 
 spring:
   datasource:
