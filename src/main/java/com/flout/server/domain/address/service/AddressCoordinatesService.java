@@ -1,9 +1,11 @@
 package com.flout.server.domain.address.service;
 
 import com.flout.server.domain.address.dto.response.AddressCoordinatesResponse;
+import com.flout.server.domain.address.dto.response.KakaoAddressSearchResponse.Document;
 import com.flout.server.domain.address.exception.KakaoAddressException;
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.global.exception.BaseException;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +26,7 @@ public class AddressCoordinatesService {
       var response = client.search(address.strip());
       if (response == null || response.documents() == null)
         throw new BaseException(AddressErrorCode.KAKAO_API_ERROR);
-      var matches =
+      var candidates =
           response.documents().stream()
               .filter(Objects::nonNull)
               .filter(
@@ -37,6 +39,21 @@ public class AddressCoordinatesService {
                           || (d.roadAddress() != null
                               && normalized.equals(normalize(d.roadAddress().addressName()))))
               .toList();
+      var direct =
+          candidates.stream().filter(d -> normalized.equals(normalize(d.addressName()))).toList();
+      var preferred = direct.isEmpty() ? candidates : direct;
+      var unique = new LinkedHashMap<String, Document>();
+      for (var candidate : preferred) {
+        String identity = normalize(candidate.addressName());
+        if (identity.isEmpty()) {
+          identity =
+              "ROAD_ADDR".equals(candidate.addressType()) && candidate.roadAddress() != null
+                  ? normalize(candidate.roadAddress().addressName())
+                  : candidate.address() == null ? "" : normalize(candidate.address().addressName());
+        }
+        unique.putIfAbsent(identity, candidate);
+      }
+      var matches = unique.values().stream().toList();
       if (matches.size() != 1)
         throw new BaseException(AddressErrorCode.COORDINATE_ADDRESS_MISMATCH);
       try {

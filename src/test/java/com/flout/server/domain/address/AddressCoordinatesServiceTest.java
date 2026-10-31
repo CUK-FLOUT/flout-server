@@ -26,6 +26,65 @@ class AddressCoordinatesServiceTest {
   }
 
   @Test
+  void acceptsDuplicateDocumentsForTheSameAddress() {
+    var first =
+        new Document(ADDRESS, "ROAD_ADDR", "126.7", "37.5", null, new RoadAddress(ADDRESS, "", ""));
+    var duplicate =
+        new Document(
+            "경기 부천시 원미구 지봉로 43",
+            "ROAD_ADDR",
+            "126.7",
+            "37.5",
+            null,
+            new RoadAddress(ADDRESS, "건물", "14662"));
+    when(client.search(ADDRESS))
+        .thenReturn(new KakaoAddressSearchResponse(List.of(first, duplicate)));
+    assertThat(service.coordinates(ADDRESS))
+        .isEqualTo(
+            new com.flout.server.domain.address.dto.response.AddressCoordinatesResponse(
+                37.5, 126.7));
+  }
+
+  @Test
+  void prefersDirectAddressMatchOverAnotherDocumentsAlternateAddress() {
+    var direct =
+        new Document(ADDRESS, "ROAD_ADDR", "126.7", "37.5", null, new RoadAddress(ADDRESS, "", ""));
+    var alternate =
+        new Document(
+            "경기도 부천시 원미구 역곡동 44",
+            "REGION_ADDR",
+            "126.8",
+            "37.6",
+            null,
+            new RoadAddress(ADDRESS, "", ""));
+    when(client.search(ADDRESS))
+        .thenReturn(new KakaoAddressSearchResponse(List.of(alternate, direct)));
+    assertThat(service.coordinates(ADDRESS).latitude()).isEqualTo(37.5);
+  }
+
+  @Test
+  void rejectsDistinctAlternateAddressesWhenNoDirectMatchExists() {
+    var first =
+        new Document(
+            "경기도 부천시 원미구 역곡동 44",
+            "REGION_ADDR",
+            "126.7",
+            "37.5",
+            null,
+            new RoadAddress(ADDRESS, "", ""));
+    var second =
+        new Document(
+            "경기도 부천시 원미구 역곡동 45",
+            "REGION_ADDR",
+            "126.8",
+            "37.6",
+            null,
+            new RoadAddress(ADDRESS, "", ""));
+    when(client.search(ADDRESS)).thenReturn(new KakaoAddressSearchResponse(List.of(first, second)));
+    assertError(() -> service.coordinates(ADDRESS), AddressErrorCode.COORDINATE_ADDRESS_MISMATCH);
+  }
+
+  @Test
   void rejectsOutsideAndMismatchedAddresses() {
     assertError(
         () -> service.coordinates("서울특별시 강남구 길 1"), AddressErrorCode.INVALID_COORDINATE_ADDRESS);

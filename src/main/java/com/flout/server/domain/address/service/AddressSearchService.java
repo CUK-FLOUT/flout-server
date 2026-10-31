@@ -5,12 +5,18 @@ import com.flout.server.domain.address.dto.response.AddressSearchResponse.Addres
 import com.flout.server.domain.address.exception.JusoAddressException;
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.List;
+import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class AddressSearchService {
   private static final int PAGE_SIZE = 10;
+  private static final Set<String> INPUT_ERROR_CODES =
+      Set.of("E0005", "E0006", "E0008", "E0009", "E0010", "E0011", "E0012", "E0013");
   private final JusoAddressClient client;
 
   public AddressSearchService(JusoAddressClient client) {
@@ -25,13 +31,19 @@ public class AddressSearchService {
     if (!query.contains("부천시")) query = "부천시 " + query;
     try {
       var response = client.search(query, page, PAGE_SIZE);
-      if (response == null
-          || response.results() == null
-          || response.results().common() == null
-          || !"0".equals(response.results().common().errorCode())) {
+      if (response == null || response.results() == null || response.results().common() == null) {
+        log.warn("Juso errorCode={}", "missing");
         throw new BaseException(AddressErrorCode.JUSO_API_ERROR);
       }
       var results = response.results();
+      String errorCode = results.common().errorCode();
+      if (!"0".equals(errorCode)) {
+        log.warn("Juso errorCode={}", safeErrorCode(errorCode));
+        throw new BaseException(
+            INPUT_ERROR_CODES.contains(errorCode == null ? "" : errorCode)
+                ? GeneralErrorCode.BAD_REQUEST_ERROR
+                : AddressErrorCode.JUSO_API_ERROR);
+      }
       long total;
       try {
         total = Long.parseLong(results.common().totalCount());
@@ -40,9 +52,11 @@ public class AddressSearchService {
             || Integer.parseInt(results.common().countPerPage()) != PAGE_SIZE)
           throw new NumberFormatException();
       } catch (NumberFormatException e) {
+        log.warn("Juso errorCode={}", safeErrorCode(errorCode));
         throw new BaseException(AddressErrorCode.JUSO_API_ERROR);
       }
       if (results.juso() == null && total > 0 && (long) (page - 1) * PAGE_SIZE < total) {
+        log.warn("Juso errorCode={}", safeErrorCode(errorCode));
         throw new BaseException(AddressErrorCode.JUSO_API_ERROR);
       }
       var rows =
@@ -77,6 +91,10 @@ public class AddressSearchService {
 
   private boolean isBucheon(String code) {
     return code != null && code.matches("411(92|94|96)\\d{5}");
+  }
+
+  private String safeErrorCode(String code) {
+    return code != null && code.matches("E[0-9]{4}|-999|0") ? code : "unknown";
   }
 
   private boolean isBroadRegionOnly(String keyword) {

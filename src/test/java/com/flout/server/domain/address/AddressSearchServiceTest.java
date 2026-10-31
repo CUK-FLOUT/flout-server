@@ -9,6 +9,8 @@ import com.flout.server.domain.address.exception.JusoAddressException;
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.domain.address.service.*;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.response.code.BaseResponseCode;
+import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -100,7 +102,56 @@ class AddressSearchServiceTest {
     assertError(() -> service.search("오류", 1), AddressErrorCode.JUSO_API_ERROR);
   }
 
-  private void assertError(Runnable action, AddressErrorCode code) {
+  @ParameterizedTest
+  @ValueSource(strings = {"E0005", "E0006", "E0008", "E0009", "E0010", "E0011", "E0012", "E0013"})
+  void mapsInputErrorsToBadRequest(String code) {
+    when(client.search("부천시 입력", 1, 10))
+        .thenReturn(
+            new JusoAddressSearchResponse(
+                new Results(new Common("0", "1", "10", code, "sensitive message"), null)));
+    assertError(() -> service.search("입력", 1), GeneralErrorCode.BAD_REQUEST_ERROR);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"E0001", "E0002", "E0014", "-999", "E0015"})
+  void keepsProviderAndOtherErrorsAsBadGateway(String code) {
+    when(client.search("부천시 입력", 1, 10))
+        .thenReturn(
+            new JusoAddressSearchResponse(
+                new Results(new Common("0", "1", "10", code, "sensitive message"), null)));
+    assertError(() -> service.search("입력", 1), AddressErrorCode.JUSO_API_ERROR);
+  }
+
+  @Test
+  void logsOnlySafeErrorCode() {
+    var logger =
+        (ch.qos.logback.classic.Logger)
+            org.slf4j.LoggerFactory.getLogger(AddressSearchService.class);
+    var appender =
+        new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(client.search("부천시 입력", 1, 10))
+          .thenReturn(
+              new JusoAddressSearchResponse(
+                  new Results(new Common("0", "1", "10", "E0001", "secret-key"), null)));
+      assertError(() -> service.search("입력", 1), AddressErrorCode.JUSO_API_ERROR);
+      assertThat(appender.list)
+          .singleElement()
+          .satisfies(
+              event -> {
+                assertThat(event.getLevel()).isEqualTo(ch.qos.logback.classic.Level.WARN);
+                assertThat(event.getFormattedMessage()).isEqualTo("Juso errorCode=E0001");
+                assertThat(event.getThrowableProxy()).isNull();
+              });
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
+  private void assertError(Runnable action, BaseResponseCode code) {
     assertThatThrownBy(action::run)
         .isInstanceOfSatisfying(
             BaseException.class, e -> assertThat(e.getBaseResponseCode()).isEqualTo(code));
