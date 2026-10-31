@@ -131,8 +131,16 @@ class AdminApplicationAttachmentTest {
         attachments.saveAndFlush(
             ApplicationAttachment.create(
                 application, "photos/second", "배수구.png", 20, "image/png", null, null));
+    var otherAssessment =
+        assessments.saveAndFlush(
+            RiskAssessment.completedDemo(
+                resident,
+                application.getAddress(),
+                application.getDetailAddress(),
+                RiskLevel.HIGH));
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id, assessment_id, receipt_no, address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude) SELECT applicant_user_id, assessment_id, 'OTHER-ATTACH', address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude FROM inspection_applications WHERE application_id = ?",
+        "INSERT INTO inspection_applications(applicant_user_id, assessment_id, receipt_no, address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude) SELECT applicant_user_id, ?, 'OTHER-ATTACH', address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude FROM inspection_applications WHERE application_id = ?",
+        otherAssessment.getId(),
         applicationId);
     Long otherId =
         jdbc.queryForObject(

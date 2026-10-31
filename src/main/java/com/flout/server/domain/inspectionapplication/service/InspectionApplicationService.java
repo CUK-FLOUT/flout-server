@@ -2,6 +2,7 @@ package com.flout.server.domain.inspectionapplication.service;
 
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.dto.response.CreateInspectionApplicationResponse;
+import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.preventionguide.repository.PreventionGuideRepository;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
@@ -26,19 +27,25 @@ public class InspectionApplicationService {
   private static final String RECEIPT_NUMBER_UNIQUE_CONSTRAINT =
       "uk_inspection_applications_receipt_no";
 
+  private static final String ASSESSMENT_UNIQUE_CONSTRAINT =
+      "uk_inspection_applications_assessment_id";
+
   private static final Pattern BUCHEON_ADDRESS =
       Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
 
+  private final InspectionApplicationRepository applications;
   private final UserRepository users;
   private final RiskAssessmentRepository assessments;
   private final PreventionGuideRepository guides;
   private final InspectionApplicationSubmissionTransaction submissionTransaction;
 
   public InspectionApplicationService(
+      InspectionApplicationRepository applications,
       UserRepository users,
       RiskAssessmentRepository assessments,
       PreventionGuideRepository guides,
       InspectionApplicationSubmissionTransaction submissionTransaction) {
+    this.applications = applications;
     this.users = users;
     this.assessments = assessments;
     this.guides = guides;
@@ -69,6 +76,10 @@ public class InspectionApplicationService {
 
     if (assessment.getStatus() != RiskAssessmentStatus.COMPLETED) {
       throw new BaseException(InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED);
+    }
+
+    if (applications.existsByAssessmentId(assessment.getId())) {
+      throw new BaseException(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
     }
 
     if (request.guideId() != null
@@ -132,7 +143,10 @@ public class InspectionApplicationService {
       } catch (ReceiptNumberCollisionException e) {
         // 저장 전 접수번호 중복 감지
       } catch (DataIntegrityViolationException e) {
-        if (!isReceiptNumberUniqueConstraintViolation(e)) {
+        if (isUniqueConstraintViolation(e, ASSESSMENT_UNIQUE_CONSTRAINT)) {
+          throw new BaseException(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+        }
+        if (!isUniqueConstraintViolation(e, RECEIPT_NUMBER_UNIQUE_CONSTRAINT)) {
           throw e;
         }
       }
@@ -141,21 +155,25 @@ public class InspectionApplicationService {
     throw new BaseException(InspectionApplicationErrorCode.RECEIPT_NUMBER_GENERATION_FAILED);
   }
 
-  private boolean isReceiptNumberUniqueConstraintViolation(
-      DataIntegrityViolationException exception) {
+  private boolean isUniqueConstraintViolation(
+      DataIntegrityViolationException exception, String constraintName) {
 
     Throwable cause = exception;
 
     while (cause != null) {
       if (cause instanceof ConstraintViolationException violation
-          && RECEIPT_NUMBER_UNIQUE_CONSTRAINT.equals(violation.getConstraintName())) {
+          && constraintName.equalsIgnoreCase(violation.getConstraintName())) {
         return true;
       }
 
       if (cause instanceof SQLException sqlException
-          && "23000".equals(sqlException.getSQLState())
+          && sqlException.getSQLState() != null
+          && sqlException.getSQLState().startsWith("23")
           && sqlException.getMessage() != null
-          && sqlException.getMessage().contains(RECEIPT_NUMBER_UNIQUE_CONSTRAINT)) {
+          && sqlException
+              .getMessage()
+              .toLowerCase(java.util.Locale.ROOT)
+              .contains(constraintName)) {
         return true;
       }
 
