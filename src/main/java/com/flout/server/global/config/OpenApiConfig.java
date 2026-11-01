@@ -305,14 +305,14 @@ public class OpenApiConfig {
         "jurisdictionAccessDenied",
         InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
         null);
-    addError(
-        operation,
-        "inspectionNotFound",
-        InspectionErrorCode.INSPECTION_NOT_FOUND,
-        InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation
+        .getResponses()
+        .get("404")
+        .description(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
   }
 
   // 배정 상세 조회의 주민 정보와 관할 접근 오류 예시
