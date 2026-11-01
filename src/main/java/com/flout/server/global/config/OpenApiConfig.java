@@ -8,6 +8,8 @@ import com.flout.server.domain.inspectionapplication.response.code.InspectionApp
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
+import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
+import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -181,6 +183,10 @@ public class OpenApiConfig {
                                     null);
                               }
                             }
+                            if (path.equals("/api/admin/public-issues")
+                                && method == PathItem.HttpMethod.POST) {
+                              describePublicIssueRegistration(operation);
+                            }
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
                             }
@@ -281,6 +287,74 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  private void describePublicIssueRegistration(Operation operation) {
+    var code = PublicIssueSuccessCode.REGISTERED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "publicIssueRegistered",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "publicIssueId",
+                1,
+                "sourceInspectionId",
+                1,
+                "address",
+                "경기도 부천시 원미구 길주로 210",
+                "issueType",
+                "REPEATED_FLOODING",
+                "description",
+                "빗물받이와 도로 배수 상태 확인이 필요합니다.",
+                "fieldFindings",
+                "배수구 덮개 주변에 이물질이 쌓여 있습니다.",
+                "status",
+                "RECEIVED",
+                "createdAt",
+                "2026-11-01T16:00:00+09:00")));
+    if (operation.getRequestBody() != null
+        && operation.getRequestBody().getContent() != null
+        && operation.getRequestBody().getContent().get(JSON) != null) {
+      operation
+          .getRequestBody()
+          .getContent()
+          .get(JSON)
+          .addExamples(
+              "registerPublicIssue",
+              new Example()
+                  .value(
+                      Map.of(
+                          "sourceInspectionId",
+                          1,
+                          "address",
+                          "경기도 부천시 원미구 길주로 210",
+                          "issueType",
+                          "REPEATED_FLOODING",
+                          "description",
+                          "빗물받이와 도로 배수 상태 확인이 필요합니다.",
+                          "fieldFindings",
+                          "배수구 덮개 주변에 이물질이 쌓여 있습니다.")));
+    }
+    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "invalidIssueType", PublicIssueErrorCode.INVALID_ISSUE_TYPE, null);
+    addError(
+        operation, "coordinatesUnavailable", PublicIssueErrorCode.COORDINATES_UNAVAILABLE, null);
+    addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
+    addError(
+        operation,
+        "sourceInspectionNotFound",
+        InspectionErrorCode.INSPECTION_NOT_FOUND,
+        "원본 점검이 존재하지 않습니다.");
+    addError(operation, "coordinateServiceFailed", AddressErrorCode.KAKAO_API_ERROR, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation.getResponses().get("404").description("원본 점검이 존재하지 않습니다.");
   }
 
   private void describeInspectionPhotoUpload(Operation operation) {
