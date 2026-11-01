@@ -6,6 +6,7 @@ import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspection.response.code.InspectionSuccessCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
+import com.flout.server.domain.notification.response.code.NotificationSuccessCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
@@ -182,6 +183,10 @@ public class OpenApiConfig {
                                     GeneralErrorCode.ACCESS_DENIED_REQUEST,
                                     null);
                               }
+                            }
+                            if (path.equals("/api/notifications/tokens")
+                                && method == PathItem.HttpMethod.PUT) {
+                              describeFcmTokenRegistration(operation);
                             }
                             if (path.equals("/api/admin/public-issues")
                                 && method == PathItem.HttpMethod.POST) {
@@ -1038,6 +1043,19 @@ public class OpenApiConfig {
         .getResponses()
         .get("409")
         .setDescription(InspectionErrorCode.INVALID_STATUS_TRANSITION.getMessage());
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  // 토큰 등록·갱신 응답 및 본문 오류 문서화
+  private void describeFcmTokenRegistration(Operation operation) {
+    var code = NotificationSuccessCode.FCM_TOKEN_REGISTERED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success, "tokenRegistered", envelope(true, code, code.getMessage(), Map.of("tokenId", 1)));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
