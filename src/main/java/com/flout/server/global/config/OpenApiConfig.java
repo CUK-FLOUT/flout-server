@@ -334,6 +334,7 @@ public class OpenApiConfig {
         .getResponses()
         .get("404")
         .description(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
+    operation.getResponses().get("413").description("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다.");
   }
 
   private void describeInspectionResultDraft(Operation operation) {
