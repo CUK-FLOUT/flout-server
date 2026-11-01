@@ -249,6 +249,10 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.PUT) {
                               describeInspectionResultDraft(operation);
                             }
+                            if (path.equals("/api/admin/inspections/{inspectionId}/attachments")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeInspectionPhotoUpload(operation);
+                            }
                             if (path.equals("/api/admin/inspections/{inspectionId}/assignment")
                                 && method == PathItem.HttpMethod.POST) {
                               describeInspectionAssignment(operation);
@@ -277,6 +281,60 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  private void describeInspectionPhotoUpload(Operation operation) {
+    var code = InspectionSuccessCode.PHOTOS_UPLOADED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "inspectionPhotosUploaded",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "inspectionId",
+                1,
+                "photos",
+                List.of(
+                    Map.of(
+                        "photoId",
+                        11,
+                        "fileName",
+                        "출입구.jpg",
+                        "url",
+                        "https://flout-dev-files-kr.s3.ap-northeast-2.amazonaws.com/inspections/1/example?X-Amz-Signature=...",
+                        "size",
+                        245760,
+                        "contentType",
+                        "image/jpeg")))));
+    addError(operation, "emptyPhotos", InspectionErrorCode.EMPTY_PHOTOS, null);
+    addError(operation, "invalidPhotos", InspectionErrorCode.INVALID_PHOTOS, null);
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "malformedMultipart", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    addError(
+        operation,
+        "photoTooLarge",
+        GeneralErrorCode.PAYLOAD_TOO_LARGE,
+        "사진은 파일당 최대 10MiB까지 업로드할 수 있습니다. 요청 전체는 80MiB 이하입니다.");
+    addError(operation, "photoUploadFailed", InspectionErrorCode.PHOTO_UPLOAD_FAILED, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation
+        .getResponses()
+        .get("404")
+        .description(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
+    operation.getResponses().get("413").description("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다.");
   }
 
   private void describeInspectionResultDraft(Operation operation) {
