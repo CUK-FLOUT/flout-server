@@ -1,8 +1,11 @@
 package com.flout.server.domain.inspection.controller;
 
 import com.flout.server.domain.inspection.dto.request.PublishInspectionResultRequest;
+import com.flout.server.domain.inspection.dto.request.SaveInspectionResultDraftRequest;
 import com.flout.server.domain.inspection.dto.response.PublishInspectionResultResponse;
+import com.flout.server.domain.inspection.dto.response.SaveInspectionResultDraftResponse;
 import com.flout.server.domain.inspection.service.PublishInspectionResultService;
+import com.flout.server.domain.inspection.service.SaveInspectionResultDraftService;
 import com.flout.server.global.response.SuccessResponse;
 import com.flout.server.global.response.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +23,23 @@ import org.springframework.web.bind.annotation.*;
 public class AdminInspectionResultController {
 
   private final PublishInspectionResultService service;
+  private final SaveInspectionResultDraftService draftService;
+
+  @PutMapping("/{inspectionId}/result/draft")
+  @Operation(
+      summary = "점검 결과 임시저장",
+      description =
+          "선택 입력한 내용을 비공개 DRAFT로 저장합니다. PUT 전체 교체 방식으로 생략·null 필드는 비우고 목록은 교체합니다. "
+              + "최초 저장은 초안을 생성하고 재저장은 같은 초안을 갱신합니다. 기존 주민 공개본, 점검·신청 상태와 이력은 변경하지 않습니다. "
+              + "모든 점검 상태에서 관할 운영자가 저장할 수 있으며 내부 메모는 주민에게 공개하지 않습니다.")
+  public SuccessResponse<SaveInspectionResultDraftResponse> saveDraft(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable Long inspectionId,
+      @Valid @RequestBody SaveInspectionResultDraftRequest request) {
+    return SuccessResponse.of(
+        draftService.save(Long.valueOf(jwt.getSubject()), inspectionId, request),
+        GeneralSuccessCode.SUCCESS_OK);
+  }
 
   @PostMapping("/{inspectionId}/result")
   @Operation(

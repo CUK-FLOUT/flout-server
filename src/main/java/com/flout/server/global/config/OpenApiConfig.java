@@ -12,6 +12,7 @@ import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import com.flout.server.global.response.code.GeneralSuccessCode;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -244,6 +245,10 @@ public class OpenApiConfig {
                               describeInspectionStatus(operation);
                             }
 
+                            if (path.equals("/api/admin/inspections/{inspectionId}/result/draft")
+                                && method == PathItem.HttpMethod.PUT) {
+                              describeInspectionResultDraft(operation);
+                            }
                             if (path.equals("/api/admin/inspections/{inspectionId}/assignment")
                                 && method == PathItem.HttpMethod.POST) {
                               describeInspectionAssignment(operation);
@@ -272,6 +277,42 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  private void describeInspectionResultDraft(Operation operation) {
+    var code = GeneralSuccessCode.SUCCESS_OK;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("점검 결과 임시저장 성공");
+    addExample(
+        success,
+        "inspectionResultDraftSaved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "inspectionId",
+                1,
+                "resultStatus",
+                "DRAFT",
+                "savedAt",
+                "2026-10-31T19:00:00+09:00")));
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "invalidDraftBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation
+        .getResponses()
+        .get("404")
+        .description(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
   }
 
   // 배정 상세 조회의 주민 정보와 관할 접근 오류 예시
