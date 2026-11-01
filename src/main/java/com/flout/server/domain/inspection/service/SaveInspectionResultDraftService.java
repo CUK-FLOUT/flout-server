@@ -9,7 +9,7 @@ import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -92,6 +92,10 @@ public class SaveInspectionResultDraftService {
     return new SaveInspectionResultDraftResponse(
         inspection.getId(),
         result.getResultStatus().name(),
-        result.getUpdatedAt().atOffset(ZoneOffset.ofHours(9)));
+        result
+            .getUpdatedAt()
+            .atZone(ZoneId.systemDefault())
+            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
+            .toOffsetDateTime());
   }
 }

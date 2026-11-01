@@ -305,7 +305,11 @@ public class OpenApiConfig {
         "jurisdictionAccessDenied",
         InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
         null);
-    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    addError(
+        operation,
+        "inspectionNotFound",
+        InspectionErrorCode.INSPECTION_NOT_FOUND,
+        InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
