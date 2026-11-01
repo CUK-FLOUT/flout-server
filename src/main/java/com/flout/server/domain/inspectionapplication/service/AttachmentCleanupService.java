@@ -66,8 +66,10 @@ public class AttachmentCleanupService {
               if (created.isEmpty()) return;
               Long count =
                   jdbc.queryForObject(
-                      "SELECT COUNT(*) FROM application_attachments WHERE object_key = ?",
+                      "SELECT (SELECT COUNT(*) FROM application_attachments WHERE object_key = ?)"
+                          + " + (SELECT COUNT(*) FROM inspection_result_photos WHERE object_key = ?)",
                       Long.class,
+                      key,
                       key);
               if (count == 0) {
                 storage.delete(key);
@@ -77,7 +79,7 @@ public class AttachmentCleanupService {
               jdbc.update("DELETE FROM attachment_upload_intents WHERE object_key = ?", key);
             });
       } catch (RuntimeException e) {
-        log.error("첨부 객체 정리 실패, 재시도 예정: {}", key, e);
+        log.error("첨부 객체 정리 실패, 재시도 예정: {}, failureType={}", key, e.getClass().getSimpleName());
         try {
           transactions.executeWithoutResult(
               status ->
@@ -86,7 +88,10 @@ public class AttachmentCleanupService {
                       LocalDateTime.now(),
                       key));
         } catch (RuntimeException retryFailure) {
-          log.error("첨부 객체 재시도 시간 갱신 실패: {}", key, retryFailure);
+          log.error(
+              "첨부 객체 재시도 시간 갱신 실패: {}, failureType={}",
+              key,
+              retryFailure.getClass().getSimpleName());
         }
       }
     }

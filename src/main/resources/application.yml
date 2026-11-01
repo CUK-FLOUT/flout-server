@@ -18,8 +18,8 @@ management:
 
 app:
   s3:
-    region: ${AWS_REGION:}
-    bucket: ${AWS_S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    bucket: ${AWS_S3_BUCKET:flout-dev-files-kr}
   inspection:
     auto-start:
       enabled: ${INSPECTION_AUTO_START_ENABLED:true}
