@@ -20,7 +20,9 @@ public class SignupController {
   private final SignupService signupService;
 
   @PostMapping("/signup")
-  @Operation(summary = "주민 회원가입", description = "필수 약관에 동의한 주민 계정을 생성합니다. 관리자 역할은 지정할 수 없습니다.")
+  @Operation(
+      summary = "주민 회원가입",
+      description = "주민 계정을 생성합니다. 필수 동의는 로그인 후 진행합니다. 관리자 역할은 지정할 수 없습니다.")
   public ResponseEntity<SuccessResponse<SignupResponse>> signup(
       @Valid @RequestBody SignupRequest request) {
     return ResponseEntity.status(UserSuccessCode.SIGNUP_SUCCESS.getStatus())

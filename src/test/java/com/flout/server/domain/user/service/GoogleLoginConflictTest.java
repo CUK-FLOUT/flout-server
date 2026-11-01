@@ -22,9 +22,8 @@ class GoogleLoginConflictTest {
   final GoogleTokenVerifier verifier = mock(GoogleTokenVerifier.class);
   final JwtService tokens = mock(JwtService.class);
   final PasswordEncoder passwords = mock(PasswordEncoder.class);
-  final GoogleLoginService service =
-      new GoogleLoginService(users, consents, verifier, tokens, passwords, "1.0", "1.0");
-  final GoogleLoginRequest request = new GoogleLoginRequest("valid", true, true);
+  final GoogleLoginService service = new GoogleLoginService(users, verifier, tokens, passwords);
+  final GoogleLoginRequest request = new GoogleLoginRequest("valid");
 
   @BeforeEach
   void setup() {

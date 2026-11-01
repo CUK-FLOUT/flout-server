@@ -9,10 +9,7 @@ import com.flout.server.global.exception.BaseException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Locale;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,22 +20,11 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class SignupService {
   private final UserRepository users;
-  private final UserConsentRepository consents;
   private final PasswordEncoder encoder;
-  private final String thirdPartyProvisionVersion;
-  private final String statusNotificationVersion;
 
-  public SignupService(
-      UserRepository users,
-      UserConsentRepository consents,
-      PasswordEncoder encoder,
-      @Value("${app.consent.third-party-provision-version:1.0}") String thirdPartyProvisionVersion,
-      @Value("${app.consent.status-notification-version:1.0}") String statusNotificationVersion) {
+  public SignupService(UserRepository users, PasswordEncoder encoder) {
     this.users = users;
-    this.consents = consents;
     this.encoder = encoder;
-    this.thirdPartyProvisionVersion = thirdPartyProvisionVersion;
-    this.statusNotificationVersion = statusNotificationVersion;
   }
 
   @Transactional
@@ -65,13 +51,6 @@ public class SignupService {
       }
       throw e;
     }
-    LocalDateTime agreedAt = LocalDateTime.now();
-    consents.saveAll(
-        List.of(
-            UserConsent.agree(
-                user, ConsentType.THIRD_PARTY_PROVISION, thirdPartyProvisionVersion, agreedAt),
-            UserConsent.agree(
-                user, ConsentType.STATUS_NOTIFICATION, statusNotificationVersion, agreedAt)));
     return SignupResponse.from(user);
   }
 

@@ -8,11 +8,8 @@ import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.GoogleTokenVerifier;
 import com.flout.server.global.security.JwtService;
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,28 +20,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleLoginService {
   private final UserRepository users;
-  private final UserConsentRepository consents;
   private final GoogleTokenVerifier verifier;
   private final JwtService tokens;
   private final PasswordEncoder passwords;
-  private final String thirdPartyProvisionVersion;
-  private final String statusNotificationVersion;
 
   public GoogleLoginService(
       UserRepository users,
-      UserConsentRepository consents,
       GoogleTokenVerifier verifier,
       JwtService tokens,
-      PasswordEncoder passwords,
-      @Value("${app.consent.third-party-provision-version:1.0}") String thirdPartyProvisionVersion,
-      @Value("${app.consent.status-notification-version:1.0}") String statusNotificationVersion) {
+      PasswordEncoder passwords) {
     this.users = users;
-    this.consents = consents;
     this.verifier = verifier;
     this.tokens = tokens;
     this.passwords = passwords;
-    this.thirdPartyProvisionVersion = thirdPartyProvisionVersion;
-    this.statusNotificationVersion = statusNotificationVersion;
   }
 
   @Transactional
@@ -78,10 +66,6 @@ public class GoogleLoginService {
       } else {
         if (requiredRole == UserRole.ADMIN)
           throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
-        if (!Boolean.TRUE.equals(request.thirdPartyProvisionAgreed())
-            || !Boolean.TRUE.equals(request.statusNotificationAgreed())) {
-          throw new BaseException(UserErrorCode.GOOGLE_CONSENT_REQUIRED);
-        }
         String name = identity.getClaimAsString("name");
         if (name == null || name.isBlank()) name = "주민";
         name = name.strip();
@@ -89,13 +73,6 @@ public class GoogleLoginService {
         user = User.resident(email, passwords.encode(UUID.randomUUID().toString()), name);
         user.connectGoogle(identity.getSubject());
         persistNew(user);
-        LocalDateTime now = LocalDateTime.now();
-        consents.saveAll(
-            List.of(
-                UserConsent.agree(
-                    user, ConsentType.THIRD_PARTY_PROVISION, thirdPartyProvisionVersion, now),
-                UserConsent.agree(
-                    user, ConsentType.STATUS_NOTIFICATION, statusNotificationVersion, now)));
       }
     }
     if (user.getRole() != requiredRole) throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
