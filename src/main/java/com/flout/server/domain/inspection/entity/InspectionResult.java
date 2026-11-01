@@ -71,6 +71,15 @@ public class InspectionResult {
     this.internalMemo = internalMemo;
   }
 
+  // 목록만 바뀌거나 내용이 같아도 마지막 초안 저장 시각을 갱신합니다.
+  public void updateDraftContent(String summary, String followUpType, String internalMemo) {
+    if (resultStatus != ResultStatus.DRAFT) {
+      throw new IllegalStateException("초안만 임시저장할 수 있습니다.");
+    }
+    updateContent(summary, followUpType, internalMemo);
+    updatedAt = LocalDateTime.now();
+  }
+
   public void publish(LocalDateTime publishedAt) {
     if (this.resultStatus == ResultStatus.PUBLISHED) {
       throw new IllegalStateException("이미 공개된 점검 결과입니다.");
