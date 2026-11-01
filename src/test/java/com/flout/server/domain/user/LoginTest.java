@@ -357,6 +357,28 @@ class LoginTest {
   }
 
   @Test
+  void adminDoesNotRequireResidentConsentAndCannotSubmitIt() throws Exception {
+    String response =
+        mvc.perform(
+                post("/api/auth/admin/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body("admin@example.com", "password123")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result.requiresConsent").value(false))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String token = mapper.readTree(response).path("result").path("accessToken").asText();
+    mvc.perform(
+            post("/api/resident/consents")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":true}"))
+        .andExpect(status().isForbidden());
+    assertThat(consents.count()).isZero();
+  }
+
+  @Test
   void swaggerDocumentsJwtAndPublicAuthEndpoints() throws Exception {
     String response =
         mvc.perform(get("/v3/api-docs"))
@@ -365,6 +387,44 @@ class LoginTest {
             .getResponse()
             .getContentAsString();
     var document = mapper.readTree(response);
+    var consent = document.path("paths").path("/api/resident/consents").path("post");
+    assertThat(consent.path("tags").toString())
+        .contains("인증/인가")
+        .doesNotContain("consent-controller");
+    assertThat(document.path("tags").toString()).doesNotContain("consent-controller");
+    assertThat(consent.path("summary").asText()).isEqualTo("정보 제공 동의 저장");
+    assertThat(consent.path("security").isMissingNode()).isTrue(); // inherits global bearerAuth
+    for (String code : java.util.List.of("200", "400", "401", "403")) {
+      assertThat(consent.path("responses").has(code)).isTrue();
+    }
+    assertThat(
+            consent
+                .path("responses")
+                .path("200")
+                .at("/content/application~1json/examples/consentSaved/value/result/requiresConsent")
+                .asBoolean(true))
+        .isFalse();
+    var schemas = document.path("components").path("schemas");
+    for (String name : java.util.List.of("SignupRequest", "GoogleLoginRequest")) {
+      var properties = schemas.path(name).path("properties");
+      assertThat(properties.has("thirdPartyProvisionAgreed")).isFalse();
+      assertThat(properties.has("statusNotificationAgreed")).isFalse();
+    }
+    assertThat(schemas.path("ConsentRequest").path("required").toString())
+        .contains("thirdPartyProvisionAgreed", "statusNotificationAgreed");
+    assertThat(
+            schemas
+                .path("LoginResponse")
+                .path("properties")
+                .path("requiresConsent")
+                .path("description")
+                .asText())
+        .contains("운영자", "false");
+    for (String path :
+        java.util.List.of("/api/auth/login", "/api/auth/google", "/api/auth/refresh")) {
+      assertThat(document.path("paths").path(path).path("post").path("description").asText())
+          .contains("requiresConsent");
+    }
     assertThat(document.at("/components/securitySchemes/bearerAuth/type").asText())
         .isEqualTo("http");
     assertThat(document.at("/components/securitySchemes/bearerAuth/scheme").asText())
@@ -397,6 +457,8 @@ class LoginTest {
       assertThat(success.at("/result/expiresIn").asLong()).isEqualTo(3600);
       assertThat(success.at("/result/role").asText())
           .isEqualTo(path.endsWith("/admin/login") ? "ADMIN" : "RESIDENT");
+      assertThat(success.at("/result/requiresConsent").asBoolean())
+          .isEqualTo(!path.endsWith("/admin/login"));
       assertThat(
               responses
                   .path("401")

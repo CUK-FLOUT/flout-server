@@ -190,6 +190,10 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
                             }
+                            if (path.equals("/api/resident/consents")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeConsent(operation);
+                            }
                             if (path.equals("/api/resident/addresses/coordinates")) {
                               describeAddressCoordinates(operation);
                             }
@@ -613,7 +617,7 @@ public class OpenApiConfig {
 
   private void describeSignup(Operation operation) {
     operation.setDescription(
-        "주민 계정과 개인정보 제3자 제공·진행상태 알림 수신 동의를 함께 저장합니다. thirdPartyProvisionAgreed와 statusNotificationAgreed는 모두 true여야 합니다. 역할은 RESIDENT로 고정됩니다. 비밀번호는 영문·숫자 포함 8~64자이며 공백은 허용하지 않습니다. 특수문자는 선택입니다.");
+        "주민 계정을 생성합니다. 필수 동의는 로그인 후 진행합니다. 역할은 RESIDENT로 고정됩니다. 비밀번호는 영문·숫자 포함 8~64자이며 공백은 허용하지 않습니다. 특수문자는 선택입니다.");
     ApiResponse success = operation.getResponses().remove("200");
     if (success == null) {
       success = new ApiResponse();
@@ -634,6 +638,22 @@ public class OpenApiConfig {
         "passwordPolicy",
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "비밀번호는 영문과 숫자를 포함한 8자 이상이어야 합니다.");
+    addError(operation, "passwordMismatch", UserErrorCode.PASSWORD_MISMATCH, null);
+    addError(operation, "passwordTooLong", UserErrorCode.PASSWORD_TOO_LONG, null);
+    addError(operation, "duplicateEmail", UserErrorCode.EMAIL_ALREADY_EXISTS, null);
+  }
+
+  private void describeConsent(Operation operation) {
+    ApiResponse success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("필수 정보 제공 동의 저장 완료");
+    addExample(
+        success,
+        "consentSaved",
+        envelope(
+            true,
+            GeneralSuccessCode.SUCCESS_OK,
+            GeneralSuccessCode.SUCCESS_OK.getMessage(),
+            Map.of("requiresConsent", false)));
     addError(
         operation,
         "thirdPartyProvisionRequired",
@@ -644,9 +664,11 @@ public class OpenApiConfig {
         "statusNotificationRequired",
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "진행상태 알림 수신 동의는 필수입니다.");
-    addError(operation, "passwordMismatch", UserErrorCode.PASSWORD_MISMATCH, null);
-    addError(operation, "passwordTooLong", UserErrorCode.PASSWORD_TOO_LONG, null);
-    addError(operation, "duplicateEmail", UserErrorCode.EMAIL_ALREADY_EXISTS, null);
+    addError(operation, "malformedJson", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "residentOnly", GeneralErrorCode.ACCESS_DENIED_REQUEST, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeGoogle(Operation operation, boolean admin, long expiresIn) {
@@ -656,13 +678,15 @@ public class OpenApiConfig {
     operation.setDescription(
         (admin
                 ? "사전 등록된 ADMIN 계정만 허용합니다. Google sub를 미리 연결하거나, 등록된 Gmail/Workspace 이메일로 최초 연결합니다."
-                : "RESIDENT 계정만 허용합니다. 신규 회원은 개인정보 제3자 제공(thirdPartyProvisionAgreed)과 진행상태 알림 수신(statusNotificationAgreed)이 모두 true여야 합니다. 기존 이메일 계정은 자동 연결하지 않습니다.")
-            + " 인증 헤더 없이 Google ID 토큰을 본문으로 전달합니다. Google 서명·발급자·대상·만료·이메일 인증을 검증합니다. 서비스 Access Token과 Refresh Token을 발급합니다.");
+                : "RESIDENT 계정만 허용합니다. 신규 회원은 로그인 후 필수 동의를 진행합니다. 기존 이메일 계정은 자동 연결하지 않습니다.")
+            + " 인증 헤더 없이 Google ID 토큰을 본문으로 전달합니다. Google 서명·발급자·대상·만료·이메일 인증을 검증합니다. 서비스 Access Token과 Refresh Token을 발급합니다."
+            + (admin
+                ? " 운영자의 requiresConsent는 항상 false입니다."
+                : " requiresConsent가 true이면 필수 동의 화면으로 이동하고, false이면 동의가 완료된 상태입니다."));
     addError(operation, "invalidGoogleToken", UserErrorCode.GOOGLE_INVALID_TOKEN, null);
     addError(operation, "roleDenied", UserErrorCode.GOOGLE_LOGIN_DENIED, null);
     addError(operation, "linkRequired", UserErrorCode.GOOGLE_LINK_REQUIRED, null);
     if (!admin) {
-      addError(operation, "consentRequired", UserErrorCode.GOOGLE_CONSENT_REQUIRED, null);
       addError(operation, "emailLoginRequired", UserErrorCode.EMAIL_LOGIN_REQUIRED, null);
     }
     addError(operation, "notConfigured", UserErrorCode.GOOGLE_NOT_CONFIGURED, null);
@@ -673,7 +697,10 @@ public class OpenApiConfig {
         (admin ? "사전 등록된 ADMIN 계정만 로그인할 수 있습니다." : "RESIDENT 계정만 로그인할 수 있습니다.")
             + " 이메일·비밀번호·역할이 일치하지 않으면 동일한 401 응답을 반환합니다. 액세스 토큰은 "
             + expiresIn
-            + "초 동안 유효합니다. Refresh Token도 함께 발급하며 기본 유효 기간은 7일입니다. 토큰 만료 시각은 UTC입니다.");
+            + "초 동안 유효합니다. Refresh Token도 함께 발급하며 기본 유효 기간은 7일입니다. 토큰 만료 시각은 UTC입니다."
+            + (admin
+                ? " 운영자의 requiresConsent는 항상 false입니다."
+                : " requiresConsent가 true이면 로그인 후 필수 동의 화면으로 이동하고, false이면 동의가 완료된 상태입니다."));
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("accessToken", "example-access-token");
     result.put("tokenType", "Bearer");
@@ -684,6 +711,7 @@ public class OpenApiConfig {
     result.put("email", admin ? "admin@example.com" : "resident@example.com");
     result.put("name", admin ? "김운영" : "홍길동");
     result.put("role", admin ? "ADMIN" : "RESIDENT");
+    result.put("requiresConsent", !admin);
     result.put("refreshToken", "example-refresh-token");
     result.put("refreshExpiresIn", refreshExpiresIn);
     result.put(
@@ -730,7 +758,7 @@ public class OpenApiConfig {
             result));
     addError(operation, "invalidRefreshToken", UserErrorCode.INVALID_REFRESH_TOKEN, null);
     operation.setDescription(
-        "본문의 refreshToken으로 Access Token과 Refresh Token을 함께 재발급합니다. 기존 Refresh Token은 즉시 폐기하며 동시 요청은 한 건만 성공합니다. 권한은 현재 DB 계정 기준입니다. Authorization 헤더를 생략하세요. 만료된 Access Token은 보내지 않습니다.");
+        "본문의 refreshToken으로 Access Token과 Refresh Token을 함께 재발급합니다. 기존 Refresh Token은 즉시 폐기하며 동시 요청은 한 건만 성공합니다. 권한과 requiresConsent는 현재 DB 계정 및 필수 동의 기준입니다. 주민의 requiresConsent가 true이면 필수 동의가 필요하며 운영자는 항상 false입니다. Authorization 헤더를 생략하세요. 만료된 Access Token은 보내지 않습니다.");
     addError(
         operation,
         "refreshTokenRequired",

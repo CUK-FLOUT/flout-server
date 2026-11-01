@@ -18,17 +18,15 @@ import org.springframework.web.server.ResponseStatusException;
 class KoreanMessageTest {
   static Stream<Object> invalidRequests() {
     return Stream.of(
-        new SignupRequest("", "password123", "password123", "홍길동", true, true),
-        new SignupRequest("invalid", "password123", "password123", "홍길동", true, true),
-        new SignupRequest(
-            "a".repeat(90) + "@example.com", "password123", "password123", "홍길동", true, true),
-        new SignupRequest("user@example.com", "password123", "", "", true, true),
-        new SignupRequest(
-            "user@example.com", "password123", "password123", "가".repeat(51), true, true),
+        new SignupRequest("", "password123", "password123", "홍길동"),
+        new SignupRequest("invalid", "password123", "password123", "홍길동"),
+        new SignupRequest("a".repeat(90) + "@example.com", "password123", "password123", "홍길동"),
+        new SignupRequest("user@example.com", "password123", "", ""),
+        new SignupRequest("user@example.com", "password123", "password123", "가".repeat(51)),
         new LoginRequest("a".repeat(90) + "@example.com", "password123"),
         new LoginRequest("user@example.com", "a".repeat(65)),
-        new GoogleLoginRequest("", null, null),
-        new GoogleLoginRequest("a".repeat(16385), null, null),
+        new GoogleLoginRequest(""),
+        new GoogleLoginRequest("a".repeat(16385)),
         new RefreshTokenRequest("a".repeat(513)));
   }
 

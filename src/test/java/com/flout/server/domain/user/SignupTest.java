@@ -1,14 +1,10 @@
 package com.flout.server.domain.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.user.controller.SignupController;
-import com.flout.server.domain.user.entity.ConsentType;
-import com.flout.server.domain.user.entity.UserConsent;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserConsentRepository;
 import com.flout.server.domain.user.repository.UserRepository;
@@ -54,10 +50,9 @@ class SignupTest {
       String terms,
       String privacy) {
     return """
-        {"email":"%s","password":"%s","passwordConfirm":"%s","name":"%s",
-         "thirdPartyProvisionAgreed":%s,"statusNotificationAgreed":%s,"role":"ADMIN"}
+        {"email":"%s","password":"%s","passwordConfirm":"%s","name":"%s","role":"ADMIN"}
         """
-        .formatted(email, password, confirmation, name, terms, privacy);
+        .formatted(email, password, confirmation, name);
   }
 
   private String valid() {
@@ -65,7 +60,7 @@ class SignupTest {
   }
 
   @Test
-  void createsResidentAndBothConsentsWithoutExposingPassword() throws Exception {
+  void createsResidentWithoutConsentsOrExposingPassword() throws Exception {
     String body =
         mvc.perform(
                 post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(valid()))
@@ -82,18 +77,7 @@ class SignupTest {
     assertThat(user.getRole()).isEqualTo(UserRole.RESIDENT);
     assertThat(encoder.matches("password123", user.getPasswordHash())).isTrue();
     assertThat(body).doesNotContain("password", user.getPasswordHash());
-    assertThat(consents.findAll())
-        .extracting(UserConsent::getConsentType)
-        .containsExactlyInAnyOrder(
-            ConsentType.THIRD_PARTY_PROVISION, ConsentType.STATUS_NOTIFICATION);
-    assertThat(consents.findAll())
-        .hasSize(2)
-        .allSatisfy(
-            consent -> {
-              assertThat(consent.isAgreed()).isTrue();
-              assertThat(consent.getVersion()).isEqualTo("1.0");
-              assertThat(consent.getAgreedAt()).isNotNull();
-            });
+    assertThat(consents.count()).isZero();
   }
 
   @Test
@@ -107,40 +91,6 @@ class SignupTest {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("USER_409_1"));
     assertThat(users.count()).isEqualTo(1);
-    assertThat(consents.count()).isEqualTo(2);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"thirdPartyProvisionAgreed", "statusNotificationAgreed"})
-  void requiredConsentCannotBeMissingNullOrFalse(String field) throws Exception {
-    for (String value : new String[] {"false", "null", "missing"}) {
-      String body =
-          value.equals("missing")
-              ? valid().replace("\"" + field + "\":true,", "")
-              : valid().replace("\"" + field + "\":true", "\"" + field + "\":" + value);
-      mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.code").value("COMMON_400_2"))
-          .andExpect(
-              jsonPath("$.message")
-                  .value(
-                      field.equals("thirdPartyProvisionAgreed")
-                          ? "개인정보 제3자 제공 동의는 필수입니다."
-                          : "진행상태 알림 수신 동의는 필수입니다."));
-      assertThat(users.count()).isZero();
-      assertThat(consents.count()).isZero();
-    }
-  }
-
-  @Test
-  void legacyConsentFieldsDoNotReplaceNewRequiredConsents() throws Exception {
-    String body =
-        valid()
-            .replace("thirdPartyProvisionAgreed", "termsAgreed")
-            .replace("statusNotificationAgreed", "privacyAgreed");
-    mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
-        .andExpect(status().isBadRequest());
-    assertThat(users.count()).isZero();
     assertThat(consents.count()).isZero();
   }
 
@@ -160,35 +110,13 @@ class SignupTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "email",
-        "password",
-        "name",
-        "terms",
-        "privacy",
-        "missingConsent",
-        "mismatch",
-        "bytes"
-      })
+  @ValueSource(strings = {"email", "password", "name", "mismatch", "bytes"})
   void rejectsInvalidSignupWithoutSaving(String scenario) throws Exception {
     String body =
         switch (scenario) {
           case "email" -> valid().replace("Resident@example.com", "invalid");
           case "password" -> valid().replace("password123", "short");
           case "name" -> valid().replace("주민", " ");
-          case "terms" ->
-              valid()
-                  .replace(
-                      "\"thirdPartyProvisionAgreed\":true", "\"thirdPartyProvisionAgreed\":false");
-          case "privacy" ->
-              valid()
-                  .replace(
-                      "\"statusNotificationAgreed\":true", "\"statusNotificationAgreed\":false");
-          case "missingConsent" ->
-              valid()
-                  .replace(
-                      "\"statusNotificationAgreed\":true", "\"statusNotificationAgreed\":null");
           case "mismatch" ->
               valid()
                   .replace(
@@ -199,15 +127,6 @@ class SignupTest {
     mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.isSuccess").value(false));
-    assertThat(users.count()).isZero();
-    assertThat(consents.count()).isZero();
-  }
-
-  @Test
-  void consentFailureRollsBackUser() throws Exception {
-    doThrow(new IllegalStateException("storage failed")).when(consents).saveAll(any());
-    mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(valid()))
-        .andExpect(status().isInternalServerError());
     assertThat(users.count()).isZero();
     assertThat(consents.count()).isZero();
   }

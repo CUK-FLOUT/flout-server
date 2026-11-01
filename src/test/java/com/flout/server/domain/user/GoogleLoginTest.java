@@ -5,9 +5,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.flout.server.domain.user.entity.ConsentType;
 import com.flout.server.domain.user.entity.User;
-import com.flout.server.domain.user.entity.UserConsent;
 import com.flout.server.domain.user.repository.*;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
@@ -76,47 +74,14 @@ class GoogleLoginTest {
   }
 
   @Test
-  void newResidentNeedsConsentAndRepeatLoginDoesNotDuplicate() throws Exception {
-    login("/api/auth/google", "", 400);
-    assertThat(users.count()).isZero();
-    login(
-        "/api/auth/google",
-        ",\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":true",
-        200);
+  void newResidentDoesNotAutomaticallySaveConsents() throws Exception {
+    login("/api/auth/google", "", 200);
     login("/api/auth/google", "", 200);
     assertThat(users.count()).isEqualTo(1);
-    assertThat(consents.count()).isEqualTo(2);
-    assertThat(consents.findAll())
-        .extracting(UserConsent::getConsentType)
-        .containsExactlyInAnyOrder(
-            ConsentType.THIRD_PARTY_PROVISION, ConsentType.STATUS_NOTIFICATION);
-    assertThat(consents.findAll())
-        .allSatisfy(
-            consent -> {
-              assertThat(consent.isAgreed()).isTrue();
-              assertThat(consent.getAgreedAt()).isNotNull();
-              assertThat(consent.getVersion()).isEqualTo("1.0");
-            });
+    assertThat(consents.count()).isZero();
     User user = users.findByEmail("person@gmail.com").orElseThrow();
     assertThat(user.getGoogleSubject()).isEqualTo("subject-1");
     assertThat(user.getLastLoginAt()).isNotNull();
-    login("/api/auth/admin/google", "", 403);
-  }
-
-  @Test
-  void bothNewConsentsMustBeExplicitlyTrue() throws Exception {
-    for (String input :
-        new String[] {
-          ",\"thirdPartyProvisionAgreed\":true",
-          ",\"statusNotificationAgreed\":true",
-          ",\"thirdPartyProvisionAgreed\":false,\"statusNotificationAgreed\":true",
-          ",\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":false",
-          ",\"termsAgreed\":true,\"privacyAgreed\":true"
-        }) {
-      login("/api/auth/google", input, 400);
-      assertThat(users.count()).isZero();
-      assertThat(consents.count()).isZero();
-    }
   }
 
   @Test
@@ -174,8 +139,7 @@ class GoogleLoginTest {
         mvc.perform(
                 post("/api/auth/google")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        "{\"idToken\":\"valid\",\"thirdPartyProvisionAgreed\":true,\"statusNotificationAgreed\":true}"))
+                    .content("{\"idToken\":\"valid\"}"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -187,6 +151,7 @@ class GoogleLoginTest {
                 .content(mapper.writeValueAsString(java.util.Map.of("refreshToken", refreshToken))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("USER_200_2"))
+        .andExpect(jsonPath("$.result.requiresConsent").value(true))
         .andExpect(jsonPath("$.result.role").value("RESIDENT"))
         .andExpect(jsonPath("$.result.email").value("person@gmail.com"));
   }

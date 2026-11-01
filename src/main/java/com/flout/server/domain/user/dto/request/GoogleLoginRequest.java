@@ -12,11 +12,7 @@ public record GoogleLoginRequest(
                 "Google Identity Services에서 받은 ID 토큰. 서비스 토큰이나 Google Access Token이 아닙니다.",
             example = "example-google-id-token",
             format = "password")
-        String idToken,
-    @Schema(description = "신규 주민 가입 시 필수 개인정보 제3자 제공 동의. 기존 회원·운영자는 생략 가능", example = "true")
-        Boolean thirdPartyProvisionAgreed,
-    @Schema(description = "신규 주민 가입 시 필수 진행상태 알림 수신 동의. 기존 회원·운영자는 생략 가능", example = "true")
-        Boolean statusNotificationAgreed) {
+        String idToken) {
   @Override
   public String toString() {
     return "GoogleLoginRequest[REDACTED]";

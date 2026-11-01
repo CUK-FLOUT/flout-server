@@ -35,6 +35,13 @@ public class UserConsent {
   @Column(name = "agreed_at", nullable = false)
   private LocalDateTime agreedAt;
 
+  public void confirm(LocalDateTime time) {
+    if (!agreed) {
+      agreed = true;
+      agreedAt = time;
+    }
+  }
+
   public static UserConsent agree(
       User user, ConsentType type, String version, LocalDateTime agreedAt) {
     UserConsent consent = new UserConsent();

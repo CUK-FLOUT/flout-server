@@ -2,6 +2,7 @@ package com.flout.server.global.security;
 
 import com.flout.server.domain.user.dto.response.LoginResponse;
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.domain.user.service.ConsentService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -17,12 +18,14 @@ public class JwtService {
   private final long expiresIn;
   private final String issuer;
   private final RefreshTokenStore refreshTokens;
+  private final ConsentService consents;
 
   public JwtService(
       JwtEncoder encoder,
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn,
       @Value("${app.jwt.issuer:flout}") String issuer,
-      RefreshTokenStore refreshTokens) {
+      RefreshTokenStore refreshTokens,
+      ConsentService consents) {
     if (expiresIn <= 0 || expiresIn > 86400) {
       throw new IllegalArgumentException("액세스 토큰 유효 시간은 1~86400초여야 합니다.");
     }
@@ -30,6 +33,7 @@ public class JwtService {
     this.expiresIn = expiresIn;
     this.issuer = issuer;
     this.refreshTokens = refreshTokens;
+    this.consents = consents;
   }
 
   @Transactional
@@ -61,6 +65,7 @@ public class JwtService {
         user.getRole(),
         refresh.token(),
         refresh.expiresIn(),
-        refresh.expiresAt());
+        refresh.expiresAt(),
+        consents.requiresConsent(user));
   }
 }

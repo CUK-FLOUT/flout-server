@@ -28,12 +28,11 @@ class SignupConcurrencyTest {
     when(encoder.encode(any())).thenReturn("hash");
     when(users.saveAndFlush(any()))
         .thenThrow(new DataIntegrityViolationException("duplicate", violation));
-    SignupService service = new SignupService(users, consents, encoder, "1.0", "1.0");
+    SignupService service = new SignupService(users, encoder);
     assertThatThrownBy(
             () ->
                 service.signup(
-                    new SignupRequest(
-                        "test@example.com", "password123", "password123", "주민", true, true)))
+                    new SignupRequest("test@example.com", "password123", "password123", "주민")))
         .isInstanceOfSatisfying(
             BaseException.class,
             error ->
