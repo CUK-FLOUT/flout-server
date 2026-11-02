@@ -64,3 +64,20 @@ V16 마이그레이션에서 기존 `SUBMITTED` 신청과 `WAITING` 점검 및 �
 신청 상세·점검 상세·배정·우선점검 상세는 저장된 이름을 사용합니다.
 같은 임시 신청을 재요청할 때 이름이 다르면 기존 임시 신청을 재사용하지 않습니다.
 V33은 기존 신청의 이름을 연결된 계정 이름으로 채웁니다. 이후 계정 이름이 바뀌어도 신청 당시 이름은 유지됩니다.
+
+## 사진 등록 후 점검 ID
+
+`POST /api/resident/applications/{applicationId}/attachments`의 성공 result는 배열에서 객체로 변경됩니다.
+
+```json
+{
+  "inspectionId": 12,
+  "attachments": [
+    { "attachmentId": 5, "filename": "출입구.png", "size": 62267, "contentType": "image/png" }
+  ]
+}
+```
+
+프론트는 사진 목록을 기존 `result` 대신 `result.attachments`에서 읽고, `result.inspectionId`를 후속 점검 요청에 사용합니다.
+신청 생성 응답의 inspectionId는 사진 등록 전에는 null이며, 첫 사진 등록으로 점검이 생성됩니다.
+추가 사진 등록과 같은 Idempotency-Key를 사용한 재시도는 기존에 연결된 동일한 점검 ID를 반환합니다.

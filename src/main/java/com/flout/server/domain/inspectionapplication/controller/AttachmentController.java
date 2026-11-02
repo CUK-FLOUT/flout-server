@@ -2,7 +2,7 @@ package com.flout.server.domain.inspectionapplication.controller;
 
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.domain.inspectionapplication.service.AttachmentService;
-import com.flout.server.domain.inspectionapplication.service.AttachmentService.AttachmentResult;
+import com.flout.server.domain.inspectionapplication.service.AttachmentService.UploadResponse;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,7 +31,7 @@ public class AttachmentController {
   @Operation(
       summary = "현장점검 신청 사진 등록",
       description =
-          "신청 생성 후 반환된 applicationId에 사진을 등록합니다. 첫 사진 등록 성공 시 신청이 접수됩니다. 본인 신청만 가능하며 JPG/JPEG/PNG, 파일당 15MB, 기존 사진 포함 최대 5장입니다.")
+          "신청 생성 후 반환된 applicationId에 사진을 등록합니다. 첫 사진 등록 성공 시 신청이 접수되고 점검이 생성됩니다. 응답의 inspectionId로 이후 점검 API를 호출하며, 등록 사진 목록은 attachments에 반환합니다. 동일 요청 키 재시도에서도 같은 점검 ID를 반환합니다. 본인 신청만 가능하며 JPG/JPEG/PNG, 파일당 15MB, 기존 사진 포함 최대 5장입니다.")
   @ApiResponse(responseCode = "201", description = "사진 등록 완료")
   @ApiResponse(responseCode = "400", description = "사진 형식 또는 개수 오류", content = @Content)
   @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content)
@@ -40,7 +40,7 @@ public class AttachmentController {
   @ApiResponse(responseCode = "409", description = "동일 요청 키의 사진이 다름", content = @Content)
   @ApiResponse(responseCode = "413", description = "요청 용량 초과", content = @Content)
   @ApiResponse(responseCode = "500", description = "사진 저장 실패", content = @Content)
-  public ResponseEntity<SuccessResponse<List<AttachmentResult>>> upload(
+  public ResponseEntity<SuccessResponse<UploadResponse>> upload(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long applicationId,
       @Parameter(description = "재시도 중복 방지 키. 동일 요청의 재시도에 같은 키를 사용합니다 (최대 128자)")

@@ -275,6 +275,14 @@ public class OpenApiConfig {
                               describeInspectionStatus(operation);
                             }
 
+                            if (path.equals("/api/admin/inspections/{inspectionId}/result")
+                                && method == PathItem.HttpMethod.POST) {
+                              addError(
+                                  operation,
+                                  "resultPhotoRequired",
+                                  InspectionErrorCode.RESULT_PHOTO_REQUIRED,
+                                  null);
+                            }
                             if (path.equals("/api/admin/inspections/{inspectionId}/result/draft")
                                 && method == PathItem.HttpMethod.PUT) {
                               describeInspectionResultDraft(operation);
@@ -1359,16 +1367,20 @@ public class OpenApiConfig {
             true,
             code,
             code.getMessage(),
-            List.of(
-                Map.of(
-                    "attachmentId",
-                    1,
-                    "filename",
-                    "photo.jpg",
-                    "size",
-                    12345,
-                    "contentType",
-                    "image/jpeg"))));
+            Map.of(
+                "inspectionId",
+                12,
+                "attachments",
+                List.of(
+                    Map.of(
+                        "attachmentId",
+                        1,
+                        "filename",
+                        "photo.jpg",
+                        "size",
+                        12345,
+                        "contentType",
+                        "image/jpeg")))));
     addError(
         operation, "invalidAttachments", InspectionApplicationErrorCode.INVALID_ATTACHMENTS, null);
     addError(

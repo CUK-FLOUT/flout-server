@@ -34,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional
 class InspectionResultDraftTest {
   @Autowired MockMvc mvc;
+  @Autowired jakarta.persistence.EntityManager entityManager;
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper mapper;
   @Autowired UserRepository users;
@@ -122,6 +123,101 @@ class InspectionResultDraftTest {
     return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
   }
 
+  void completeInspection() throws Exception {
+    mvc.perform(
+            patch("/api/admin/inspections/" + inspectionId + "/status")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"COMPLETED\"}"))
+        .andExpect(status().isOk());
+  }
+
+  void addPhoto() throws Exception {
+    if (jdbc.queryForObject(
+            "SELECT COUNT(*) FROM inspection_results WHERE inspection_id=? AND result_status='DRAFT'",
+            Integer.class,
+            inspectionId)
+        == 0) {
+      save(Map.of()).andExpect(status().isOk());
+    }
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) VALUES(?,?,'현장.png',100,'image/png')",
+        resultId(),
+        "required-photo-" + inspectionId);
+  }
+
+  @Test
+  void rejectsPublishingWithoutFieldPhotoAndPreservesDraftAndStates() throws Exception {
+    completeInspection();
+    var state =
+        jdbc.queryForMap(
+            "SELECT status,updated_at FROM inspections WHERE inspection_id=?", inspectionId);
+    for (boolean draftExists : List.of(false, true)) {
+      if (draftExists) save(full()).andExpect(status().isOk());
+      mvc.perform(
+              post("/api/admin/inspections/" + inspectionId + "/result")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(full())))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("INSPECTION_400_5"));
+      assertThat(count("inspection_results")).isEqualTo(draftExists ? 1 : 0);
+      assertThat(
+              jdbc.queryForMap(
+                  "SELECT status,updated_at FROM inspections WHERE inspection_id=?", inspectionId))
+          .isEqualTo(state);
+      assertThat(count("application_status_histories")).isZero();
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT result_status FROM inspection_results WHERE inspection_id=?",
+                String.class,
+                inspectionId))
+        .isEqualTo("DRAFT");
+  }
+
+  @Test
+  void publishRequiresCompletedInspectionAndDoesNotDuplicateCompletionHistory() throws Exception {
+    for (String state : List.of("RECEIVED", "SCHEDULED", "IN_PROGRESS")) {
+      jdbc.update("UPDATE inspections SET status=? WHERE inspection_id=?", state, inspectionId);
+      entityManager.clear();
+      mvc.perform(
+              post("/api/admin/inspections/" + inspectionId + "/result")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(full())))
+          .andExpect(status().isConflict());
+    }
+    assertThat(count("inspection_results")).isZero();
+    entityManager.clear();
+    completeInspection();
+    addPhoto();
+    var historyCount = count("inspection_status_histories");
+    var completed =
+        jdbc.queryForMap(
+            "SELECT status,updated_at FROM inspections WHERE inspection_id=?", inspectionId);
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(full())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.inspectionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.result.resultStatus").value("PUBLISHED"));
+    assertThat(count("inspection_status_histories")).isEqualTo(historyCount);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status,updated_at FROM inspections WHERE inspection_id=?", inspectionId))
+        .isEqualTo(completed);
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(full())))
+        .andExpect(status().isConflict());
+    assertThat(count("application_status_histories")).isEqualTo(1);
+  }
+
   @Test
   void savesMultipleDescriptionOnlyActionsIndependentlyOfVulnerabilities() throws Exception {
     var body = new HashMap<String, Object>(full());
@@ -145,6 +241,8 @@ class InspectionResultDraftTest {
                 resultId()))
         .isEqualTo(1);
     body.put("recommendedActions", List.of(Map.of("description", "교체한 조치")));
+    completeInspection();
+    addPhoto();
     mvc.perform(
             post("/api/admin/inspections/" + inspectionId + "/result")
                 .header("Authorization", "Bearer " + token)
@@ -172,6 +270,8 @@ class InspectionResultDraftTest {
                   .content(mapper.writeValueAsString(body)))
           .andExpect(status().isBadRequest());
     }
+    completeInspection();
+    addPhoto();
     body.put(
         "recommendedActions",
         List.of(Map.of("description", "첫 조치"), Map.of("description", "추가 조치")));
@@ -419,6 +519,39 @@ class InspectionResultDraftTest {
         "INSERT INTO users(email,password_hash,name,role) VALUES(?,'hash','무관할','ADMIN')", email);
     token = jwt.issue(users.findByEmail(email).orElseThrow()).accessToken();
     save(Map.of()).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void swaggerExamplesUseScreenDataForBothDraftAndPublish() throws Exception {
+    var response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var paths = mapper.readTree(response).get("paths");
+    for (String suffix : List.of("/result/draft", "/result")) {
+      var operation =
+          paths
+              .get("/api/admin/inspections/{inspectionId}" + suffix)
+              .get(suffix.endsWith("draft") ? "put" : "post");
+      var example =
+          operation
+              .get("requestBody")
+              .get("content")
+              .get("application/json")
+              .get("examples")
+              .get("화면 입력 예시")
+              .get("value");
+      assertThat(example.get("summary").asText()).startsWith("출입구가 낮고 배수구 주변에");
+      assertThat(example.get("vulnerabilities").get(0).get("title").asText())
+          .isEqualTo("낮은 출입구 높이");
+      var action = example.get("recommendedActions").get(0);
+      assertThat(action.get("description").asText()).isEqualTo("출입구 물막이판 · 관련 취약지점: 출입구");
+      assertThat(action.has("title")).isFalse();
+      assertThat(action.has("relatedTarget")).isFalse();
+      assertThat(example.get("followUpType").asText()).isEqualTo("INDIVIDUAL_HOUSE");
+    }
   }
 
   @Test

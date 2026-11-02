@@ -69,12 +69,12 @@ public class AttachmentService {
   }
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public List<AttachmentResult> upload(Long userId, Long applicationId, List<MultipartFile> files) {
+  public UploadResponse upload(Long userId, Long applicationId, List<MultipartFile> files) {
     return upload(userId, applicationId, files, null);
   }
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public List<AttachmentResult> upload(
+  public UploadResponse upload(
       Long userId, Long applicationId, List<MultipartFile> files, String requestKey) {
     if (files == null || files.isEmpty() || files.size() > 5) throw invalid();
     if (requestKey != null && !requestKey.matches("[A-Za-z0-9._:-]{1,128}")) throw invalid();
@@ -98,7 +98,7 @@ public class AttachmentService {
     if (storedKey != null) {
       List<AttachmentResult> previous =
           transactions.execute(status -> findPrevious(applicationId, storedKey, requestHash));
-      if (previous != null) return previous;
+      if (previous != null) return uploadResponse(applicationId, previous);
     }
     List<String> attemptedKeys =
         validated.stream()
@@ -158,7 +158,7 @@ public class AttachmentService {
                 return saved;
               });
       cleanup.reconcile(attemptedKeys);
-      return result;
+      return uploadResponse(applicationId, result);
     } catch (RuntimeException e) {
       cleanup.reconcile(attemptedKeys);
       if (e instanceof BaseException baseException) throw baseException;
@@ -166,6 +166,19 @@ public class AttachmentService {
       throw new BaseException(InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED);
     }
   }
+
+  private UploadResponse uploadResponse(Long applicationId, List<AttachmentResult> saved) {
+    Long inspectionId =
+        transactions.execute(
+            status ->
+                inspections
+                    .findByApplicationId(applicationId)
+                    .orElseThrow(() -> new IllegalStateException("접수된 신청에 연결된 점검이 없습니다."))
+                    .getId());
+    return new UploadResponse(inspectionId, saved);
+  }
+
+  public record UploadResponse(Long inspectionId, List<AttachmentResult> attachments) {}
 
   private List<AttachmentResult> findPrevious(Long applicationId, String key, String hash) {
     List<ApplicationAttachment> previous =

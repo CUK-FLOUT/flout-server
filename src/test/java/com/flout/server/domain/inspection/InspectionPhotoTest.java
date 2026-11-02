@@ -241,6 +241,13 @@ class InspectionPhotoTest {
 
   @Test
   void uploadedPhotosFollowSameResultWhenFinallyPublished() throws Exception {
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/admin/inspections/" + inspectionId + "/status")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"status\":\"COMPLETED\"}"))
+        .andExpect(status().isOk());
     upload(token, file("draft.png", png)).andExpect(status().isOk());
     long result = draft();
     long photo =

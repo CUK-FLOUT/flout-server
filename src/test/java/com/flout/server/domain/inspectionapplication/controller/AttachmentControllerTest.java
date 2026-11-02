@@ -73,6 +73,8 @@ class AttachmentControllerTest {
         List.of(
             "attachment_upload_intents",
             "application_attachments",
+            "inspection_status_histories",
+            "inspections",
             "inspection_applications",
             "risk_assessments",
             "users")) jdbc.update("DELETE FROM " + table);
@@ -104,6 +106,8 @@ class AttachmentControllerTest {
         applications
             .saveAndFlush(InspectionApplication.received(user, assessment, request, "ATTACH-TEST"))
             .getId();
+    jdbc.update(
+        "INSERT INTO inspections(application_id,status) VALUES(?, 'RECEIVED')", applicationId);
     png = image("png");
     jpeg = image("jpeg");
   }
@@ -152,7 +156,7 @@ class AttachmentControllerTest {
     submit(token, applicationId, file("one.png", png))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("APPLICATION_201_2"))
-        .andExpect(jsonPath("$.result[0].contentType").value("image/png"));
+        .andExpect(jsonPath("$.result.attachments[0].contentType").value("image/png"));
     submit(
             token,
             applicationId,

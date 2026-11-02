@@ -187,13 +187,29 @@ class InspectionApplicationFlowTest {
                 .file(png())
                 .header("Idempotency-Key", "initial-photo")
                 .header("Authorization", "Bearer " + token))
-        .andExpect(status().isCreated());
+        .andExpect(status().isCreated())
+        .andExpect(
+            jsonPath("$.result.inspectionId")
+                .value(
+                    jdbc.queryForObject(
+                        "SELECT inspection_id FROM inspections WHERE application_id=?",
+                        Long.class,
+                        applicationId)))
+        .andExpect(jsonPath("$.result.attachments[0].attachmentId").isNumber());
     mvc.perform(
             multipart("/api/resident/applications/{id}/attachments", applicationId)
                 .file(png())
                 .header("Idempotency-Key", "initial-photo")
                 .header("Authorization", "Bearer " + token))
-        .andExpect(status().isCreated());
+        .andExpect(status().isCreated())
+        .andExpect(
+            jsonPath("$.result.inspectionId")
+                .value(
+                    jdbc.queryForObject(
+                        "SELECT inspection_id FROM inspections WHERE application_id=?",
+                        Long.class,
+                        applicationId)))
+        .andExpect(jsonPath("$.result.attachments[0].attachmentId").isNumber());
     assertThat(
             jdbc.queryForObject(
                 "SELECT status FROM inspection_applications WHERE application_id=?",

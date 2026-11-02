@@ -33,7 +33,7 @@ public class PublishInspectionResultService {
   private final InspectionResultRepository results;
   private final InspectionVulnerabilityRepository vulnerabilities;
   private final PreventionRecommendationRepository recommendations;
-  private final InspectionStatusHistoryRepository histories;
+  private final InspectionResultPhotoRepository photos;
   private final Clock inspectionClock;
   private final ApplicationStatusHistoryRepository applicationStatusHistories;
 
@@ -68,8 +68,8 @@ public class PublishInspectionResultService {
       throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
     }
 
-    // 진행 중인 점검만 공개 가능
-    if (inspection.getStatus() != InspectionStatus.IN_PROGRESS) {
+    // PATCH 상태 변경으로 완료된 점검만 공개 가능
+    if (inspection.getStatus() != InspectionStatus.COMPLETED) {
       throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
     }
 
@@ -80,11 +80,14 @@ public class PublishInspectionResultService {
       throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
     }
 
-    // 기존 임시저장 결과 조회 또는 새 결과 생성, 저장
+    // 공개할 초안에 등록된 현장사진이 있어야 함
     InspectionResult result =
         results
             .findByInspectionIdAndResultStatus(inspectionId, ResultStatus.DRAFT)
-            .orElseGet(() -> InspectionResult.draft(inspection));
+            .orElseThrow(() -> new BaseException(InspectionErrorCode.RESULT_PHOTO_REQUIRED));
+    if (!photos.existsByResultId(result.getId())) {
+      throw new BaseException(InspectionErrorCode.RESULT_PHOTO_REQUIRED);
+    }
 
     result.updateContent(request.summary(), request.followUpType().name(), request.internalMemo());
 
@@ -118,14 +121,12 @@ public class PublishInspectionResultService {
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     result.publish(now);
 
-    InspectionStatus previous = inspection.getStatus();
-    inspection.changeStatus(InspectionStatus.COMPLETED, now);
     inspection.getApplication().completeInspection();
 
     applicationStatusHistories.save(
         ApplicationStatusHistory.inspectionCompleted(inspection.getApplication()));
 
-    histories.saveAndFlush(InspectionStatusHistory.changed(inspection, previous, operator, now));
+    results.flush();
 
     return new PublishInspectionResultResponse(
         inspection.getId(),

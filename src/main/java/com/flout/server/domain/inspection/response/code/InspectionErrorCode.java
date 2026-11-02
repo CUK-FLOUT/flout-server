@@ -17,6 +17,7 @@ public enum InspectionErrorCode implements BaseResponseCode {
   PAST_VISIT_TIME(400, "INSPECTION_400_2", "확정 방문 일시는 현재 이후로 입력해주세요."),
   INVALID_PHOTOS(400, "INSPECTION_400_3", "JPG, JPEG, PNG 형식의 유효한 사진만 업로드할 수 있습니다."),
   EMPTY_PHOTOS(400, "INSPECTION_400_4", "업로드할 사진을 선택해주세요."),
+  RESULT_PHOTO_REQUIRED(400, "INSPECTION_400_5", "점검 결과를 공개하려면 현장사진을 최소 1장 등록해주세요."),
   PHOTO_UPLOAD_FAILED(500, "INSPECTION_500_1", "현장점검 사진 등록에 실패했습니다.");
 
   private final int status;
