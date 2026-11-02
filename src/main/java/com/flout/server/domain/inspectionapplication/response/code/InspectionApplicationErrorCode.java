@@ -31,6 +31,7 @@ public enum InspectionApplicationErrorCode implements BaseResponseCode {
   JURISDICTION_READ_ACCESS_DENIED(403, "APPLICATION_403_4", "본인 관할 지역의 신청만 조회할 수 있습니다."),
 
   APPLICATION_ACCESS_DENIED(403, "APPLICATION_403_5", "본인의 신청서에만 사진을 등록할 수 있습니다."),
+  APPLICATION_DETAIL_ACCESS_DENIED(403, "APPLICATION_403_6", "본인의 신청서만 조회할 수 있습니다."),
   INVALID_ATTACHMENTS(400, "APPLICATION_400_4", "사진은 신청서당 최대 5장, 파일당 15MB 이하의 JPG 또는 PNG여야 합니다."),
   ATTACHMENT_UPLOAD_FAILED(500, "APPLICATION_500_2", "사진 등록에 실패했습니다."),
   ATTACHMENT_READ_FAILED(500, "APPLICATION_500_3", "첨부사진 조회에 실패했습니다."),

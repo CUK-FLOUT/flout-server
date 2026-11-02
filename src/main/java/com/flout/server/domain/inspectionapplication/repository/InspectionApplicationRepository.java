@@ -21,6 +21,10 @@ public interface InspectionApplicationRepository
   @Query("select a from InspectionApplication a where a.id = :applicationId")
   Optional<InspectionApplication> findForAdminDetail(@Param("applicationId") Long applicationId);
 
+  @EntityGraph(attributePaths = {"applicant", "assessment"})
+  @Query("select a from InspectionApplication a where a.id = :applicationId")
+  Optional<InspectionApplication> findForResidentDetail(@Param("applicationId") Long applicationId);
+
   // 상세 패널에 필요한 신청자와 분석 결과 함께 조회
   @EntityGraph(attributePaths = {"applicant", "assessment"})
   @Query("select a from InspectionApplication a where a.id = :applicationId")

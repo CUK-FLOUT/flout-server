@@ -219,6 +219,11 @@ public class OpenApiConfig {
                               describeInspectionApplication(operation);
                             }
 
+                            if (path.equals("/api/resident/applications/{applicationId}")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeResidentApplicationDetail(operation);
+                            }
+
                             if (path.equals("/api/admin/applications/{applicationId}")
                                 && method == PathItem.HttpMethod.GET) {
                               describeApplicationDetail(operation);
@@ -1072,6 +1077,45 @@ public class OpenApiConfig {
   }
 
   // GIS 신청 응답 예시와 ID·관할 오류 문서화
+  private void describeResidentApplicationDetail(Operation operation) {
+    var code = InspectionApplicationSuccessCode.DETAIL_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("applicationId", 1);
+    result.put("receiptNumber", "000001");
+    result.put("applicant", Map.of("name", "김주민", "phone", "010-1234-1234"));
+    result.put("address", "경기도 부천시 원미구 길주로 53");
+    result.put("detailAddress", "101호");
+    result.put("occupancyType", "TENANT");
+    result.put("floodExperience", "YES");
+    result.put("inflowLocations", List.of("DRAIN"));
+    result.put("existingFacility", true);
+    result.put("requestReason", "점검 요청");
+    result.put("preferredVisitDate", "2026-11-03");
+    result.put("preferredTimeSlot", "MORNING");
+    result.put("attachmentCount", 1);
+    result.put("applicationStatus", "RECEIVED");
+    result.put("inspectionStatus", "RECEIVED");
+    result.put("resultPublished", false);
+    result.put("createdAt", "2026-10-21T22:30:00");
+    addExample(
+        success, "residentApplicationDetail", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
   private void describeApplicationDetail(Operation operation) {
     var code = InspectionApplicationSuccessCode.DETAIL_FOUND;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
