@@ -158,6 +158,45 @@ class InspectionApplicationFlowTest {
   }
 
   @Test
+  void inspectionLookupFailureRollsBackPhotoAndReceiptAndRetryDoesNotDuplicate() throws Exception {
+    var response =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    long applicationId = mapper.readTree(response).get("result").get("applicationId").asLong();
+    doThrow(new org.springframework.dao.DataAccessResourceFailureException("lookup failed"))
+        .when(inspections)
+        .findByApplicationId(applicationId);
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", applicationId)
+                .file(png())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isInternalServerError());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_attachments", Long.class))
+        .isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_status_histories", Long.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM inspection_applications WHERE application_id=?",
+                String.class,
+                applicationId))
+        .isEqualTo("DRAFT");
+    reset(inspections);
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", applicationId)
+                .file(png())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.inspectionId").isNumber())
+        .andExpect(jsonPath("$.result.attachments.length()").value(1));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_attachments", Long.class))
+        .isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_status_histories", Long.class))
+        .isEqualTo(1);
+  }
+
+  @Test
   void submissionCreatesDraftAndPhotoUploadReceivesIt() throws Exception {
     var response =
         submit()
