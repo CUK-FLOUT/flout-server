@@ -11,4 +11,10 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       @org.springframework.data.repository.query.Param("id") Long id);
 
   boolean existsByApplicationIdAndProgramId(Long applicationId, Long programId);
+
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @org.springframework.data.jpa.repository.Query(
+      "select a from SupportApplication a where a.id = :id")
+  java.util.Optional<SupportApplication> findForApproval(
+      @org.springframework.data.repository.query.Param("id") Long id);
 }
