@@ -12,6 +12,7 @@ import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
+import com.flout.server.domain.supportapplication.response.code.SupportAttachmentErrorCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -195,6 +196,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
+                            }
+                            if (path.equals(
+                                    "/api/resident/support-applications/{supportApplicationId}/attachments")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeSupportAttachment(operation);
                             }
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
@@ -1392,6 +1398,70 @@ public class OpenApiConfig {
         "attachmentUploadFailed",
         InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED,
         null);
+  }
+
+  private void describeSupportAttachment(Operation operation) {
+    operation.setRequestBody(
+        new io.swagger.v3.oas.models.parameters.RequestBody()
+            .required(true)
+            .content(
+                new Content()
+                    .addMediaType(
+                        "multipart/form-data",
+                        new MediaType()
+                            .schema(
+                                new ObjectSchema()
+                                    .addProperty(
+                                        "file",
+                                        new StringSchema()
+                                            .format("binary")
+                                            .description("PDF/JPG/JPEG/PNG, 최대 15 MiB"))
+                                    .required(List.of("file"))))));
+    operation.getResponses().remove("200");
+    var code = SupportApplicationSuccessCode.ATTACHMENT_SUBMITTED;
+    var success = operation.getResponses().computeIfAbsent("201", k -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "evidenceSubmitted",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "attachmentId",
+                1,
+                "supportApplicationId",
+                1,
+                "attachmentType",
+                "OWNERSHIP_PROOF",
+                "fileName",
+                "ownership.pdf",
+                "size",
+                12345,
+                "contentType",
+                "application/pdf",
+                "submittedAt",
+                "2026-11-02T15:00:00+09:00")));
+    for (var error : SupportAttachmentErrorCode.values())
+      addError(operation, error.name(), error, null);
+    addError(operation, "invalidMultipart", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "residentOnly",
+        com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode
+            .RESIDENT_ONLY,
+        null);
+    addError(operation, "tooLarge", GeneralErrorCode.PAYLOAD_TOO_LARGE, null);
+    operation.getResponses().get("413").setDescription("업로드 허용 용량 초과(파일당 최대 15 MiB).");
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponse", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription("동일한 유형의 증빙서류를 이미 제출했습니다. 재제출·교체는 지원하지 않습니다.");
   }
 
   private void describeSupportApplication(Operation operation) {

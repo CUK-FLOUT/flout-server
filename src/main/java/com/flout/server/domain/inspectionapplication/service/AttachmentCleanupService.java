@@ -67,8 +67,10 @@ public class AttachmentCleanupService {
               Long count =
                   jdbc.queryForObject(
                       "SELECT (SELECT COUNT(*) FROM application_attachments WHERE object_key = ?)"
-                          + " + (SELECT COUNT(*) FROM inspection_result_photos WHERE object_key = ?)",
+                          + " + (SELECT COUNT(*) FROM inspection_result_photos WHERE object_key = ?)"
+                          + " + (SELECT COUNT(*) FROM support_attachments WHERE object_key = ?)",
                       Long.class,
+                      key,
                       key,
                       key);
               if (count == 0) {
