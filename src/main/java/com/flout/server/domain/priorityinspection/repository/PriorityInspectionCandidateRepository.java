@@ -23,7 +23,7 @@ public class PriorityInspectionCandidateRepository {
       FROM inspection_applications a
       JOIN risk_assessments r ON r.assessment_id = a.assessment_id
       LEFT JOIN priority_inspection_designations d ON d.application_id = a.application_id
-      WHERE TRIM(a.address) REGEXP :region
+      WHERE a.status <> 'DRAFT' AND TRIM(a.address) REGEXP :region
         AND NOT EXISTS (
           SELECT 1 FROM inspections i
           WHERE i.application_id = a.application_id AND i.status = 'COMPLETED')
@@ -127,13 +127,14 @@ public class PriorityInspectionCandidateRepository {
         SELECT a.application_id, COUNT(b.application_id) AS nearby_count
         FROM inspection_applications a
         LEFT JOIN inspection_applications b ON b.application_id <> a.application_id
+          AND b.status <> 'DRAFT'
           AND TRIM(b.address) REGEXP :jurisdiction
           AND 6371000.0 * 2 * ASIN(SQRT(LEAST(1.0, GREATEST(0.0,
             POWER(SIN(RADIANS(b.latitude - a.latitude) / 2), 2)
             + COS(RADIANS(a.latitude)) * COS(RADIANS(b.latitude))
             * POWER(SIN(RADIANS(b.longitude - a.longitude) / 2), 2)
           )))) <= :radius
-        WHERE a.application_id IN (:ids)
+        WHERE a.application_id IN (:ids) AND a.status <> 'DRAFT'
         GROUP BY a.application_id
         """,
             params,

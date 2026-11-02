@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.inspection.repository.InspectionRepository;
+import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.inspectionapplication.service.ReceiptNumberGenerator;
 import com.flout.server.domain.riskassessment.entity.*;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
@@ -24,6 +25,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
@@ -45,6 +48,7 @@ class InspectionApplicationFlowTest {
   @Autowired ObjectMapper mapper;
   @MockitoSpyBean InspectionRepository inspections;
   @MockitoSpyBean ReceiptNumberGenerator receiptNumbers;
+  @MockitoBean AttachmentStorage storage;
   Long assessmentId;
   String token;
 
@@ -53,6 +57,8 @@ class InspectionApplicationFlowTest {
   void setup() {
     for (String table :
         List.of(
+            "attachment_upload_intents",
+            "application_attachments",
             "inspection_status_histories",
             "inspections",
             "application_inflow_locations",
@@ -111,13 +117,13 @@ class InspectionApplicationFlowTest {
   }
 
   @Test
-  void submissionImmediatelyReceivesApplicationAndCreatesUsableReceivedInspection()
-      throws Exception {
+  void submissionCreatesDraftAndPhotoUploadReceivesIt() throws Exception {
     var response =
         submit()
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.result.status").value("RECEIVED"))
-            .andExpect(jsonPath("$.result.inspectionId").isNumber())
+            .andExpect(jsonPath("$.result.status").value("DRAFT"))
+            .andExpect(jsonPath("$.result.inspectionId").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.nullValue()))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -125,14 +131,47 @@ class InspectionApplicationFlowTest {
     Long applicationId = result.get("applicationId").asLong();
     assertThat(result.get("receiptNo").asText())
         .isEqualTo(String.format(java.util.Locale.ROOT, "%06d", applicationId));
-    Long inspectionId = result.get("inspectionId").asLong();
     var application =
         jdbc.queryForMap(
             "SELECT address, detail_address FROM inspection_applications WHERE application_id = ?",
             applicationId);
     assertThat(application.get("address")).isEqualTo("경기도 부천시 원미구 길주로 211");
     assertThat(application.get("detail_address")).isEqualTo("202호");
-    var row = jdbc.queryForMap("SELECT * FROM inspections WHERE inspection_id = ?", inspectionId);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_status_histories", Long.class))
+        .isZero();
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", applicationId)
+                .file(png())
+                .header("Idempotency-Key", "initial-photo")
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isCreated());
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", applicationId)
+                .file(png())
+                .header("Idempotency-Key", "initial-photo")
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isCreated());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM inspection_applications WHERE application_id=?",
+                String.class,
+                applicationId))
+        .isEqualTo("RECEIVED");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inspections WHERE application_id=?",
+                Long.class,
+                applicationId))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM application_status_histories WHERE application_id=?",
+                Long.class,
+                applicationId))
+        .isEqualTo(1);
+    var row = jdbc.queryForMap("SELECT * FROM inspections WHERE application_id = ?", applicationId);
+    Long inspectionId = ((Number) row.get("inspection_id")).longValue();
     assertThat(((Number) row.get("application_id")).longValue()).isEqualTo(applicationId);
     assertThat(row.get("status")).isEqualTo("RECEIVED");
     assertThat(row.get("scheduled_at")).isNull();
@@ -182,28 +221,178 @@ class InspectionApplicationFlowTest {
 
   // 점검 생성 실패 시 신청 롤백
   @Test
-  void inspectionFailureRollsBackApplicationLocationsAndHistory() throws Exception {
+  void inspectionFailureDuringUploadLeavesDraftAndRollsBackPhotos() throws Exception {
     doThrow(new IllegalStateException("simulated inspection persistence failure"))
         .when(inspections)
         .saveAndFlush(any());
-    submit().andExpect(status().isInternalServerError());
+    var response =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    long id = mapper.readTree(response).path("result").path("applicationId").asLong();
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", id)
+                .file(png())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isInternalServerError());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo("DRAFT");
     for (String table :
-        List.of(
-            "inspection_applications",
-            "application_inflow_locations",
-            "application_status_histories",
-            "inspections")) {
+        List.of("application_attachments", "application_status_histories", "inspections")) {
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class)).isZero();
     }
   }
 
   @Test
-  void duplicateSubmissionReturnsConflict() throws Exception {
-    submit().andExpect(status().isCreated());
-    submit().andExpect(status().isConflict());
+  void duplicateDraftSubmissionReturnsSameDraft() throws Exception {
+    var first =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    var second =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    assertThat(mapper.readTree(first).path("result").path("applicationId").asLong())
+        .isEqualTo(mapper.readTree(second).path("result").path("applicationId").asLong());
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
         .isEqualTo(1);
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
+    var changed = request();
+    changed.put("contact", "010-9999-9999");
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(changed)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("APPLICATION_409_4"));
+  }
+
+  @Test
+  void concurrentFirstUploadsCreateOneReceptionAndOneInspection() throws Exception {
+    var response =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    long id = mapper.readTree(response).path("result").path("applicationId").asLong();
+    var barrier = new java.util.concurrent.CyclicBarrier(2);
+    doAnswer(
+            invocation -> {
+              barrier.await(10, java.util.concurrent.TimeUnit.SECONDS);
+              return null;
+            })
+        .when(storage)
+        .upload(anyString(), any(), anyString());
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      java.util.concurrent.Callable<Integer> upload =
+          () ->
+              mvc.perform(
+                      multipart("/api/resident/applications/{id}/attachments", id)
+                          .file(png())
+                          .header("Authorization", "Bearer " + token))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
+      var first = executor.submit(upload);
+      var second = executor.submit(upload);
+      assertThat(
+              List.of(
+                  first.get(30, java.util.concurrent.TimeUnit.SECONDS),
+                  second.get(30, java.util.concurrent.TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(201, 201);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM application_attachments WHERE application_id=?",
+                  Long.class,
+                  id))
+          .isEqualTo(2);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM application_status_histories WHERE application_id=?",
+                  Long.class,
+                  id))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM inspections WHERE application_id=?", Long.class, id))
+          .isEqualTo(1);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void storageFailureAndOtherResidentCannotReceiveDraft() throws Exception {
+    var response =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    long id = mapper.readTree(response).path("result").path("applicationId").asLong();
+    var other = users.saveAndFlush(User.resident("other-flow@example.com", "hash", "다른 주민"));
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", id)
+                .file(png())
+                .header("Authorization", "Bearer " + jwt.issue(other).accessToken()))
+        .andExpect(status().isForbidden());
+    doThrow(new IllegalStateException("S3 failure"))
+        .when(storage)
+        .upload(anyString(), any(), anyString());
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", id)
+                .file(png())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isInternalServerError());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo("DRAFT");
+    for (String table :
+        List.of("application_attachments", "application_status_histories", "inspections"))
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class)).isZero();
+  }
+
+  @Test
+  void draftIsExcludedFromAdminDetailAndPriorityCandidates() throws Exception {
+    var response =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    long id = mapper.readTree(response).path("result").path("applicationId").asLong();
+    mvc.perform(
+            get("/api/resident/applications/{id}", id).header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applicationStatus").value("DRAFT"))
+        .andExpect(jsonPath("$.result.inspectionStatus").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.resultPublished").value(false));
+    jdbc.update(
+        "INSERT INTO users(email,password_hash,name,role,jurisdiction_id) VALUES ('flow-admin@example.com','hash','운영자','ADMIN',(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시'))");
+    var admin = users.findByEmail("flow-admin@example.com").orElseThrow();
+    String adminToken = jwt.issue(admin).accessToken();
+    mvc.perform(
+            get("/api/admin/applications/{id}", id).header("Authorization", "Bearer " + adminToken))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            get("/api/admin/priority-inspections/{id}", id)
+                .header("Authorization", "Bearer " + adminToken))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            get("/api/admin/priority-inspections").header("Authorization", "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+    jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) SELECT user_id,address,detail_address,risk_level,status FROM risk_assessments WHERE assessment_id=?",
+        assessmentId);
+    Long anotherAssessment =
+        jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_applications(applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) SELECT applicant_user_id,?,'IA-RECEIVED-NEARBY',address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,'RECEIVED' FROM inspection_applications WHERE application_id=?",
+        anotherAssessment,
+        id);
+    mvc.perform(
+            get("/api/admin/priority-inspections").header("Authorization", "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(0));
+    jdbc.update("INSERT INTO inspections(application_id,status) VALUES (?, 'RECEIVED')", id);
+    mvc.perform(get("/api/admin/inspections").header("Authorization", "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
   }
 
   @Test
@@ -241,12 +430,21 @@ class InspectionApplicationFlowTest {
               List.of(
                   first.get(30, java.util.concurrent.TimeUnit.SECONDS),
                   second.get(30, java.util.concurrent.TimeUnit.SECONDS)))
-          .containsExactlyInAnyOrder(201, 409);
+          .containsExactlyInAnyOrder(201, 201);
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
           .isEqualTo(1);
-      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isEqualTo(1);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
     } finally {
       executor.shutdownNow();
     }
+  }
+
+  private MockMultipartFile png() throws Exception {
+    var bytes = new java.io.ByteArrayOutputStream();
+    javax.imageio.ImageIO.write(
+        new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB),
+        "png",
+        bytes);
+    return new MockMultipartFile("files", "photo.png", "image/png", bytes.toByteArray());
   }
 }

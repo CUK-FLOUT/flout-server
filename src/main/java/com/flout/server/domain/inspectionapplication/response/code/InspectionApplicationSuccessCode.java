@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum InspectionApplicationSuccessCode implements BaseResponseCode {
-  INSPECTION_APPLICATION_CREATED(CREATED, "APPLICATION_201_1", "현장점검 신청이 완료되었습니다."),
+  INSPECTION_APPLICATION_CREATED(
+      CREATED, "APPLICATION_201_1", "현장점검 신청이 임시 저장되었습니다. 사진 등록 후 접수됩니다."),
   ATTACHMENTS_CREATED(CREATED, "APPLICATION_201_2", "사진이 등록되었습니다."),
   INTERNAL_MEMO_SAVED(200, "APPLICATION_200_1", "내부 메모가 저장되었습니다."),
   DETAIL_FOUND(200, "APPLICATION_200_2", "현장점검 신청 상세정보를 조회했습니다."),

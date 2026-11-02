@@ -35,7 +35,7 @@ public class InternalMemoService {
     }
     var application =
         applications
-            .findById(applicationId)
+            .findForAdminDetail(applicationId)
             .orElseThrow(
                 () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
     // 부천시 행정구역 일치 여부 확인

@@ -25,7 +25,7 @@ public class InspectionApplicationController {
   @Operation(
       summary = "현장점검 신청",
       description =
-          "완료된 본인 침수 위험도 분석 결과를 기반으로 현장점검을 신청합니다. 신청 주소, 연락처, 거주 형태, 침수 경험, 침수 유입 위치, 기존 침수방지시설 여부 및 요청 사유 등을 입력받아 현장점검 신청과 점검을 RECEIVED(접수) 상태로 생성합니다.")
+          "완료된 본인 침수 위험도 분석 결과를 기반으로 신청 정보를 DRAFT로 저장합니다. 사진 업로드 성공 시 접수 및 점검이 생성됩니다. 동일한 임시 신청 요청은 기존 신청을 반환합니다.")
   public ResponseEntity<SuccessResponse<CreateInspectionApplicationResponse>> submit(
       @AuthenticationPrincipal Jwt jwt,
       @Valid @RequestBody CreateInspectionApplicationRequest request) {

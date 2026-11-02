@@ -78,10 +78,6 @@ public class InspectionApplicationService {
       throw new BaseException(InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED);
     }
 
-    if (applications.existsByAssessmentId(assessment.getId())) {
-      throw new BaseException(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
-    }
-
     if (request.guideId() != null
         && !guides.existsByIdAndAssessmentId(request.guideId(), assessment.getId())) {
       throw new BaseException(InspectionApplicationErrorCode.GUIDE_NOT_FOUND);
@@ -112,6 +108,9 @@ public class InspectionApplicationService {
             request.preferredTimeSlot(),
             request.inflowLocations());
 
+    if (applications.existsByAssessmentId(assessment.getId())) {
+      return submissionTransaction.reuseDraft(applicant.getId(), normalizedRequest);
+    }
     return submitWithReceiptNumberRetry(applicant, assessment, normalizedRequest);
   }
 
@@ -144,7 +143,7 @@ public class InspectionApplicationService {
         // 저장 전 접수번호 중복 감지
       } catch (DataIntegrityViolationException e) {
         if (isUniqueConstraintViolation(e, ASSESSMENT_UNIQUE_CONSTRAINT)) {
-          throw new BaseException(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+          return submissionTransaction.reuseDraft(applicant.getId(), request);
         }
         if (!isUniqueConstraintViolation(e, RECEIPT_NUMBER_UNIQUE_CONSTRAINT)) {
           throw e;

@@ -1263,6 +1263,12 @@ public class OpenApiConfig {
     }
     success.setDescription(
         InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage());
+    var draft = new LinkedHashMap<String, Object>();
+    draft.put("applicationId", 1);
+    draft.put("inspectionId", null);
+    draft.put("receiptNo", "000001");
+    draft.put("status", "DRAFT");
+    draft.put("submittedAt", null);
     addExample(
         success,
         "inspectionApplicationCreated",
@@ -1270,17 +1276,7 @@ public class OpenApiConfig {
             true,
             InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED,
             InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage(),
-            Map.of(
-                "applicationId",
-                1,
-                "inspectionId",
-                1,
-                "receiptNo",
-                "000001",
-                "status",
-                "RECEIVED",
-                "submittedAt",
-                "2026-10-28T10:30:00")));
+            draft));
     operation.getResponses().addApiResponse("201", success);
 
     addError(
@@ -1323,7 +1319,15 @@ public class OpenApiConfig {
         "duplicateAssessmentApplication",
         InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION,
         null);
-    operation.getResponses().get("409").setDescription("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했습니다.");
+    addError(
+        operation,
+        "draftRequestMismatch",
+        InspectionApplicationErrorCode.DRAFT_REQUEST_MISMATCH,
+        null);
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했거나 기존 임시 신청과 요청 내용이 다릅니다.");
     addError(
         operation,
         "receiptNumberGenerationFailed",

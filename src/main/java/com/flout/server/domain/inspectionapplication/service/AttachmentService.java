@@ -1,8 +1,13 @@
 package com.flout.server.domain.inspectionapplication.service;
 
+import com.flout.server.domain.inspection.entity.Inspection;
+import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspectionapplication.entity.ApplicationAttachment;
+import com.flout.server.domain.inspectionapplication.entity.ApplicationStatusHistory;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
+import com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus;
 import com.flout.server.domain.inspectionapplication.repository.ApplicationAttachmentRepository;
+import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.user.entity.UserRole;
@@ -41,6 +46,8 @@ public class AttachmentService {
   private final ApplicationAttachmentRepository attachments;
   private final AttachmentStorage storage;
   private final AttachmentCleanupService cleanup;
+  private final InspectionRepository inspections;
+  private final ApplicationStatusHistoryRepository histories;
   private final TransactionTemplate transactions;
 
   public AttachmentService(
@@ -48,11 +55,15 @@ public class AttachmentService {
       ApplicationAttachmentRepository attachments,
       AttachmentStorage storage,
       AttachmentCleanupService cleanup,
+      InspectionRepository inspections,
+      ApplicationStatusHistoryRepository histories,
       PlatformTransactionManager transactionManager) {
     this.applications = applications;
     this.attachments = attachments;
     this.storage = storage;
     this.cleanup = cleanup;
+    this.inspections = inspections;
+    this.histories = histories;
     this.transactions = new TransactionTemplate(transactionManager);
     this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -138,6 +149,11 @@ public class AttachmentService {
                       new AttachmentResult(
                           attachment.getId(), file.filename(), file.size(), file.contentType()));
                   cleanup.completed(key);
+                }
+                if (application.getStatus() == InspectionApplicationStatus.DRAFT) {
+                  application.receive();
+                  histories.save(ApplicationStatusHistory.received(application));
+                  inspections.saveAndFlush(Inspection.received(application));
                 }
                 return saved;
               });

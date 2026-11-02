@@ -38,7 +38,17 @@ class AttachmentServiceTest {
     when(application.getApplicant()).thenReturn(user);
     when(applications.findById(10L)).thenReturn(Optional.of(application));
     when(manager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
-    var service = new AttachmentService(applications, attachments, storage, cleanup, manager);
+    var service =
+        new AttachmentService(
+            applications,
+            attachments,
+            storage,
+            cleanup,
+            mock(com.flout.server.domain.inspection.repository.InspectionRepository.class),
+            mock(
+                com.flout.server.domain.inspectionapplication.repository
+                    .ApplicationStatusHistoryRepository.class),
+            manager);
     var data = new ByteArrayOutputStream();
     ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", data);
     for (int[] dimensions :
@@ -107,7 +117,17 @@ class AttachmentServiceTest {
     ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", data);
     var file = new MockMultipartFile("files", "photo.png", "image/png", data.toByteArray());
 
-    var service = new AttachmentService(applications, attachments, storage, cleanup, manager);
+    var service =
+        new AttachmentService(
+            applications,
+            attachments,
+            storage,
+            cleanup,
+            mock(com.flout.server.domain.inspection.repository.InspectionRepository.class),
+            mock(
+                com.flout.server.domain.inspectionapplication.repository
+                    .ApplicationStatusHistoryRepository.class),
+            manager);
     assertThatThrownBy(() -> service.upload(1L, 10L, List.of(file)))
         .isInstanceOf(BaseException.class);
     var key = org.mockito.ArgumentCaptor.forClass(String.class);

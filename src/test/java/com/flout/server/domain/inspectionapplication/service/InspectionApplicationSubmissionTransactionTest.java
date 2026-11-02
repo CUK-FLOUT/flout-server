@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.flout.server.domain.inspection.entity.Inspection;
-import com.flout.server.domain.inspection.entity.InspectionStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.entity.*;
@@ -40,7 +38,7 @@ class InspectionApplicationSubmissionTransactionTest {
   @InjectMocks InspectionApplicationSubmissionTransaction transaction;
 
   @Test
-  void savesMultipleInflowLocationsAndInitialStatusHistory() {
+  void savesDraftAndLocationsWithoutCreatingInspectionOrHistory() {
     User applicant = User.resident("resident@example.com", "hash", "Resident");
     ReflectionTestUtils.setField(applicant, "id", 1L);
     RiskAssessment assessment =
@@ -57,33 +55,19 @@ class InspectionApplicationSubmissionTransactionTest {
               return application;
             });
 
-    when(inspections.saveAndFlush(any()))
-        .thenAnswer(
-            invocation -> {
-              Inspection inspection = invocation.getArgument(0);
-              ReflectionTestUtils.setField(inspection, "id", 200L);
-              return inspection;
-            });
     var response = transaction.create(applicant, assessment, request());
 
     assertThat(response.applicationId()).isEqualTo(100L);
-    assertThat(response.inspectionId()).isEqualTo(200L);
+    assertThat(response.inspectionId()).isNull();
     assertThat(response.receiptNo()).isEqualTo("000100");
-    assertThat(response.status()).isEqualTo(InspectionApplicationStatus.RECEIVED);
-    var inspection = ArgumentCaptor.forClass(Inspection.class);
-    verify(inspections).saveAndFlush(inspection.capture());
-    assertThat(inspection.getValue().getApplication().getId()).isEqualTo(100L);
-    assertThat(inspection.getValue().getStatus()).isEqualTo(InspectionStatus.RECEIVED);
-    assertThat(inspection.getValue().getScheduledAt()).isNull();
+    assertThat(response.status()).isEqualTo(InspectionApplicationStatus.DRAFT);
+    assertThat(response.submittedAt()).isNull();
+    verifyNoInteractions(inspections, statusHistories);
     ArgumentCaptor<List<ApplicationInflowLocation>> locations = ArgumentCaptor.forClass(List.class);
     verify(inflowLocations).saveAll(locations.capture());
     assertThat(locations.getValue())
         .extracting(ApplicationInflowLocation::getInflowLocation)
         .containsExactly(InflowLocation.WINDOW, InflowLocation.DRAIN);
-    ArgumentCaptor<ApplicationStatusHistory> history =
-        ArgumentCaptor.forClass(ApplicationStatusHistory.class);
-    verify(statusHistories).save(history.capture());
-    assertThat(history.getValue().getStatus()).isEqualTo(InspectionApplicationStatus.RECEIVED);
   }
 
   @Test

@@ -178,7 +178,7 @@ class OpenApiConfigTest {
     assertThat(responses.get("403").getDescription()).isEqualTo("취약도 분석 결과에 대한 접근 권한이 없습니다.");
     assertThat(responses.get("404").getDescription()).isEqualTo("취약도 분석 결과를 찾을 수 없습니다.");
     assertThat(responses.get("409").getDescription())
-        .isEqualTo("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했습니다.");
+        .isEqualTo("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했거나 기존 임시 신청과 요청 내용이 다릅니다.");
     assertExampleMessage(responses, "403", "assessmentAccessDenied", "본인의 취약도 분석 결과만 사용할 수 있습니다.");
     assertExampleMessage(responses, "404", "assessmentNotFound", "취약도 분석 결과를 찾을 수 없습니다.");
     assertExampleMessage(
@@ -208,7 +208,8 @@ class OpenApiConfigTest {
         java.util.Map.of(
             "assessmentNotCompleted", InspectionApplicationErrorCode.ASSESSMENT_NOT_COMPLETED,
             "duplicateAssessmentApplication",
-                InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
+                InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION,
+            "draftRequestMismatch", InspectionApplicationErrorCode.DRAFT_REQUEST_MISMATCH);
     assertThat(examples).containsKeys(expected.keySet().toArray(String[]::new));
     expected.forEach(
         (name, code) ->

@@ -31,7 +31,7 @@ public class AttachmentController {
   @Operation(
       summary = "현장점검 신청 사진 등록",
       description =
-          "신청 생성 후 반환된 applicationId에 사진을 등록합니다. 본인 신청만 가능하며 JPG/JPEG/PNG, 파일당 15MB, 기존 사진 포함 최대 5장입니다.")
+          "신청 생성 후 반환된 applicationId에 사진을 등록합니다. 첫 사진 등록 성공 시 신청이 접수됩니다. 본인 신청만 가능하며 JPG/JPEG/PNG, 파일당 15MB, 기존 사진 포함 최대 5장입니다.")
   @ApiResponse(responseCode = "201", description = "사진 등록 완료")
   @ApiResponse(responseCode = "400", description = "사진 형식 또는 개수 오류", content = @Content)
   @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content)
