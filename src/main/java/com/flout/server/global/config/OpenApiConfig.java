@@ -10,6 +10,8 @@ import com.flout.server.domain.priorityinspection.response.code.PriorityInspecti
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
+import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
+import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -189,6 +191,10 @@ public class OpenApiConfig {
                             if (path.equals("/api/admin/public-issues")
                                 && method == PathItem.HttpMethod.POST) {
                               describePublicIssueRegistration(operation);
+                            }
+                            if (path.equals("/api/resident/support-applications")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeSupportApplication(operation);
                             }
                             if (path.equals("/api/resident/addresses/search")) {
                               describeAddressSearch(operation);
@@ -1386,6 +1392,56 @@ public class OpenApiConfig {
         "attachmentUploadFailed",
         InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED,
         null);
+  }
+
+  private void describeSupportApplication(Operation operation) {
+    operation.getResponses().remove("200");
+    var code = SupportApplicationSuccessCode.SUBMITTED;
+    var success = operation.getResponses().computeIfAbsent("201", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "submitted",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "supportApplicationId",
+                201,
+                "applicationId",
+                101,
+                "programId",
+                1,
+                "status",
+                "SUBMITTED",
+                "submittedAt",
+                "2026-10-21T14:00:00+09:00")));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "preferredVisitDateRequired",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "preferredVisitDate는 필수입니다.");
+    addError(
+        operation,
+        "pastVisitDate",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "희망 방문일은 오늘 또는 미래여야 합니다.");
+    addError(
+        operation,
+        "invalidVisitTime",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "방문 가능 시간은 MORNING, AFTERNOON, ANY 중 하나여야 합니다.");
+    for (var error : SupportApplicationErrorCode.values()) {
+      addError(operation, error.name(), error, null);
+    }
+    operation.getResponses().get("403").setDescription("주민 권한이 없거나 본인 소유의 현장점검 신청이 아닙니다.");
+    operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없습니다.");
+    operation.getResponses().get("409").setDescription("동일 현장점검 신청과 동일 지원사업으로 이미 신청했습니다.");
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void addError(Operation operation, String name, BaseResponseCode code, String message) {

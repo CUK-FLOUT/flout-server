@@ -1,0 +1,18 @@
+package com.flout.server.domain.supportapplication.response.code;
+
+import com.flout.server.global.response.code.BaseResponseCode;
+import lombok.*;
+
+@Getter
+@RequiredArgsConstructor
+public enum SupportApplicationErrorCode implements BaseResponseCode {
+  SOURCE_INFORMATION_UNAVAILABLE(400, "SUPPORT_400_1", "기존 신청자 기본정보를 확인할 수 없습니다. 정보를 확인해 주세요."),
+  RESIDENT_ONLY(403, "SUPPORT_403_1", "주민만 지원 신청을 할 수 있습니다."),
+  APPLICATION_ACCESS_DENIED(403, "SUPPORT_403_2", "본인의 현장점검 신청만 사용할 수 있습니다."),
+  APPLICATION_NOT_FOUND(404, "SUPPORT_404_1", "현장점검 신청을 찾을 수 없습니다."),
+  PROGRAM_NOT_FOUND(404, "SUPPORT_404_2", "지원사업을 찾을 수 없습니다."),
+  DUPLICATE_APPLICATION(409, "SUPPORT_409_1", "이미 접수된 지원 신청이 존재합니다.");
+  private final int status;
+  private final String code;
+  private final String message;
+}
