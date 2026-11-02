@@ -110,7 +110,8 @@ class InspectionAssignmentTest {
             null,
             null,
             null,
-            null);
+            null,
+            "주민");
     var application =
         applications.saveAndFlush(
             InspectionApplication.received(resident, assessment, request, "IA-STATUS-TEST"));

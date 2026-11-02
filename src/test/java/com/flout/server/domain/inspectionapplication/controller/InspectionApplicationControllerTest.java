@@ -69,6 +69,7 @@ class InspectionApplicationControllerTest {
         null,
         null,
         null,
-        null);
+        null,
+        "김주민");
   }
 }

@@ -80,7 +80,7 @@ class SupportApplicationTest {
         jdbc.queryForObject(
             "SELECT assessment_id FROM risk_assessments WHERE user_id=?", Long.class, residentId);
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES(?,?,'SUPPORT-TEST',?,37.5,126.76,?,'OWNER','NO',FALSE,'RECEIVED')",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'SUPPORT-TEST',?,37.5,126.76,?,'OWNER','NO',FALSE,'RECEIVED')",
         residentId,
         risk,
         ADDRESS,
@@ -165,7 +165,7 @@ class SupportApplicationTest {
             jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
     var row = jdbc.queryForMap("SELECT * FROM support_applications");
     assertThat(row.get("APPLICANT_USER_ID")).isEqualTo(residentId);
-    assertThat(row.get("APPLICANT_NAME")).isEqualTo("테스트주민");
+    assertThat(row.get("APPLICANT_NAME")).isEqualTo("김주민");
     assertThat(row.get("CONTACT")).isEqualTo(CONTACT);
     assertThat(row.get("ADDRESS")).isEqualTo(ADDRESS);
     assertThat(row.get("OCCUPANCY_TYPE")).isEqualTo(occupancy);
@@ -176,7 +176,7 @@ class SupportApplicationTest {
     assertThat(snapshot()).isEqualTo(before);
     jdbc.update("UPDATE users SET name='변경된 테스트 이름' WHERE user_id=?", residentId);
     assertThat(jdbc.queryForObject("SELECT applicant_name FROM support_applications", String.class))
-        .isEqualTo("테스트주민");
+        .isEqualTo("김주민");
   }
 
   @Test
@@ -248,7 +248,7 @@ class SupportApplicationTest {
     b.put(field, "다른값");
     send(b, token).andExpect(status().isCreated());
     var row = jdbc.queryForMap("SELECT * FROM support_applications");
-    assertThat(row.get("APPLICANT_NAME")).isEqualTo("테스트주민");
+    assertThat(row.get("APPLICANT_NAME")).isEqualTo("김주민");
     assertThat(row.get("CONTACT")).isEqualTo(CONTACT);
     assertThat(row.get("ADDRESS")).isEqualTo(ADDRESS);
     assertThat(row.get("OCCUPANCY_TYPE")).isEqualTo("OWNER");
@@ -320,7 +320,8 @@ class SupportApplicationTest {
     String name = "가".repeat(50), contact = "1".repeat(50), address = "가".repeat(255);
     jdbc.update("UPDATE users SET name=? WHERE user_id=?", name, residentId);
     jdbc.update(
-        "UPDATE inspection_applications SET contact=?,address=? WHERE application_id=?",
+        "UPDATE inspection_applications SET applicant_name=?,contact=?,address=? WHERE application_id=?",
+        name,
         contact,
         address,
         applicationId);

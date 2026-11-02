@@ -112,7 +112,8 @@ class PriorityInspectionDesignationTest {
             "점검 요청",
             LocalDate.of(2030, 1, 3),
             PreferredTimeSlot.MORNING,
-            null);
+            null,
+            "주민");
     var application =
         applications.saveAndFlush(
             InspectionApplication.received(resident, assessment, request, "IA-PRIORITY-TEST"));
@@ -1298,7 +1299,8 @@ class PriorityInspectionDesignationTest {
             "점검 요청",
             LocalDate.of(2030, 1, 3),
             PreferredTimeSlot.MORNING,
-            null);
+            null,
+            "주민");
     return applications
         .saveAndFlush(
             InspectionApplication.received(

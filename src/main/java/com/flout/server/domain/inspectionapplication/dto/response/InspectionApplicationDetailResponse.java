@@ -11,7 +11,7 @@ import java.util.Locale;
 public record InspectionApplicationDetailResponse(
     @Schema(description = "현장점검 신청 ID", example = "1") Long applicationId,
     @Schema(description = "신청 ID를 최소 6자리로 표시한 접수번호", example = "000001") String receiptNo,
-    @Schema(description = "신청자 계정의 이름", example = "김주민") String applicantName,
+    @Schema(description = "신청 당시 입력한 신청자 이름", example = "김주민") String applicantName,
     @Schema(description = "신청 시 입력한 연락처", example = "010-1234-1234") String contact,
     @Schema(description = "신청에 저장된 전체 주소", example = "경기도 부천시 원미구 길주로 53") String address,
     @Schema(
@@ -55,7 +55,7 @@ public record InspectionApplicationDetailResponse(
     return new InspectionApplicationDetailResponse(
         application.getId(),
         String.format(Locale.ROOT, "%06d", application.getId()),
-        application.getApplicant().getName(),
+        application.getApplicantName(),
         application.getContact(),
         application.getAddress(),
         application.getDetailAddress(),

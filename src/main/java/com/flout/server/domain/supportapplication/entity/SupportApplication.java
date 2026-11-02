@@ -82,7 +82,7 @@ public class SupportApplication {
     support.program = program;
     support.applicant = applicant;
     support.requestedFacility = facility;
-    support.applicantName = applicant.getName().strip();
+    support.applicantName = source.getApplicantName().strip();
     support.contact = source.getContact().strip();
     support.address = source.getAddress().strip();
     support.occupancyType = source.getOccupancyType();

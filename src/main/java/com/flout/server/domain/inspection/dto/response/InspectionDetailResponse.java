@@ -47,7 +47,7 @@ public record InspectionDetailResponse(
         inspection.getId(),
         application.getId(),
         String.format(Locale.ROOT, "%06d", application.getId()),
-        application.getApplicant().getName(),
+        application.getApplicantName(),
         application.getAddress(),
         application.getDetailAddress(),
         application.getContact(),

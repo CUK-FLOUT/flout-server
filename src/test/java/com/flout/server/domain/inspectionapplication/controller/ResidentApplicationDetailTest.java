@@ -91,7 +91,8 @@ class ResidentApplicationDetailTest {
             "점검 요청",
             LocalDate.of(2026, 11, 3),
             PreferredTimeSlot.MORNING,
-            null);
+            null,
+            "신청이름");
     var application =
         applications.saveAndFlush(
             InspectionApplication.received(owner, assessment, request, "IA-STORED-RECEIPT"));
@@ -121,7 +122,7 @@ class ResidentApplicationDetailTest {
         .andExpect(
             jsonPath("$.result.receiptNumber")
                 .value(String.format(Locale.ROOT, "%06d", applicationId)))
-        .andExpect(jsonPath("$.result.applicant.name").value("김주민"))
+        .andExpect(jsonPath("$.result.applicant.name").value("신청이름"))
         .andExpect(jsonPath("$.result.applicant.phone").value("010-1234-1234"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 53"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))

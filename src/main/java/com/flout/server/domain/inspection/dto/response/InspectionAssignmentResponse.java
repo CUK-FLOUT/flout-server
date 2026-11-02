@@ -21,7 +21,7 @@ public record InspectionAssignmentResponse(
     return new InspectionAssignmentResponse(
         inspection.getId(),
         String.format(Locale.ROOT, "%06d", inspection.getApplication().getId()),
-        inspection.getApplication().getApplicant().getName(),
+        inspection.getApplication().getApplicantName(),
         inspection.getInspector().getId(),
         inspection.getInspector().getName(),
         inspection.getScheduledAt().toLocalDate(),

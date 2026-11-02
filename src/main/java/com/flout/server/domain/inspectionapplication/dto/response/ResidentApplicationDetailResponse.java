@@ -39,7 +39,7 @@ public record ResidentApplicationDetailResponse(
     return new ResidentApplicationDetailResponse(
         application.getId(),
         String.format(Locale.ROOT, "%06d", application.getId()),
-        new Applicant(application.getApplicant().getName(), application.getContact()),
+        new Applicant(application.getApplicantName(), application.getContact()),
         application.getAddress(),
         application.getDetailAddress(),
         application.getOccupancyType(),

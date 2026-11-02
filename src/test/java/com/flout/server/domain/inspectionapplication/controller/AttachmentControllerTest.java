@@ -98,7 +98,8 @@ class AttachmentControllerTest {
             null,
             null,
             null,
-            null);
+            null,
+            "김주민");
     applicationId =
         applications
             .saveAndFlush(InspectionApplication.received(user, assessment, request, "ATTACH-TEST"))

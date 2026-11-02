@@ -38,7 +38,7 @@ Swagger 그룹은 `운영자-GIS 신청관리`입니다. 요청 본문·쿼리 �
 | 필드 | 의미·표시 예시 |
 | --- | --- |
 | receiptNo | 신청 ID를 최소 6자리로 표시. 긴 ID는 자르지 않음 |
-| applicantName / contact | 신청자 계정 이름 / 신청에 입력한 연락처 |
+| applicantName / contact | 신청 당시 입력한 신청자 이름 / 신청에 입력한 연락처 |
 | address / detailAddress | 신청에 저장된 전체 주소 / 상세주소 |
 | occupancyType | OWNER=자가, TENANT=세입자, ETC=기타 |
 | riskLevel | 연결된 분석 결과. HIGH=높음, CAUTION=주의, LOW=낮음 |

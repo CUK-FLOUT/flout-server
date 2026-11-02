@@ -98,7 +98,7 @@ class PublicIssueTest {
             Long.class,
             resident.getId());
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES(?,?,'PUBLIC-TEST',?,'101호',37.5000000,126.7600000,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'PUBLIC-TEST',?,'101호',37.5000000,126.7600000,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
         resident.getId(),
         assessment,
         SOURCE);

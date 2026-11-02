@@ -9,7 +9,7 @@ import java.util.Locale;
 public record PriorityInspectionDetailResponse(
     @Schema(description = "현장점검 신청 ID", example = "5") Long applicationId,
     @Schema(description = "신청 ID를 최소 6자리로 표시한 접수번호", example = "000005") String receiptNo,
-    @Schema(description = "신청자 계정의 이름", example = "김주민") String applicantName,
+    @Schema(description = "신청 당시 입력한 신청자 이름", example = "김주민") String applicantName,
     @Schema(description = "신청 주소", example = "경기도 부천시 원미구 길주로 53") String address,
     @Schema(description = "분석 결과에서 복사해 신청에 저장한 상세주소", example = "101동 302호", nullable = true)
         String detailAddress,
@@ -40,7 +40,7 @@ public record PriorityInspectionDetailResponse(
     return new PriorityInspectionDetailResponse(
         application.getId(),
         String.format(Locale.ROOT, "%06d", application.getId()),
-        application.getApplicant().getName(),
+        application.getApplicantName(),
         application.getAddress(),
         application.getDetailAddress(),
         need,

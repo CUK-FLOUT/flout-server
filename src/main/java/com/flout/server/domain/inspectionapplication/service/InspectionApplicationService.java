@@ -106,7 +106,8 @@ public class InspectionApplicationService {
             request.requestReason(),
             request.preferredVisitDate(),
             request.preferredTimeSlot(),
-            request.inflowLocations());
+            request.inflowLocations(),
+            request.applicantName());
 
     if (applications.existsByAssessmentId(assessment.getId())) {
       return submissionTransaction.reuseDraft(applicant.getId(), normalizedRequest);
