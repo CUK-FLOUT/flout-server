@@ -12,6 +12,7 @@ import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
+import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportAttachmentErrorCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
@@ -188,6 +189,11 @@ public class OpenApiConfig {
                                     GeneralErrorCode.ACCESS_DENIED_REQUEST,
                                     null);
                               }
+                            }
+                            if (path.equals(
+                                    "/api/admin/support-applications/{supportApplicationId}/approve")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeSupportApproval(operation);
                             }
                             if (path.equals("/api/admin/public-issues")
                                 && method == PathItem.HttpMethod.POST) {
@@ -1410,6 +1416,55 @@ public class OpenApiConfig {
         "attachmentUploadFailed",
         InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED,
         null);
+  }
+
+  private void describeSupportApproval(Operation operation) {
+    var code = SupportApplicationSuccessCode.APPROVED;
+    var success = operation.getResponses().computeIfAbsent("200", k -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "approved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "supportApplicationId",
+                201,
+                "status",
+                "APPROVED",
+                "supportScope",
+                "출입구 물막이판 설치 지원",
+                "approvedByUserId",
+                1,
+                "approvedAt",
+                "2026-11-02T15:00:00+09:00")));
+    operation
+        .getRequestBody()
+        .getContent()
+        .get(JSON)
+        .addExamples(
+            "approval",
+            new Example()
+                .summary("지원 범위와 행정 검토 완료")
+                .value(
+                    Map.of(
+                        "supportScope",
+                        "출입구 물막이판 설치 지원",
+                        "applicantHousingReviewed",
+                        true,
+                        "expertInspectionReviewed",
+                        true,
+                        "eligibilityDocumentsReviewed",
+                        true)));
+    for (var error : SupportApprovalErrorCode.values())
+      addError(operation, error.name(), error, null);
+    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    operation.getResponses().get("400").setDescription("필수값·지원 범위·검토 항목 오류, 동의 미확인 또는 승인 불가 거주 형태");
+    operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
+    operation.getResponses().get("409").setDescription("이미 처리된 지원 신청입니다.");
   }
 
   private void describeSupportAttachment(Operation operation) {

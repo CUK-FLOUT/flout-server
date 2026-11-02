@@ -59,8 +59,25 @@ public class SupportApplication {
   private PreferredTimeSlot preferredVisitTime;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, columnDefinition = "enum('SUBMITTED')")
+  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED')")
   private SupportApplicationStatus status;
+
+  @Column(name = "support_scope", length = 500)
+  private String supportScope;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "approved_by_user_id")
+  private User approvedBy;
+
+  @Column(name = "approved_at")
+  private LocalDateTime approvedAt;
+
+  @Enumerated(EnumType.STRING)
+  @Column(
+      name = "landlord_consent_status",
+      nullable = false,
+      columnDefinition = "enum('NOT_REQUIRED','PENDING','CONFIRMED')")
+  private LandlordConsentStatus landlordConsentStatus;
 
   @Column(name = "submitted_at", nullable = false, updatable = false)
   private LocalDateTime submittedAt;
@@ -86,9 +103,20 @@ public class SupportApplication {
     support.contact = source.getContact().strip();
     support.address = source.getAddress().strip();
     support.occupancyType = source.getOccupancyType();
+    support.landlordConsentStatus =
+        source.getOccupancyType() == OccupancyType.OWNER
+            ? LandlordConsentStatus.NOT_REQUIRED
+            : LandlordConsentStatus.PENDING;
     support.preferredVisitDate = preferredVisitDate;
     support.preferredVisitTime = preferredVisitTime;
     support.status = SupportApplicationStatus.SUBMITTED;
     return support;
+  }
+
+  public void approve(String scope, User operator, LocalDateTime approvedAt) {
+    this.supportScope = scope;
+    this.approvedBy = operator;
+    this.approvedAt = approvedAt;
+    this.status = SupportApplicationStatus.APPROVED;
   }
 }
