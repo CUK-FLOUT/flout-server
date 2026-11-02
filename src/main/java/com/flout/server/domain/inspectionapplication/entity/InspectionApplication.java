@@ -107,6 +107,23 @@ public class InspectionApplication {
     return application;
   }
 
+  public static InspectionApplication draft(
+      User applicant,
+      RiskAssessment assessment,
+      CreateInspectionApplicationRequest request,
+      String receiptNo) {
+    var application = received(applicant, assessment, request, receiptNo);
+    application.status = InspectionApplicationStatus.DRAFT;
+    return application;
+  }
+
+  public void receive() {
+    if (status != InspectionApplicationStatus.DRAFT) {
+      throw new IllegalStateException("임시 신청만 접수할 수 있습니다.");
+    }
+    status = InspectionApplicationStatus.RECEIVED;
+  }
+
   @PrePersist
   void onCreate() {
     createdAt = LocalDateTime.now();

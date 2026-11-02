@@ -77,8 +77,11 @@ class InspectionApplicationServiceTest {
   void rejectsDuplicateAssessment() {
     stubValidSubmissionPrerequisites();
     when(applications.existsByAssessmentId(10L)).thenReturn(true);
+    when(submissionTransaction.reuseDraft(eq(1L), any()))
+        .thenThrow(
+            new BaseException(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION));
     assertError(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
-    verifyNoInteractions(submissionTransaction);
+    verify(submissionTransaction).reuseDraft(eq(1L), any());
   }
 
   @Test
@@ -92,6 +95,9 @@ class InspectionApplicationServiceTest {
                     "duplicate",
                     new SQLException("duplicate", "23000"),
                     "uk_inspection_applications_assessment_id")));
+    when(submissionTransaction.reuseDraft(eq(1L), any()))
+        .thenThrow(
+            new BaseException(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION));
     assertError(InspectionApplicationErrorCode.DUPLICATE_ASSESSMENT_APPLICATION);
     verify(submissionTransaction).create(any(), any(), any());
   }

@@ -117,7 +117,9 @@ class InternalMemoTest {
 
   // 신청 정보 변경 없이 메모 저장
   @ParameterizedTest
-  @EnumSource(InspectionApplicationStatus.class)
+  @EnumSource(
+      value = InspectionApplicationStatus.class,
+      names = {"RECEIVED", "INSPECTION_COMPLETED"})
   void savesAndReplacesMemoWithoutChangingApplication(InspectionApplicationStatus initialStatus)
       throws Exception {
     jdbc.update(

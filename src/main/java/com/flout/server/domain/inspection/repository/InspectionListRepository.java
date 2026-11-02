@@ -45,7 +45,7 @@ public class InspectionListRepository {
         JOIN inspection_applications a ON a.application_id = i.application_id
         LEFT JOIN users u ON u.user_id = i.inspector_user_id
         LEFT JOIN priority_inspection_designations d ON d.application_id = a.application_id
-        WHERE TRIM(a.address) REGEXP :region
+        WHERE a.status <> 'DRAFT' AND TRIM(a.address) REGEXP :region
           AND (:keyword = '' OR LOCATE(:keyword, a.address) > 0
             OR LOCATE(:keyword, LPAD(CONCAT('', a.application_id),
               GREATEST(6, LENGTH(CONCAT('', a.application_id))), '0')) > 0)

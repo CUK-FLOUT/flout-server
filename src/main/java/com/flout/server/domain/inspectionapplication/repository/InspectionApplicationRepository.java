@@ -16,9 +16,13 @@ public interface InspectionApplicationRepository
 
   boolean existsByAssessmentId(Long assessmentId);
 
+  @EntityGraph(attributePaths = {"applicant", "assessment"})
+  Optional<InspectionApplication> findByAssessmentId(Long assessmentId);
+
   // 신청자와 취약도 분석 함께 조회
   @EntityGraph(attributePaths = {"applicant", "assessment"})
-  @Query("select a from InspectionApplication a where a.id = :applicationId")
+  @Query(
+      "select a from InspectionApplication a where a.id = :applicationId and a.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT")
   Optional<InspectionApplication> findForAdminDetail(@Param("applicationId") Long applicationId);
 
   @EntityGraph(attributePaths = {"applicant", "assessment"})
@@ -27,11 +31,13 @@ public interface InspectionApplicationRepository
 
   // 상세 패널에 필요한 신청자와 분석 결과 함께 조회
   @EntityGraph(attributePaths = {"applicant", "assessment"})
-  @Query("select a from InspectionApplication a where a.id = :applicationId")
+  @Query(
+      "select a from InspectionApplication a where a.id = :applicationId and a.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT")
   Optional<InspectionApplication> findForPriorityDetail(@Param("applicationId") Long applicationId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select a from InspectionApplication a where a.id = :applicationId")
+  @Query(
+      "select a from InspectionApplication a where a.id = :applicationId and a.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT")
   Optional<InspectionApplication> findForPriorityDesignation(
       @Param("applicationId") Long applicationId);
 

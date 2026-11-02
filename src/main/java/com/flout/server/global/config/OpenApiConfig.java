@@ -1263,6 +1263,12 @@ public class OpenApiConfig {
     }
     success.setDescription(
         InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage());
+    var draft = new LinkedHashMap<String, Object>();
+    draft.put("applicationId", 1);
+    draft.put("inspectionId", null);
+    draft.put("receiptNo", "000001");
+    draft.put("status", "DRAFT");
+    draft.put("submittedAt", null);
     addExample(
         success,
         "inspectionApplicationCreated",
@@ -1270,17 +1276,7 @@ public class OpenApiConfig {
             true,
             InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED,
             InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED.getMessage(),
-            Map.of(
-                "applicationId",
-                1,
-                "inspectionId",
-                1,
-                "receiptNo",
-                "000001",
-                "status",
-                "RECEIVED",
-                "submittedAt",
-                "2026-10-28T10:30:00")));
+            draft));
     operation.getResponses().addApiResponse("201", success);
 
     addError(

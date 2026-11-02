@@ -37,7 +37,7 @@ public class ApplicationAttachmentReader {
       throw new BaseException(InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED);
     var application =
         applications
-            .findById(applicationId)
+            .findForAdminDetail(applicationId)
             .orElseThrow(
                 () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
     if (!BUCHEON_ADDRESS.matcher(application.getAddress().strip()).find())
