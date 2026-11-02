@@ -85,7 +85,10 @@ public class OpenApiConfig {
       // OpenAPI 3.1 nullable enum 허용값에 JSON null 포함
       if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
         for (String schemaName :
-            List.of("InspectionDetailResponse", "InspectionApplicationDetailResponse")) {
+            List.of(
+                "InspectionDetailResponse",
+                "InspectionApplicationDetailResponse",
+                "ResidentApplicationDetailResponse")) {
           var detail = api.getComponents().getSchemas().get(schemaName);
           if (detail != null && detail.getProperties() != null) {
             Schema timeSlot = (Schema) detail.getProperties().get("preferredTimeSlot");
@@ -1113,6 +1116,10 @@ public class OpenApiConfig {
         "applicationNotFound",
         InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
         null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
