@@ -19,14 +19,6 @@ public class PreventionRecommendation {
   @JoinColumn(name = "result_id", nullable = false)
   private InspectionResult result;
 
-  @Column(name = "title", length = 255)
-  private String title;
-
-  @Column(
-      name = "related_target",
-      columnDefinition = "enum('ENTRANCE','WINDOW_OPENING','DRAIN','OTHER_STRUCTURE')")
-  private String relatedTarget;
-
   @Column(name = "description", columnDefinition = "TEXT")
   private String description;
 
@@ -34,16 +26,10 @@ public class PreventionRecommendation {
   private int sortOrder;
 
   public static PreventionRecommendation create(
-      InspectionResult result,
-      String title,
-      String relatedTarget,
-      String description,
-      int sortOrder) {
+      InspectionResult result, String description, int sortOrder) {
     PreventionRecommendation recommendation = new PreventionRecommendation();
 
     recommendation.result = result;
-    recommendation.title = title;
-    recommendation.relatedTarget = relatedTarget;
     recommendation.description = description;
     recommendation.sortOrder = sortOrder;
 

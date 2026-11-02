@@ -69,12 +69,13 @@ public class AttachmentService {
   }
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public List<AttachmentResult> upload(Long userId, Long applicationId, List<MultipartFile> files) {
+  public UploadResponse upload(Long userId, Long applicationId, List<MultipartFile> files) {
     return upload(userId, applicationId, files, null);
   }
 
+  /** 파일 저장소 업로드는 트랜잭션 밖에서, 첨부·접수·점검 생성과 응답 구성은 같은 DB 트랜잭션에서 처리한다. */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public List<AttachmentResult> upload(
+  public UploadResponse upload(
       Long userId, Long applicationId, List<MultipartFile> files, String requestKey) {
     if (files == null || files.isEmpty() || files.size() > 5) throw invalid();
     if (requestKey != null && !requestKey.matches("[A-Za-z0-9._:-]{1,128}")) throw invalid();
@@ -96,7 +97,7 @@ public class AttachmentService {
     List<ValidatedFile> validated = files.stream().map(this::validate).toList();
     String requestHash = storedKey == null ? null : requestHash(validated);
     if (storedKey != null) {
-      List<AttachmentResult> previous =
+      UploadResponse previous =
           transactions.execute(status -> findPrevious(applicationId, storedKey, requestHash));
       if (previous != null) return previous;
     }
@@ -112,7 +113,7 @@ public class AttachmentService {
         if (bytes.length != file.size() || !digest(bytes).equals(file.hash())) throw invalid();
         storage.upload(attemptedKeys.get(i), bytes, file.contentType());
       }
-      List<AttachmentResult> result =
+      UploadResponse result =
           transactions.execute(
               status -> {
                 for (String key : attemptedKeys) cleanup.lock(key);
@@ -125,8 +126,7 @@ public class AttachmentService {
                                     InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
                 authorize(application, userId);
                 if (storedKey != null) {
-                  List<AttachmentResult> previous =
-                      findPrevious(applicationId, storedKey, requestHash);
+                  UploadResponse previous = findPrevious(applicationId, storedKey, requestHash);
                   if (previous != null) return previous;
                 }
                 if (attachments.countByApplicationId(applicationId) + files.size() > 5)
@@ -155,7 +155,7 @@ public class AttachmentService {
                   histories.save(ApplicationStatusHistory.received(application));
                   inspections.saveAndFlush(Inspection.received(application));
                 }
-                return saved;
+                return uploadResponse(applicationId, saved);
               });
       cleanup.reconcile(attemptedKeys);
       return result;
@@ -167,22 +167,38 @@ public class AttachmentService {
     }
   }
 
-  private List<AttachmentResult> findPrevious(Long applicationId, String key, String hash) {
+  /** 호출한 저장·재사용 트랜잭션 안에서 점검 ID를 확인하며, 누락되면 저장도 롤백한다. */
+  private UploadResponse uploadResponse(Long applicationId, List<AttachmentResult> saved) {
+    Long inspectionId =
+        inspections
+            .findByApplicationId(applicationId)
+            .orElseThrow(
+                () -> new BaseException(InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED))
+            .getId();
+    return new UploadResponse(inspectionId, saved);
+  }
+
+  public record UploadResponse(Long inspectionId, List<AttachmentResult> attachments) {}
+
+  /** 같은 요청 키의 저장 결과와 점검 ID를 하나의 트랜잭션에서 함께 재사용한다. */
+  private UploadResponse findPrevious(Long applicationId, String key, String hash) {
     List<ApplicationAttachment> previous =
         attachments.findAllByApplicationIdAndUploadRequestKeyOrderByIdAsc(applicationId, key);
     if (previous.isEmpty()) return null;
     if (previous.stream().anyMatch(attachment -> !hash.equals(attachment.getUploadRequestHash()))) {
       throw new BaseException(InspectionApplicationErrorCode.ATTACHMENT_IDEMPOTENCY_CONFLICT);
     }
-    return previous.stream()
-        .map(
-            attachment ->
-                new AttachmentResult(
-                    attachment.getId(),
-                    attachment.getOriginalFilename(),
-                    attachment.getFileSize(),
-                    attachment.getContentType()))
-        .toList();
+    var saved =
+        previous.stream()
+            .map(
+                attachment ->
+                    new AttachmentResult(
+                        attachment.getId(),
+                        attachment.getOriginalFilename(),
+                        attachment.getFileSize(),
+                        attachment.getContentType()))
+            .toList();
+    return uploadResponse(applicationId, saved);
   }
 
   private String requestHash(List<ValidatedFile> files) {

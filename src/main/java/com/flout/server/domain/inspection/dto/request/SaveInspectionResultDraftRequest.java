@@ -22,8 +22,6 @@ public record SaveInspectionResultDraftRequest(
       @Size(max = 4000) String expertOpinion,
       @Size(max = 4000) String fieldFindings) {}
 
-  public record RecommendedActionRequest(
-      @Size(max = 255) String title,
-      VulnerabilityType relatedTarget,
-      @Size(max = 4000) String description) {}
+  @Schema(description = "취약지점과 독립적으로 추가하는 권장 예방조치")
+  public record RecommendedActionRequest(@Size(max = 4000) String description) {}
 }

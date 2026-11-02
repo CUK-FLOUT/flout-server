@@ -79,13 +79,7 @@ public class SaveInspectionResultDraftService {
     if (request.recommendedActions() != null) {
       for (int i = 0; i < request.recommendedActions().size(); i++) {
         var item = request.recommendedActions().get(i);
-        recommendations.save(
-            PreventionRecommendation.create(
-                result,
-                item.title(),
-                item.relatedTarget() == null ? null : item.relatedTarget().name(),
-                item.description(),
-                i));
+        recommendations.save(PreventionRecommendation.create(result, item.description(), i));
       }
     }
     results.flush();
