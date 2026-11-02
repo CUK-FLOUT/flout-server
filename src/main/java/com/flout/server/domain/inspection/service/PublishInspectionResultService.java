@@ -112,9 +112,7 @@ public class PublishInspectionResultService {
     for (int i = 0; i < request.recommendedActions().size(); i++) {
       var item = request.recommendedActions().get(i);
 
-      recommendations.save(
-          PreventionRecommendation.create(
-              result, item.title(), item.relatedTarget().name(), item.description(), i));
+      recommendations.save(PreventionRecommendation.create(result, item.description(), i));
     }
 
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);

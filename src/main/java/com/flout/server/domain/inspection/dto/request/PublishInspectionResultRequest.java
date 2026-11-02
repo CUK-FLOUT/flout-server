@@ -20,10 +20,7 @@ public record PublishInspectionResultRequest(
       @NotBlank @Size(max = 4000) String expertOpinion,
       @Size(max = 4000) String fieldFindings) {}
 
-  public record RecommendedActionRequest(
-      @NotBlank @Size(max = 255) String title,
-      @NotNull VulnerabilityType relatedTarget,
-      @NotBlank @Size(max = 4000) String description) {}
+  public record RecommendedActionRequest(@NotBlank @Size(max = 4000) String description) {}
 
   public enum VulnerabilityType {
     ENTRANCE,

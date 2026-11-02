@@ -251,7 +251,7 @@ class InspectionPhotoTest {
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
                 .content(
-                    "{\"summary\":\"완료\",\"vulnerabilities\":[{\"type\":\"ENTRANCE\",\"title\":\"입구\",\"expertOpinion\":\"의견\"}],\"recommendedActions\":[{\"title\":\"예방\",\"relatedTarget\":\"ENTRANCE\",\"description\":\"설명\"}],\"followUpType\":\"INDIVIDUAL_HOUSE\",\"internalMemo\":\"내부\"}"))
+                    "{\"summary\":\"완료\",\"vulnerabilities\":[{\"type\":\"ENTRANCE\",\"title\":\"입구\",\"expertOpinion\":\"의견\"}],\"recommendedActions\":[{\"description\":\"설명\"}],\"followUpType\":\"INDIVIDUAL_HOUSE\",\"internalMemo\":\"내부\"}"))
         .andExpect(status().isOk());
     assertThat(
             jdbc.queryForObject(
