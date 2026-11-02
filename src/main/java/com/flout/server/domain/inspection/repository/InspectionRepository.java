@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface InspectionRepository extends JpaRepository<Inspection, Long> {
+  Optional<Inspection> findByApplicationId(Long applicationId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select i from Inspection i where i.id = :inspectionId")
   Optional<Inspection> findForStatusUpdate(@Param("inspectionId") Long inspectionId);
