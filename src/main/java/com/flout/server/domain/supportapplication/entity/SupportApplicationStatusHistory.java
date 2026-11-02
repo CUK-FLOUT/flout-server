@@ -23,15 +23,18 @@ public class SupportApplicationStatusHistory {
   @Column(
       name = "previous_status",
       nullable = false,
-      columnDefinition = "enum('SUBMITTED','APPROVED')")
+      columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus previousStatus;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED')")
+  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)
   private String supportScope;
+
+  @Column(name = "rejection_reason", length = 500)
+  private String rejectionReason;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "changed_by_user_id", nullable = false)
@@ -41,6 +44,10 @@ public class SupportApplicationStatusHistory {
   private LocalDateTime changedAt;
 
   public static SupportApplicationStatusHistory approved(SupportApplication application) {
+    return changed(application);
+  }
+
+  private static SupportApplicationStatusHistory changed(SupportApplication application) {
     var history = new SupportApplicationStatusHistory();
     history.application = application;
     history.previousStatus = SupportApplicationStatus.SUBMITTED;
@@ -48,6 +55,12 @@ public class SupportApplicationStatusHistory {
     history.supportScope = application.getSupportScope();
     history.changedBy = application.getApprovedBy();
     history.changedAt = application.getApprovedAt();
+    return history;
+  }
+
+  public static SupportApplicationStatusHistory rejected(SupportApplication application) {
+    var history = changed(application);
+    history.rejectionReason = application.getRejectionReason();
     return history;
   }
 }

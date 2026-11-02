@@ -59,12 +59,16 @@ public class SupportApplication {
   private PreferredTimeSlot preferredVisitTime;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED')")
+  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)
   private String supportScope;
 
+  @Column(name = "rejection_reason", length = 500)
+  private String rejectionReason;
+
+  // 기존 컬럼명을 유지하며 승인·미승인 결정의 처리자와 처리 시각으로 공용 사용한다.
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "approved_by_user_id")
   private User approvedBy;
@@ -118,5 +122,12 @@ public class SupportApplication {
     this.approvedBy = operator;
     this.approvedAt = approvedAt;
     this.status = SupportApplicationStatus.APPROVED;
+  }
+
+  public void reject(String reason, User operator, LocalDateTime processedAt) {
+    this.rejectionReason = reason;
+    this.approvedBy = operator;
+    this.approvedAt = processedAt;
+    this.status = SupportApplicationStatus.REJECTED;
   }
 }

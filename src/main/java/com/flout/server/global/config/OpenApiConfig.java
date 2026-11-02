@@ -195,6 +195,11 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApproval(operation);
                             }
+                            if (path.equals(
+                                    "/api/admin/support-applications/{supportApplicationId}/reject")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeSupportRejection(operation);
+                            }
                             if (path.equals("/api/admin/public-issues")
                                 && method == PathItem.HttpMethod.POST) {
                               describePublicIssueRegistration(operation);
@@ -1416,6 +1421,46 @@ public class OpenApiConfig {
         "attachmentUploadFailed",
         InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED,
         null);
+  }
+
+  private void describeSupportRejection(Operation operation) {
+    var code = SupportApplicationSuccessCode.REJECTED;
+    var success = operation.getResponses().computeIfAbsent("200", k -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "rejected",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "supportApplicationId",
+                201,
+                "status",
+                "REJECTED",
+                "reason",
+                "자격 미달",
+                "processedByUserId",
+                1,
+                "processedAt",
+                "2026-11-03T15:00:00+09:00")));
+    operation
+        .getRequestBody()
+        .getContent()
+        .get(JSON)
+        .addExamples("rejection", new Example().summary("미승인 사유").value(Map.of("reason", "자격 미달")));
+    for (var error :
+        List.of(
+            SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED,
+            SupportApprovalErrorCode.APPLICATION_NOT_FOUND,
+            SupportApprovalErrorCode.ALREADY_DECIDED))
+      addError(operation, error.name(), error, null);
+    addError(operation, "invalidReason", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    operation.getResponses().get("400").setDescription("미승인 사유 누락·공백·길이·형식 또는 지원 신청 ID 오류");
+    operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
+    operation.getResponses().get("409").setDescription("이미 처리된 지원 신청입니다.");
   }
 
   private void describeSupportApproval(Operation operation) {
