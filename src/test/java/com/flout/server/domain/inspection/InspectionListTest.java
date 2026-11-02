@@ -203,7 +203,8 @@ class InspectionListTest {
             "검색 대상 아닌 사유",
             date,
             slot,
-            null);
+            null,
+            "주민");
     var application =
         applications.saveAndFlush(
             InspectionApplication.received(

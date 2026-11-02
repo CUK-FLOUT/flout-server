@@ -86,7 +86,7 @@ class InspectionPhotoTest {
         jdbc.queryForObject(
             "SELECT assessment_id FROM risk_assessments WHERE user_id=?", Long.class, residentId);
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES(?,?,'PHOTO-TEST','부천시 원미구 길주로 53','101호',37.5,126.76,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'PHOTO-TEST','부천시 원미구 길주로 53','101호',37.5,126.76,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
         residentId,
         assessment);
     applicationId =

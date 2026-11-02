@@ -104,7 +104,8 @@ class AdminApplicationAttachmentTest {
             "최근 배수구 역류가 있어 점검을 희망합니다.",
             LocalDate.of(2026, 11, 3),
             PreferredTimeSlot.MORNING,
-            null);
+            null,
+            "김주민");
     var application =
         applications.saveAndFlush(
             InspectionApplication.received(resident, assessment, request, "IA-DETAIL-TEST"));
@@ -139,7 +140,7 @@ class AdminApplicationAttachmentTest {
                 application.getDetailAddress(),
                 RiskLevel.HIGH));
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id, assessment_id, receipt_no, address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude) SELECT applicant_user_id, ?, 'OTHER-ATTACH', address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude FROM inspection_applications WHERE application_id = ?",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id, assessment_id, receipt_no, address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude) SELECT '김주민', applicant_user_id, ?, 'OTHER-ATTACH', address, contact, occupancy_type, flood_experience, existing_facility, status, latitude, longitude FROM inspection_applications WHERE application_id = ?",
         otherAssessment.getId(),
         applicationId);
     Long otherId =

@@ -198,7 +198,8 @@ class InspectionApplicationServiceTest {
             null,
             LocalDate.now(),
             null,
-            List.of(InflowLocation.UNKNOWN));
+            List.of(InflowLocation.UNKNOWN),
+            "김주민");
 
     assertThat(validator.validate(invalid)).hasSizeGreaterThanOrEqualTo(7);
   }
@@ -224,7 +225,8 @@ class InspectionApplicationServiceTest {
             request.requestReason(),
             request.preferredVisitDate(),
             request.preferredTimeSlot(),
-            request.inflowLocations());
+            request.inflowLocations(),
+            "김주민");
 
     assertThatThrownBy(() -> service.submit(1L, invalidRequest))
         .isInstanceOf(BaseException.class)
@@ -255,7 +257,8 @@ class InspectionApplicationServiceTest {
             request.requestReason(),
             request.preferredVisitDate(),
             request.preferredTimeSlot(),
-            request.inflowLocations());
+            request.inflowLocations(),
+            "김주민");
 
     assertThatThrownBy(() -> service.submit(1L, mismatchedRequest))
         .isInstanceOf(BaseException.class)
@@ -287,7 +290,8 @@ class InspectionApplicationServiceTest {
         "Need an inspection.",
         LocalDate.now().plusDays(1),
         PreferredTimeSlot.MORNING,
-        locations);
+        locations,
+        "김주민");
   }
 
   private CreateInspectionApplicationRequest requestWithGuide(Long guideId) {
@@ -306,7 +310,8 @@ class InspectionApplicationServiceTest {
         request.requestReason(),
         request.preferredVisitDate(),
         request.preferredTimeSlot(),
-        request.inflowLocations());
+        request.inflowLocations(),
+        "김주민");
   }
 
   private User resident(Long id) {

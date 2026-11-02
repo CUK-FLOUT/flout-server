@@ -97,6 +97,7 @@ class InspectionApplicationSubmissionTransactionTest {
         "Need an inspection.",
         LocalDate.now().plusDays(1),
         PreferredTimeSlot.MORNING,
-        List.of(InflowLocation.WINDOW, InflowLocation.DRAIN));
+        List.of(InflowLocation.WINDOW, InflowLocation.DRAIN),
+        "김주민");
   }
 }

@@ -69,8 +69,8 @@ public class SupportApplicationService {
                         () -> new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_FOUND));
             if (supports.existsByApplicationIdAndProgramId(source.getId(), program.getId()))
               throw new BaseException(SupportApplicationErrorCode.DUPLICATE_APPLICATION);
-            if (user.getName() == null
-                || user.getName().isBlank()
+            if (source.getApplicantName() == null
+                || source.getApplicantName().isBlank()
                 || source.getContact() == null
                 || source.getContact().isBlank()
                 || source.getAddress() == null

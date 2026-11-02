@@ -79,6 +79,46 @@ class InspectionApplicationFlowTest {
             .getId();
   }
 
+  @Test
+  void rejectsMissingBlankAndOversizedApplicantNames() throws Exception {
+    for (String invalid : List.of("", "   ", "가".repeat(51))) {
+      var body = request();
+      body.put("applicantName", invalid);
+      mvc.perform(
+              post("/api/resident/applications")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(body)))
+          .andExpect(status().isBadRequest());
+    }
+    var body = request();
+    body.remove("applicantName");
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void changedApplicantNameDoesNotReuseDraft() throws Exception {
+    submit().andExpect(status().isCreated());
+    var body = request();
+    body.put("applicantName", "다른이름");
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isConflict());
+    assertThat(
+            jdbc.queryForObject("SELECT applicant_name FROM inspection_applications", String.class))
+        .isEqualTo("신청자");
+  }
+
   private Map<String, Object> request() {
     var body =
         new java.util.HashMap<String, Object>(
@@ -103,6 +143,7 @@ class InspectionApplicationFlowTest {
                 "MORNING",
                 "inflowLocations",
                 List.of("WINDOW", "DRAIN")));
+    body.put("applicantName", "  신청자  ");
     body.put("address", "경기도 부천시 원미구 길주로 211");
     body.put("detailAddress", "202호");
     return body;
@@ -133,8 +174,9 @@ class InspectionApplicationFlowTest {
         .isEqualTo(String.format(java.util.Locale.ROOT, "%06d", applicationId));
     var application =
         jdbc.queryForMap(
-            "SELECT address, detail_address FROM inspection_applications WHERE application_id = ?",
+            "SELECT address, detail_address, applicant_name FROM inspection_applications WHERE application_id = ?",
             applicationId);
+    assertThat(application.get("applicant_name")).isEqualTo("신청자");
     assertThat(application.get("address")).isEqualTo("경기도 부천시 원미구 길주로 211");
     assertThat(application.get("detail_address")).isEqualTo("202호");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
@@ -381,7 +423,7 @@ class InspectionApplicationFlowTest {
     Long anotherAssessment =
         jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) SELECT applicant_user_id,?,'IA-RECEIVED-NEARBY',address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,'RECEIVED' FROM inspection_applications WHERE application_id=?",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) SELECT '김주민', applicant_user_id,?,'IA-RECEIVED-NEARBY',address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,'RECEIVED' FROM inspection_applications WHERE application_id=?",
         anotherAssessment,
         id);
     mvc.perform(

@@ -25,6 +25,9 @@ public class InspectionApplication {
   @JoinColumn(name = "applicant_user_id", nullable = false)
   private User applicant;
 
+  @Column(name = "applicant_name", nullable = false, length = 50)
+  private String applicantName;
+
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "assessment_id", nullable = false)
   private RiskAssessment assessment;
@@ -89,6 +92,7 @@ public class InspectionApplication {
       String receiptNo) {
     InspectionApplication application = new InspectionApplication();
     application.applicant = applicant;
+    application.applicantName = request.applicantName().strip();
     application.assessment = assessment;
     application.guideId = request.guideId();
     application.receiptNo = receiptNo;

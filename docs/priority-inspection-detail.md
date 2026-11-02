@@ -34,7 +34,7 @@ Swagger 그룹: `운영자-우선점검 관리`
 ```
 
 - receiptNo는 신청 ID를 최소 6자리로 표시하고 긴 ID를 자르지 않습니다.
-- applicantName은 신청자 계정 이름입니다.
+- applicantName은 신청 당시 입력한 신청자 이름입니다.
 - address와 detailAddress는 신청 시 연결된 분석 결과에서 복사해 신청에 저장한 주소·상세주소입니다. 신청 POST에서 별도로 입력받지 않습니다.
 - riskLevel은 해당 신청에 연결된 분석 결과이며 이후 생성한 다른 분석을 사용하지 않습니다.
 - inspectionNeed는 HIGH → 우선점검 권장, CAUTION → 점검 검토, LOW → 일반 점검입니다. 실제 우선점검 지정 여부와 별개입니다.

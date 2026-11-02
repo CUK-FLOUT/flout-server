@@ -72,4 +72,9 @@ public record CreateInspectionApplicationRequest(
             description = "침수 유입 위치 목록",
             allowableValues = {"WINDOW", "ENTRANCE", "BATHROOM", "DRAIN", "ETC", "UNKNOWN"},
             example = "[\"WINDOW\", \"DRAIN\"]")
-        List<@NotNull InflowLocation> inflowLocations) {}
+        List<@NotNull InflowLocation> inflowLocations,
+    @NotBlank(message = "신청자 이름은 필수입니다.") @Size(max = 50, message = "신청자 이름은 50자 이하여야 합니다.") @Schema(
+            description = "신청 당시 입력한 신청자 이름",
+            example = "김주민",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String applicantName) {}

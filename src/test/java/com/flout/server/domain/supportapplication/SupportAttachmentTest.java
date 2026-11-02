@@ -86,7 +86,7 @@ class SupportAttachmentTest {
         uid);
     long risk = jdbc.queryForObject("SELECT assessment_id FROM risk_assessments", Long.class);
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES(?,?,'PROOF-TEST','경기도 부천시 원미구 길주로 210',37.5,126.76,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'PROOF-TEST','경기도 부천시 원미구 길주로 210',37.5,126.76,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
         uid,
         risk);
     app = jdbc.queryForObject("SELECT application_id FROM inspection_applications", Long.class);

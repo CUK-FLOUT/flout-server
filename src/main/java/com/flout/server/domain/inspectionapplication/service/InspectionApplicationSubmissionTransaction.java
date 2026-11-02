@@ -64,7 +64,8 @@ public class InspectionApplicationSubmissionTransaction {
     var requestedLocations =
         request.inflowLocations() == null ? List.<InflowLocation>of() : request.inflowLocations();
     boolean same =
-        Objects.equals(application.getGuideId(), request.guideId())
+        Objects.equals(application.getApplicantName(), request.applicantName().strip())
+            && Objects.equals(application.getGuideId(), request.guideId())
             && Objects.equals(application.getAddress(), request.address())
             && Objects.equals(application.getDetailAddress(), request.detailAddress())
             && application

@@ -91,7 +91,8 @@ class InspectionApplicationDetailTest {
             "최근 배수구 역류가 있어 점검을 희망합니다.",
             LocalDate.of(2026, 11, 3),
             PreferredTimeSlot.MORNING,
-            null);
+            null,
+            "신청이름");
     var application =
         applications.saveAndFlush(
             InspectionApplication.received(resident, assessment, request, "IA-DETAIL-TEST"));
@@ -120,7 +121,7 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.result.applicationId").value(applicationId))
         .andExpect(
             jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", applicationId)))
-        .andExpect(jsonPath("$.result.applicantName").value("김주민"))
+        .andExpect(jsonPath("$.result.applicantName").value("신청이름"))
         .andExpect(jsonPath("$.result.contact").value("010-1234-1234"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 53"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
