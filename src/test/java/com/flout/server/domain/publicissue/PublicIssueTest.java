@@ -142,7 +142,7 @@ class PublicIssueTest {
 
   Map<String, Object> body() {
     var map = new LinkedHashMap<String, Object>();
-    map.put("sourceInspectionId", inspectionId);
+    map.put("inspectionId", inspectionId);
     map.put("address", SOURCE);
     map.put("issueType", "REPEATED_FLOODING");
     map.put("description", "조치 필요");
@@ -211,7 +211,7 @@ class PublicIssueTest {
         .andExpect(jsonPath("$.isSuccess").value(true))
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_1"))
         .andExpect(jsonPath("$.result.publicIssueId").isNumber())
-        .andExpect(jsonPath("$.result.sourceInspectionId").value(inspectionId))
+        .andExpect(jsonPath("$.result.inspectionId").value(inspectionId))
         .andExpect(jsonPath("$.result.address").value(SOURCE))
         .andExpect(jsonPath("$.result.issueType").value("REPEATED_FLOODING"))
         .andExpect(jsonPath("$.result.description").value("조치 필요"))
@@ -409,7 +409,7 @@ class PublicIssueTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"sourceInspectionId", "issueType", "description", "fieldFindings"})
+  @ValueSource(strings = {"inspectionId", "issueType", "description", "fieldFindings"})
   void rejectsMissingAndNullFields(String field) throws Exception {
     var body = body();
     body.remove(field);
@@ -447,7 +447,7 @@ class PublicIssueTest {
   @MethodSource("invalidIds")
   void rejectsNonPositiveNonIntegralAndOverflowIds(Object value) throws Exception {
     var body = body();
-    body.put("sourceInspectionId", value);
+    body.put("inspectionId", value);
     postBody(body).andExpect(status().isBadRequest());
     assertThat(count()).isZero();
   }
@@ -460,7 +460,7 @@ class PublicIssueTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_2"));
     body = body();
-    body.put("sourceInspectionId", Long.MAX_VALUE);
+    body.put("inspectionId", Long.MAX_VALUE);
     postBody(body)
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("INSPECTION_404_1"));
@@ -570,8 +570,7 @@ class PublicIssueTest {
             jsonPath("$.components.schemas.CreatePublicIssueRequest.properties.address.maxLength")
                 .value(255))
         .andExpect(
-            jsonPath(
-                    "$.components.schemas.CreatePublicIssueRequest.properties.sourceInspectionId.type")
+            jsonPath("$.components.schemas.CreatePublicIssueRequest.properties.inspectionId.type")
                 .value("integer"));
   }
 }

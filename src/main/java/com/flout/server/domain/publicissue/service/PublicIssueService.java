@@ -53,7 +53,7 @@ public class PublicIssueService {
     var source =
         transactions.execute(
             status -> {
-              var inspection = authorize(operatorId, request.sourceInspectionId());
+              var inspection = authorize(operatorId, request.inspectionId());
               var app = inspection.getApplication();
               return new SourceLocation(app.getAddress(), app.getLatitude(), app.getLongitude());
             });
@@ -69,7 +69,7 @@ public class PublicIssueService {
     // 외부 주소 조회 동안 DB 트랜잭션을 유지하지 않고, 저장 시 다시 접근 권한을 확인합니다.
     return transactions.execute(
         status -> {
-          var inspection = authorize(operatorId, request.sourceInspectionId());
+          var inspection = authorize(operatorId, request.inspectionId());
           var app = inspection.getApplication();
           boolean nowSame = normalize(address).equals(normalize(app.getAddress()));
           if (same && !nowSame)

@@ -354,7 +354,7 @@ public class OpenApiConfig {
             Map.of(
                 "publicIssueId",
                 1,
-                "sourceInspectionId",
+                "inspectionId",
                 1,
                 "address",
                 "경기도 부천시 원미구 길주로 210",
@@ -381,7 +381,7 @@ public class OpenApiConfig {
                   .summary("원본 점검 신청 주소로 등록 (address 생략)")
                   .value(
                       Map.of(
-                          "sourceInspectionId",
+                          "inspectionId",
                           1,
                           "issueType",
                           "REPEATED_FLOODING",

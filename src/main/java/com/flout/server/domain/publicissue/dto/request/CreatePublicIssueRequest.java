@@ -14,9 +14,9 @@ public record CreatePublicIssueRequest(
             type = "integer",
             implementation = Long.class,
             format = "int64",
-            description = "원본 점검 ID (양의 정수)",
+            description = "현장점검 조회 응답의 inspectionId (양의 정수). 해당 점검 신청 주소를 자동 사용",
             example = "1")
-        Long sourceInspectionId,
+        Long inspectionId,
     @Size(min = 1, max = 255) @JsonDeserialize(using = StrictString.class)
         @Schema(
             type = "string",

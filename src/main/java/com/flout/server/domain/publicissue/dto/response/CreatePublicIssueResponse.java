@@ -6,7 +6,7 @@ import java.time.ZoneId;
 
 public record CreatePublicIssueResponse(
     Long publicIssueId,
-    Long sourceInspectionId,
+    Long inspectionId,
     String address,
     PublicIssueType issueType,
     String description,
