@@ -14,7 +14,7 @@ public enum PriorityInspectionErrorCode implements BaseResponseCode {
   ORDER_LIST_CHANGED(
       409,
       "PRIORITY_INSPECTION_409_2",
-      "관할 지역의 우선점검 대상 전체 신청 ID를 applicationIds에 포함해주세요. 필터와 페이지 밖의 신청도 모두 포함해야 합니다. 지정·취소로 목록이 변경된 경우 다시 조회한 후 요청해주세요.");
+      "완료된 점검을 제외한 관할 지역의 우선점검 대상 전체 신청 ID를 applicationIds에 포함해주세요. 필터와 페이지 밖의 신청도 모두 포함해야 합니다. 지정·취소 또는 점검 완료로 목록이 변경된 경우 다시 조회한 후 요청해주세요.");
 
   private final int status;
   private final String code;

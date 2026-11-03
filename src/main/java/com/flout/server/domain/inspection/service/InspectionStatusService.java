@@ -8,6 +8,8 @@ import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -25,6 +27,7 @@ public class InspectionStatusService {
   private final InspectionRepository inspections;
   private final InspectionStatusHistoryRepository histories;
   private final Clock inspectionClock;
+  private final EntityManager entityManager;
 
   // 상태와 이력 저장 및 중복 기록 방지
   @Transactional
@@ -40,6 +43,9 @@ public class InspectionStatusService {
             .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
     if (operator.getRole() != UserRole.ADMIN)
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
+    // 순서 저장·지정과 동일하게 관할 → 점검 순서로 잠급니다.
+    if (operator.getJurisdiction() != null)
+      entityManager.lock(operator.getJurisdiction(), LockModeType.PESSIMISTIC_WRITE);
     var inspection =
         inspections
             .findForStatusUpdate(inspectionId)
