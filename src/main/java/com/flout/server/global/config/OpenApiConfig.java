@@ -10,6 +10,7 @@ import com.flout.server.domain.priorityinspection.response.code.PriorityInspecti
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
+import com.flout.server.domain.supportapplication.response.code.LandlordConsentErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
@@ -199,6 +200,11 @@ public class OpenApiConfig {
                                     "/api/admin/support-applications/{supportApplicationId}/reject")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportRejection(operation);
+                            }
+                            if (path.equals(
+                                    "/api/admin/support-applications/{supportApplicationId}/landlord-consent")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeLandlordConsent(operation);
                             }
                             if (path.equals("/api/admin/public-issues")
                                 && method == PathItem.HttpMethod.POST) {
@@ -1421,6 +1427,40 @@ public class OpenApiConfig {
         "attachmentUploadFailed",
         InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED,
         null);
+  }
+
+  private void describeLandlordConsent(Operation operation) {
+    var code = SupportApplicationSuccessCode.LANDLORD_CONSENT_CONFIRMED;
+    var success = operation.getResponses().computeIfAbsent("200", k -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "consentConfirmed",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of("supportApplicationId", 15, "landlordConsentStatus", "CONFIRMED")));
+    operation
+        .getRequestBody()
+        .getContent()
+        .get(JSON)
+        .addExamples(
+            "confirmation",
+            new Example().summary("제출된 임대인 동의서 확인").value(Map.of("status", "CONFIRMED")));
+    for (var error : LandlordConsentErrorCode.values())
+      addError(operation, error.name(), error, null);
+    for (var error :
+        List.of(
+            SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED,
+            SupportApprovalErrorCode.APPLICATION_NOT_FOUND,
+            SupportApprovalErrorCode.ALREADY_DECIDED))
+      addError(operation, error.name(), error, null);
+    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    operation.getResponses().get("400").setDescription("요청값·지원 신청 ID 오류, 세입자 아님 또는 동의서 미제출");
+    operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
+    operation.getResponses().get("409").setDescription("이미 처리된 신청 또는 동의 확인 대기 상태가 아님");
   }
 
   private void describeSupportRejection(Operation operation) {
