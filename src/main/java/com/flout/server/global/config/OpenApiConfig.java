@@ -477,6 +477,11 @@ public class OpenApiConfig {
     operation.getResponses().get("413").description("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다.");
   }
 
+  /**
+   * 점검 결과 조회의 성공·미저장 예시와 ID·관할·점검 조회 오류를 Swagger에 등록합니다.
+   *
+   * @param operation 점검 결과 GET API의 OpenAPI 명세
+   */
   private void describeInspectionResultQuery(Operation operation) {
     var code = GeneralSuccessCode.SUCCESS_OK;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());

@@ -52,6 +52,13 @@ public class AdminInspectionResultController {
   private final SaveInspectionResultDraftService draftService;
   private final InspectionResultQueryService queryService;
 
+  /**
+   * 인증된 운영자의 관할 점검 결과를 공통 성공 응답으로 반환합니다.
+   *
+   * @param jwt 운영자 인증 정보
+   * @param inspectionId 현장점검 ID
+   * @return 초안 우선 조회 결과. 저장된 결과가 없으면 응답의 result는 null
+   */
   @GetMapping(value = "/{inspectionId}/result", produces = "application/json")
   @Operation(
       summary = "점검 결과 조회",

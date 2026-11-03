@@ -21,6 +21,12 @@ public record InspectionResultResponse(
 
   public record RecommendedAction(String description) {}
 
+  /**
+   * 결과 내용은 유지하고 사진 목록을 교체한 새 응답을 반환합니다.
+   *
+   * @param photos 임시 열람 URL이 발급된 현장사진 목록
+   * @return 사진 목록이 교체된 점검 결과 응답
+   */
   public InspectionResultResponse withPhotos(List<InspectionPhotoUploadResponse.Photo> photos) {
     return new InspectionResultResponse(
         inspectionId,

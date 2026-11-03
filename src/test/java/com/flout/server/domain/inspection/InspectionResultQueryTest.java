@@ -39,6 +39,7 @@ class InspectionResultQueryTest {
   User resident;
   String token;
 
+  /** 테스트 데이터를 초기화하고 부천시 운영자와 관할 점검을 준비합니다. */
   @BeforeEach
   void setup() {
     for (String table :
@@ -77,6 +78,13 @@ class InspectionResultQueryTest {
     return "/api/admin/inspections/" + inspectionId + "/result";
   }
 
+  /**
+   * 지정한 상태의 결과를 생성하며 공개본에만 공개 시각을 설정합니다.
+   *
+   * @param status 생성할 결과 상태
+   * @param summary 저장할 결과 요약
+   * @return 생성된 결과 ID
+   */
   Long addResult(String status, String summary) {
     jdbc.update(
         "INSERT INTO inspection_results(inspection_id,result_status,summary,internal_memo,published_at) VALUES(?,?,?,'내부 메모',?)",
@@ -155,6 +163,7 @@ class InspectionResultQueryTest {
     verifyNoInteractions(storage);
   }
 
+  /** 잘못된 점검 ID는 400, 존재하지 않는 점검 ID는 404로 구분하는지 검증합니다. */
   @Test
   void validatesIdAndMissingInspection() throws Exception {
     for (String id : List.of("0", "-1", "abc")) {

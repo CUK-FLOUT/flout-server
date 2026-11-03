@@ -27,6 +27,14 @@ public class InspectionResultReader {
   private final PreventionRecommendationRepository recommendations;
   private final InspectionResultPhotoRepository photos;
 
+  /**
+   * 운영자 권한과 관할을 검증하고 초안 우선으로 점검 결과와 사진 메타데이터를 조회합니다.
+   *
+   * @param operatorId 조회하는 운영자 ID
+   * @param inspectionId 현장점검 ID
+   * @return 저장된 결과와 사진 경로의 스냅샷. 초안과 공개본이 모두 없으면 null
+   * @throws BaseException 점검 ID, 인증·권한·관할이 유효하지 않거나 점검이 없는 경우
+   */
   @Transactional(readOnly = true)
   public Snapshot get(Long operatorId, Long inspectionId) {
     if (inspectionId == null || inspectionId <= 0)
