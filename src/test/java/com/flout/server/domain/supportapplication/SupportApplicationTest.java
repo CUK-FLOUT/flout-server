@@ -105,7 +105,7 @@ class SupportApplicationTest {
         inspectionId,
         residentId);
     jdbc.update(
-        "INSERT INTO inspection_results(inspection_id,result_status,summary) VALUES(?,'DRAFT','preserved')",
+        "INSERT INTO inspection_results(inspection_id,result_status,summary,published_at) VALUES(?,'PUBLISHED','preserved',CURRENT_TIMESTAMP)",
         inspectionId);
     programId =
         programs.saveAndFlush(SupportProgram.create("테스트 지원사업", "테스트 설명", "테스트 대상", null)).getId();
@@ -154,16 +154,50 @@ class SupportApplicationTest {
     var before = snapshot();
     var b = body();
     b.put("requestedFacility", "  출입구 물막이판  ");
-    send(b, token)
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.status").value(201))
-        .andExpect(jsonPath("$.code").value("SUPPORT_201_1"))
-        .andExpect(jsonPath("$.result.applicationId").value(applicationId))
-        .andExpect(jsonPath("$.result.programId").value(programId))
-        .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
-        .andExpect(
-            jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
+    var response =
+        send(b, token)
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value(201))
+            .andExpect(jsonPath("$.code").value("SUPPORT_201_1"))
+            .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+            .andExpect(jsonPath("$.result.programId").value(programId))
+            .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
+            .andExpect(
+                jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
+            .andExpect(
+                jsonPath("$.result.receiptNumber")
+                    .value(String.format(Locale.ROOT, "%06d", applicationId)))
+            .andExpect(jsonPath("$.result.applicantName").value("김주민"))
+            .andExpect(jsonPath("$.result.programName").value("테스트 지원사업"))
+            .andExpect(
+                jsonPath("$.result.createdAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
+            .andReturn();
     var row = jdbc.queryForMap("SELECT * FROM support_applications");
+    var result = mapper.readTree(response.getResponse().getContentAsString()).path("result");
+    assertThat(result.path("applicantName").asString()).isEqualTo(row.get("APPLICANT_NAME"));
+    assertThat(result.path("programName").asString())
+        .isEqualTo(
+            jdbc.queryForObject(
+                "SELECT name FROM support_programs WHERE program_id=?", String.class, programId));
+    assertThat(result.path("supportApplicationId").asLong())
+        .isEqualTo(((Number) row.get("SUPPORT_APPLICATION_ID")).longValue());
+    assertThat(java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toInstant())
+        .isEqualTo(((java.sql.Timestamp) row.get("SUBMITTED_AT")).toInstant());
+    assertThat(result.path("createdAt").asString())
+        .isEqualTo(result.path("submittedAt").asString());
+    var detail =
+        mvc.perform(
+                get("/api/resident/applications/" + applicationId)
+                    .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+    assertThat(result.path("receiptNumber").asString())
+        .isEqualTo(
+            mapper
+                .readTree(detail.getResponse().getContentAsString())
+                .path("result")
+                .path("receiptNumber")
+                .asString());
     assertThat(row.get("APPLICANT_USER_ID")).isEqualTo(residentId);
     assertThat(row.get("APPLICANT_NAME")).isEqualTo("김주민");
     assertThat(row.get("CONTACT")).isEqualTo(CONTACT);
@@ -191,6 +225,95 @@ class SupportApplicationTest {
         programs.saveAndFlush(SupportProgram.create("별도 테스트 사업", null, null, "표시용 메타데이터")).getId());
     send(b, token).andExpect(status().isCreated());
     assertThat(count()).isEqualTo(2);
+  }
+
+  @Test
+  void rejectsWhenInspectionDoesNotExist() throws Exception {
+    jdbc.update("DELETE FROM inspection_results");
+    jdbc.update("DELETE FROM inspection_status_histories");
+    jdbc.update("DELETE FROM inspections");
+    var before = snapshot();
+    send(body(), token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SUPPORT_400_2"));
+    assertThat(count()).isZero();
+    assertThat(snapshot()).isEqualTo(before);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"RECEIVED", "INSPECTION_COMPLETED"})
+  void rejectsMissingResultEvenWhenSourceStatusLooksCompleted(String state) throws Exception {
+    jdbc.update("DELETE FROM inspection_results");
+    jdbc.update("UPDATE inspection_applications SET status=?", state);
+    var before = snapshot();
+    send(body(), token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SUPPORT_400_2"));
+    assertThat(count()).isZero();
+    assertThat(snapshot()).isEqualTo(before);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"IN_PROGRESS", "COMPLETED"})
+  void rejectsDraftAndCompletedButUnpublishedResult(String state) throws Exception {
+    jdbc.update("UPDATE inspections SET status=?", state);
+    jdbc.update("UPDATE inspection_applications SET status='INSPECTION_COMPLETED'");
+    jdbc.update("UPDATE inspection_results SET result_status='DRAFT',published_at=NULL");
+    var before = snapshot();
+    send(body(), token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SUPPORT_400_2"));
+    assertThat(count()).isZero();
+    assertThat(snapshot()).isEqualTo(before);
+    mvc.perform(
+            get("/api/resident/applications/" + applicationId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.resultPublished").value(false));
+  }
+
+  @Test
+  void allowsPublishedResultEvenWhenAnotherDraftExists() throws Exception {
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status,summary) VALUES(?,'DRAFT','new private draft')",
+        inspectionId);
+    var before = snapshot();
+    send(body(), token).andExpect(status().isCreated());
+    assertThat(snapshot()).isEqualTo(before);
+  }
+
+  @Test
+  void checksOwnershipBeforeDisclosingPublicationState() throws Exception {
+    jdbc.update("UPDATE inspection_results SET result_status='DRAFT',published_at=NULL");
+    var other =
+        users.saveAndFlush(
+            User.resident("unpublished-other@example.test", "unused-test-hash", "다른테스트주민"));
+    send(body(), jwt.issue(other).accessToken())
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SUPPORT_403_2"));
+    assertThat(count()).isZero();
+  }
+
+  @Test
+  void usesOnlyTheRequestedApplicationsPublishedResult() throws Exception {
+    jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,?,'other fixture','HIGH','COMPLETED')",
+        residentId,
+        ADDRESS);
+    var otherRisk =
+        jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) SELECT applicant_name,applicant_user_id,?,'UNPUBLISHED-OTHER',address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,'RECEIVED' FROM inspection_applications WHERE application_id=?",
+        otherRisk,
+        applicationId);
+    var otherApplication =
+        jdbc.queryForObject("SELECT MAX(application_id) FROM inspection_applications", Long.class);
+    var request = body();
+    request.put("applicationId", otherApplication);
+    send(request, token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SUPPORT_400_2"));
+    assertThat(count()).isZero();
   }
 
   @Test
@@ -475,5 +598,61 @@ class SupportApplicationTest {
             jsonPath(
                     "$.components.schemas.CreateSupportApplicationRequest.properties.occupancyType")
                 .doesNotExist());
+    String operation = "$.paths['/api/resident/support-applications'].post";
+    var documentation =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath(operation + ".description")
+                    .value(org.hamcrest.Matchers.containsString("주민에게 공개된 PUBLISHED 점검 결과")))
+            .andExpect(
+                jsonPath(
+                        operation
+                            + ".responses['400'].content['application/json'].examples.RESULT_NOT_PUBLISHED.value.code")
+                    .value("SUPPORT_400_2"))
+            .andExpect(
+                jsonPath(
+                        operation
+                            + ".responses['201'].content['application/json'].examples.submitted.value.result.receiptNumber")
+                    .value("000101"))
+            .andExpect(
+                jsonPath(
+                        operation
+                            + ".responses['201'].content['application/json'].examples.submitted.value.result.applicantName")
+                    .value("홍길동"))
+            .andExpect(
+                jsonPath(
+                        operation
+                            + ".responses['201'].content['application/json'].examples.submitted.value.result.programName")
+                    .value("침수 예방시설 설치 지원"))
+            .andExpect(
+                jsonPath(
+                        operation
+                            + ".responses['201'].content['application/json'].examples.submitted.value.result.createdAt")
+                    .value("2026-10-21T14:00:00+09:00"))
+            .andExpect(
+                jsonPath("$.components.schemas.CreateSupportApplicationRequest.required")
+                    .value(
+                        org.hamcrest.Matchers.containsInAnyOrder(
+                            "applicationId",
+                            "programId",
+                            "requestedFacility",
+                            "preferredVisitDate",
+                            "preferredVisitTime")));
+    for (String field :
+        List.of(
+            "supportApplicationId",
+            "applicationId",
+            "programId",
+            "status",
+            "submittedAt",
+            "receiptNumber",
+            "applicantName",
+            "programName",
+            "createdAt"))
+      documentation.andExpect(
+          jsonPath("$.components.schemas.CreateSupportApplicationResponse.properties." + field)
+              .exists());
+    mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
   }
 }

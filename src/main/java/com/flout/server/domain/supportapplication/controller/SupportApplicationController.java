@@ -28,7 +28,7 @@ public class SupportApplicationController {
   @Operation(
       summary = "지원 신청 등록",
       description =
-          "RESIDENT 본인의 현장점검 신청과 지원사업을 연결해 SUBMITTED로 신청합니다. 이름·연락처·주소·거주 형태는 요청받지 않고 서버 DB에서 조회해 스냅샷으로 저장합니다. 시설명은 최대 255자의 자유 문자열이며 사업별 시설 적합성은 판정하지 않습니다. 지원시설 설치 희망 방문일(오늘 이후)과 시간대(MORNING/AFTERNOON/ANY)는 필수이며 현장점검·확정 시공 일정과 별개로 저장합니다. 같은 신청·사업 조합은 재신청할 수 없고 기존 상태·이력은 변경하지 않습니다.")
+          "RESIDENT 본인의 현장점검 신청과 지원사업을 연결해 SUBMITTED로 신청합니다. 주민에게 공개된 PUBLISHED 점검 결과가 있어야 하며 미작성·DRAFT·미공개 결과는 400으로 거부합니다. 점검 완료 상태만으로는 신청할 수 없습니다. 이름·연락처·주소·거주 형태는 요청받지 않고 서버 DB에서 조회해 스냅샷으로 저장합니다. 시설명은 최대 255자의 자유 문자열이며 사업별 시설 적합성은 판정하지 않습니다. 지원시설 설치 희망 방문일(오늘 이후)과 시간대(MORNING/AFTERNOON/ANY)는 필수이며 현장점검·확정 시공 일정과 별개로 저장합니다. 같은 신청·사업 조합은 재신청할 수 없고 기존 상태·이력은 변경하지 않습니다. 접수번호는 기존 주민 신청 상세와 동일한 현장점검 신청 ID 최소 6자리 표기이며 별도로 발급하지 않습니다.")
   public SuccessResponse<CreateSupportApplicationResponse> submit(
       @AuthenticationPrincipal Jwt jwt,
       @Valid @RequestBody CreateSupportApplicationRequest request) {
