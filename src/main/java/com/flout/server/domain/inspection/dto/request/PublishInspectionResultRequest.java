@@ -1,5 +1,6 @@
 package com.flout.server.domain.inspection.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -12,7 +13,8 @@ public record PublishInspectionResultRequest(
     @NotEmpty @Size(max = 20) List<@NotNull @Valid VulnerabilityRequest> vulnerabilities,
     @NotEmpty @Size(max = 20) List<@NotNull @Valid RecommendedActionRequest> recommendedActions,
     @NotNull FollowUpType followUpType,
-    @NotBlank @Size(max = 4000) String internalMemo) {
+    @Size(max = 4000) @Schema(description = "운영자 내부 메모. 선택 입력이며 생략·null·빈 문자열 허용, 최대 4000자", nullable = true)
+        String internalMemo) {
 
   public record VulnerabilityRequest(
       @NotNull VulnerabilityType type,
