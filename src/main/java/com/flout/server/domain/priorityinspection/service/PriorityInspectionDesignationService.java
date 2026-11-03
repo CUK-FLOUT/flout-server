@@ -1,5 +1,6 @@
 package com.flout.server.domain.priorityinspection.service;
 
+import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
@@ -31,6 +32,7 @@ public class PriorityInspectionDesignationService {
   private final InspectionApplicationRepository applications;
   private final PriorityInspectionDesignationRepository designations;
   private final Clock inspectionClock;
+  private final InspectionRepository inspections;
 
   // 전체 검증 후 일괄 변경하며 실패 시 모두 롤백
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -64,8 +66,10 @@ public class PriorityInspectionDesignationService {
                     PriorityInspectionDesignation::getApplicationId, Function.identity()));
     var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     if (designated) {
+      var completed = new HashSet<>(inspections.findCompletedApplicationIds(applicationIds));
       int lastOrder =
-          current.values().stream()
+          designations.findAllWithoutCompletedInspections().stream()
+              .filter(item -> access.includes(item.getApplication().getAddress()))
               .mapToInt(PriorityInspectionDesignation::getSelectionOrder)
               .max()
               .orElse(0);
@@ -73,7 +77,8 @@ public class PriorityInspectionDesignationService {
       for (Long id : applicationIds) {
         if (current.containsKey(id)) continue;
         var item = PriorityInspectionDesignation.designated(found.get(id), operator, now);
-        item.changeOrder(++lastOrder, operator, now);
+        // 완료된 신청의 신규 지정은 미완료 대상 순위를 차지하지 않습니다.
+        item.changeOrder(completed.contains(id) ? lastOrder + 1 : ++lastOrder, operator, now);
         current.put(id, designations.saveAndFlush(item));
       }
       return new PriorityInspectionDesignationsResponse(
@@ -87,7 +92,7 @@ public class PriorityInspectionDesignationService {
       designations.flush();
       // 취소 후 남은 순위를 한 번만 정리
       var remaining =
-          designations.findAllByOrderBySelectionOrderAscApplicationIdAsc().stream()
+          designations.findAllWithoutCompletedInspections().stream()
               .filter(item -> access.includes(item.getApplication().getAddress()))
               .toList();
       for (int index = 0; index < remaining.size(); index++)

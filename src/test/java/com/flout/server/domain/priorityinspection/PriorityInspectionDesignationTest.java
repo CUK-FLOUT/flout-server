@@ -7,7 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.inspection.entity.Inspection;
+import com.flout.server.domain.inspection.entity.InspectionStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
+import com.flout.server.domain.inspection.repository.InspectionStatusHistoryRepository;
+import com.flout.server.domain.inspection.service.InspectionStatusService;
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.entity.*;
 import com.flout.server.domain.inspectionapplication.repository.*;
@@ -46,6 +49,8 @@ import tools.jackson.databind.ObjectMapper;
     })
 @AutoConfigureMockMvc
 class PriorityInspectionDesignationTest {
+  @Autowired InspectionStatusService statusService;
+  @MockitoSpyBean InspectionStatusHistoryRepository inspectionHistories;
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final LocalDateTime NOW = LocalDateTime.of(2030, 1, 2, 14, 0);
   @Autowired MockMvc mvc;
@@ -1406,6 +1411,118 @@ class PriorityInspectionDesignationTest {
             jdbc.queryForList(
                 "SELECT * FROM priority_inspection_designations ORDER BY application_id"))
         .isEqualTo(before);
+  }
+
+  @Test
+  void cancellationAndNewDesignationRankOnlyUncompletedTargets() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    var third = additionalApplication("부천시 길주로 212");
+    bulk(List.of(second, applicationId, third), true).andExpect(status().isOk());
+    jdbc.update("UPDATE inspections SET status='COMPLETED' WHERE inspection_id=?", inspectionId);
+    saveOrder(List.of(second, third)).andExpect(status().isOk());
+    var completed =
+        jdbc.queryForMap(
+            "SELECT * FROM priority_inspection_designations WHERE application_id=?", applicationId);
+    bulk(List.of(second), false).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT selection_order FROM priority_inspection_designations WHERE application_id=?",
+                Integer.class,
+                third))
+        .isEqualTo(1);
+    designateApplication(second);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT selection_order FROM priority_inspection_designations WHERE application_id=?",
+                Integer.class,
+                second))
+        .isEqualTo(2);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM priority_inspection_designations WHERE application_id=?",
+                applicationId))
+        .isEqualTo(completed);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void completionAndOrderShareJurisdictionLock(boolean completionFirst) throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    bulk(List.of(applicationId, second), true).andExpect(status().isOk());
+    jdbc.update("UPDATE inspections SET status='IN_PROGRESS' WHERE inspection_id=?", inspectionId);
+    var completedBefore =
+        jdbc.queryForMap(
+            "SELECT * FROM priority_inspection_designations WHERE application_id=?", applicationId);
+    var holding = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    if (completionFirst) {
+      doAnswer(
+              invocation -> {
+                Object result = invocation.getArgument(0);
+                entityManager.persist(result);
+                entityManager.flush();
+                holding.countDown();
+                if (!release.await(10, TimeUnit.SECONDS))
+                  throw new IllegalStateException("test timeout");
+                return result;
+              })
+          .when(inspectionHistories)
+          .saveAndFlush(any());
+    } else {
+      doAnswer(
+              invocation -> {
+                var result =
+                    entityManager
+                        .createQuery(
+                            "select d from PriorityInspectionDesignation d order by d.selectionOrder, d.applicationId",
+                            com.flout.server.domain.priorityinspection.entity
+                                .PriorityInspectionDesignation.class)
+                        .getResultList();
+                holding.countDown();
+                if (!release.await(10, TimeUnit.SECONDS))
+                  throw new IllegalStateException("test timeout");
+                return result;
+              })
+          .when(designations)
+          .findAllWithoutCompletedInspections();
+    }
+    Callable<Integer> order =
+        () -> saveOrder(List.of(second, applicationId)).andReturn().getResponse().getStatus();
+    Callable<Integer> complete =
+        () -> {
+          statusService.change(operatorId, inspectionId, InspectionStatus.COMPLETED);
+          return 200;
+        };
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var first = executor.submit(completionFirst ? complete : order);
+      try {
+        assertThat(holding.await(10, TimeUnit.SECONDS)).isTrue();
+        var started = new CountDownLatch(1);
+        var next =
+            executor.submit(
+                () -> {
+                  started.countDown();
+                  return (completionFirst ? order : complete).call();
+                });
+        assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> next.get(300, TimeUnit.MILLISECONDS))
+            .isInstanceOf(TimeoutException.class);
+        release.countDown();
+        assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(200);
+        assertThat(next.get(10, TimeUnit.SECONDS)).isEqualTo(completionFirst ? 409 : 200);
+      } finally {
+        release.countDown();
+      }
+    }
+    assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
+        .isEqualTo(InspectionStatus.COMPLETED);
+    if (completionFirst)
+      assertThat(
+              jdbc.queryForMap(
+                  "SELECT * FROM priority_inspection_designations WHERE application_id=?",
+                  applicationId))
+          .isEqualTo(completedBefore);
   }
 
   @Test
