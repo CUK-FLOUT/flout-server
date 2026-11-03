@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/addresses")
-@Tag(name = "주민 주소", description = "주민 주소 검색")
+@Tag(name = "주민-AI취약도 분석", description = "주민 주소 검색")
 public class AddressController {
   private final AddressSearchService addressSearchService;
   private final AddressCoordinatesService addressCoordinatesService;

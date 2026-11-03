@@ -18,7 +18,7 @@ import org.springframework.web.multipart.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/support-applications")
-@Tag(name = "주민-지원 신청")
+@Tag(name = "주민-지원신청")
 public class SupportAttachmentController {
   private final SupportAttachmentService service;
 

@@ -21,7 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/applications")
-@Tag(name = "주민 - 현장점검 신청 및 진행")
+@Tag(name = "주민-현장점검 신청")
 public class AttachmentController {
   private final AttachmentService attachments;
 

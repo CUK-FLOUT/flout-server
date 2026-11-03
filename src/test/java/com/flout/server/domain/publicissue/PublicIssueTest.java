@@ -392,8 +392,24 @@ class PublicIssueTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"sourceInspectionId", "address", "issueType", "description", "fieldFindings"})
+  @ValueSource(booleans = {false, true})
+  void missingOrNullAddressUsesSourceAddressAndCoordinates(boolean explicitNull) throws Exception {
+    var request = body();
+    if (explicitNull) request.put("address", null);
+    else request.remove("address");
+    var before = snapshot();
+    postBody(request)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.address").value(SOURCE));
+    var row = jdbc.queryForMap("SELECT * FROM public_issues");
+    assertThat(row.get("latitude")).isEqualTo(new BigDecimal("37.5000000"));
+    assertThat(row.get("longitude")).isEqualTo(new BigDecimal("126.7600000"));
+    verifyNoInteractions(client);
+    assertThat(snapshot()).isEqualTo(before);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sourceInspectionId", "issueType", "description", "fieldFindings"})
   void rejectsMissingAndNullFields(String field) throws Exception {
     var body = body();
     body.remove(field);
