@@ -337,6 +337,11 @@ public class OpenApiConfig {
                             }
 
                             if (path.equals("/api/admin/priority-inspections/order")
+                                && method == PathItem.HttpMethod.GET) {
+                              describePriorityOrderList(operation);
+                            }
+
+                            if (path.equals("/api/admin/priority-inspections/order")
                                 && method == PathItem.HttpMethod.PUT) {
                               describePriorityOrder(operation);
                             }
@@ -883,7 +888,52 @@ public class OpenApiConfig {
     operation.getResponses().get("503").setDescription("외부 주소 좌표 조회 서비스 응답 시간 초과");
   }
 
-  // 우선점검 순서 저장 응답과 오류 예시
+  // 우선점검 순서 조회 응답과 오류 예시
+  private void describePriorityOrderList(Operation operation) {
+    var code = PriorityInspectionSuccessCode.ORDER_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "orderFound",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "applications",
+                List.of(
+                    Map.of(
+                        "applicationId",
+                        3,
+                        "receiptNo",
+                        "000003",
+                        "selectionOrder",
+                        1,
+                        "address",
+                        "경기도 부천시 원미구 길주로 210",
+                        "riskLevel",
+                        "HIGH",
+                        "floodExperience",
+                        "YES",
+                        "requestReason",
+                        "최근 배수구 역류",
+                        "nearbyApplicationCount",
+                        3,
+                        "designated",
+                        true)))));
+    addExample(
+        success,
+        "emptyOrder",
+        envelope(true, code, code.getMessage(), Map.of("applications", List.of())));
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED,
+        null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
   private void describePriorityOrder(Operation operation) {
     var code = PriorityInspectionSuccessCode.ORDER_SAVED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());

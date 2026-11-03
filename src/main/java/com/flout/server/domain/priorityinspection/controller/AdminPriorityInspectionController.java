@@ -5,6 +5,7 @@ import com.flout.server.domain.priorityinspection.dto.request.UpdatePriorityInsp
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionCandidatesResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDesignationsResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDetailResponse;
+import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderListResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderResponse;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.priorityinspection.service.PriorityInspectionCandidateService;
@@ -32,6 +33,18 @@ public class AdminPriorityInspectionController {
   private final PriorityInspectionOrderService orderService;
   private final PriorityInspectionCandidateService candidateService;
   private final PriorityInspectionDetailService detailService;
+
+  @GetMapping(value = "/order", produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "우선점검 선정 순서 조회",
+      description =
+          "선정 순서 변경 모달용 조회입니다. 관할 내 완료(COMPLETED) 건을 제외한 지정 대상 전체를 저장된 selectionOrder 오름차순으로 반환합니다. 검색·필터·페이지를 적용하지 않습니다. 대상이 없으면 applications는 빈 배열입니다. 순서를 변경하거나 재번호를 부여하지 않습니다.")
+  public SuccessResponse<PriorityInspectionOrderListResponse> getOrder(
+      @AuthenticationPrincipal Jwt jwt) {
+    return SuccessResponse.of(
+        orderService.get(Long.valueOf(jwt.getSubject())),
+        PriorityInspectionSuccessCode.ORDER_FOUND);
+  }
 
   // 선택한 신청의 상세 패널 조회
   @GetMapping(value = "/{applicationId}", produces = MediaType.APPLICATION_JSON_VALUE)

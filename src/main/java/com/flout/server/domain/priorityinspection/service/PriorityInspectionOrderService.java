@@ -2,7 +2,9 @@ package com.flout.server.domain.priorityinspection.service;
 
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderListResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderResponse;
+import com.flout.server.domain.priorityinspection.repository.PriorityInspectionCandidateRepository;
 import com.flout.server.domain.priorityinspection.repository.PriorityInspectionDesignationRepository;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
 import com.flout.server.global.exception.BaseException;
@@ -25,6 +27,26 @@ public class PriorityInspectionOrderService {
   private final InspectionApplicationRepository applications;
   private final PriorityInspectionDesignationRepository designations;
   private final Clock inspectionClock;
+  private final PriorityInspectionCandidateRepository candidates;
+
+  @Transactional(readOnly = true)
+  public PriorityInspectionOrderListResponse get(Long operatorId) {
+    access.requireJurisdiction(operatorId);
+    var ordered =
+        designations.findActiveOrder().stream()
+            .filter(designation -> access.includes(designation.getApplication().getAddress()))
+            .toList();
+    var counts =
+        candidates.nearbyCounts(
+            ordered.stream().map(designation -> designation.getApplicationId()).toList());
+    return new PriorityInspectionOrderListResponse(
+        ordered.stream()
+            .map(
+                designation ->
+                    PriorityInspectionOrderListResponse.Item.from(
+                        designation, counts.getOrDefault(designation.getApplicationId(), 0L)))
+            .toList());
+  }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PriorityInspectionOrderResponse save(Long operatorId, List<Long> applicationIds) {
