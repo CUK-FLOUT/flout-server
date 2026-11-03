@@ -117,6 +117,10 @@ public class SupportApplication {
     return support;
   }
 
+  public void confirmLandlordConsent() {
+    this.landlordConsentStatus = LandlordConsentStatus.CONFIRMED;
+  }
+
   public void approve(String scope, User operator, LocalDateTime approvedAt) {
     this.supportScope = scope;
     this.approvedBy = operator;
