@@ -18,4 +18,15 @@ public interface PriorityInspectionDesignationRepository
           + "and i.status = com.flout.server.domain.inspection.entity.InspectionStatus.COMPLETED) "
           + "order by d.selectionOrder, d.applicationId")
   List<PriorityInspectionDesignation> findAllWithoutCompletedInspections();
+
+  @EntityGraph(attributePaths = {"application", "application.assessment"})
+  @Query(
+      """
+      select d from PriorityInspectionDesignation d
+      where d.application.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT
+        and not exists (select i.id from Inspection i where i.application = d.application
+          and i.status = com.flout.server.domain.inspection.entity.InspectionStatus.COMPLETED)
+      order by d.selectionOrder, d.applicationId
+      """)
+  List<PriorityInspectionDesignation> findActiveOrder();
 }

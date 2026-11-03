@@ -237,6 +237,25 @@ class OpenApiConfigTest {
   }
 
   @Test
+  void priorityOrderQueryDocumentsSuccessEmptyAndAuthErrorsSeparatelyFromPut() {
+    String path = "/api/admin/priority-inspections/order";
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths().addPathItem(path, new PathItem().get(new Operation()).put(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    var responses = api.getPaths().get(path).getGet().getResponses();
+    assertExampleMessage(responses, "200", "orderFound", "우선점검 선정 순서를 조회했습니다.");
+    assertThat(responses.get("200").getContent().get("application/json").getExamples())
+        .containsKeys("orderFound", "emptyOrder");
+    assertThat(responses).containsKeys("200", "401", "403", "406", "500");
+    assertThat(responses).doesNotContainKeys("400", "404", "409", "415");
+    assertExampleMessage(
+        api.getPaths().get(path).getPut().getResponses(),
+        "200",
+        "orderSaved",
+        "우선점검 선정 순서가 저장되었습니다.");
+  }
+
+  @Test
   void attachmentUploadExamplesMatchActualErrorCodesAndMessages() {
     String path = "/api/resident/applications/{applicationId}/attachments";
     var api = new OpenAPI().paths(new Paths());

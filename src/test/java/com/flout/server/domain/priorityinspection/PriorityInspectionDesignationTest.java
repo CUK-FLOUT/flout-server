@@ -71,6 +71,102 @@ class PriorityInspectionDesignationTest {
   Long inspectionId;
   String token;
 
+  @Test
+  void getOrderReturnsAllActiveDesignatedRowsInSavedOrderWithoutMutation() throws Exception {
+    var second = additionalApplication("부천시 소사구 두번째");
+    var third = additionalApplication("부천시 오정구 세번째");
+    additionalApplication("부천시 미지정");
+    var outside = additionalApplication("서울특별시 중구 관할밖");
+    bulk(List.of(applicationId, second, third), true).andExpect(status().isOk());
+    saveOrder(List.of(third, applicationId, second)).andExpect(status().isOk());
+    jdbc.update(
+        "UPDATE inspections SET status = 'COMPLETED' WHERE inspection_id = ?", inspectionId);
+    jdbc.update(
+        "INSERT INTO priority_inspection_designations "
+            + "(application_id, designated_by_user_id, designated_at, selection_order, order_updated_by_user_id, order_updated_at) "
+            + "VALUES (?, ?, ?, 1, ?, ?)",
+        outside,
+        operatorId,
+        NOW,
+        operatorId,
+        NOW);
+    var before =
+        jdbc.queryForList("SELECT * FROM priority_inspection_designations ORDER BY application_id");
+    mvc.perform(
+            get("/api/admin/priority-inspections/order").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_200_6"))
+        .andExpect(jsonPath("$.result.applications.length()").value(2))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(third))
+        .andExpect(jsonPath("$.result.applications[0].selectionOrder").value(1))
+        .andExpect(
+            jsonPath("$.result.applications[0].receiptNo")
+                .value(String.format(Locale.ROOT, "%06d", third)))
+        .andExpect(jsonPath("$.result.applications[0].riskLevel").value("HIGH"))
+        .andExpect(jsonPath("$.result.applications[0].floodExperience").value("YES"))
+        .andExpect(jsonPath("$.result.applications[0].requestReason").value("점검 요청"))
+        .andExpect(jsonPath("$.result.applications[0].nearbyApplicationCount").value(3))
+        .andExpect(jsonPath("$.result.applications[0].designated").value(true))
+        .andExpect(jsonPath("$.result.applications[1].applicationId").value(second))
+        .andExpect(jsonPath("$.result.applications[1].selectionOrder").value(3));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY application_id"))
+        .isEqualTo(before);
+  }
+
+  @Test
+  void getOrderReturnsEmptyArrayWhenNoDesignations() throws Exception {
+    mvc.perform(
+            get("/api/admin/priority-inspections/order").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty());
+  }
+
+  @Test
+  void getOrderDoesNotPaginateOrApplyCandidateFilters() throws Exception {
+    var ids = new ArrayList<Long>();
+    ids.add(applicationId);
+    for (int index = 0; index < 11; index++) {
+      ids.add(additionalApplication("부천시 원미구 추가 " + index));
+    }
+    bulk(ids, true).andExpect(status().isOk());
+    Collections.reverse(ids);
+    saveOrder(ids).andExpect(status().isOk());
+    mvc.perform(
+            get("/api/admin/priority-inspections/order")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "일치하지 않는 검색어")
+                .param("district", "소사구")
+                .param("page", "1")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications.length()").value(12))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(ids.getFirst()))
+        .andExpect(jsonPath("$.result.applications[11].applicationId").value(applicationId));
+    jdbc.update(
+        "UPDATE inspection_applications SET status = 'DRAFT' WHERE application_id = ?",
+        applicationId);
+    mvc.perform(
+            get("/api/admin/priority-inspections/order").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications.length()").value(11));
+  }
+
+  @Test
+  void getOrderRequiresAdminAndJurisdiction() throws Exception {
+    mvc.perform(get("/api/admin/priority-inspections/order")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/priority-inspections/order")
+                .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
+        .andExpect(status().isForbidden());
+    jdbc.update("UPDATE users SET jurisdiction_id = NULL WHERE user_id = ?", operatorId);
+    mvc.perform(
+            get("/api/admin/priority-inspections/order").header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_403_1"));
+  }
+
   // 신청과 점검이 연결된 접수 건 준비
   @BeforeEach
   void setup() {
