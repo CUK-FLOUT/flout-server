@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/notifications/tokens")
-@Tag(name = "알림", description = "로그인 사용자의 기기 FCM 토큰 관리")
+@Tag(name = "주민-알림", description = "로그인 사용자의 기기 FCM 토큰 관리")
 public class FcmTokenController {
   private final FcmTokenService tokens;
 
