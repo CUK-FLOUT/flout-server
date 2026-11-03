@@ -106,7 +106,7 @@ public class AdminPriorityInspectionController {
   @Operation(
       summary = "우선점검 선정 순서 저장",
       description =
-          "관할 지역의 우선점검 대상 전체 신청 ID를 원하는 순서대로 전달합니다. 첫 항목부터 1순위로 저장합니다. 필터·페이지 밖의 대상도 포함해야 하며 누락되거나 지정 목록이 변경되면 409를 반환합니다. 동일 순서 재요청은 변경 시각을 유지합니다. 신청·점검·메모·최초 지정 정보는 변경하지 않습니다.")
+          "관할 지역에서 완료된 점검을 제외한 우선점검 대상 전체 신청 ID를 원하는 순서대로 전달합니다. 첫 항목부터 1순위로 저장합니다. 필터·페이지 밖의 대상도 포함해야 하며 누락되거나 완료된 점검이 포함되면 409를 반환합니다. 동일 순서 재요청은 변경 시각을 유지합니다. 완료된 점검의 기존 지정·순서 정보와 신청·점검·메모·최초 지정 정보는 변경하지 않습니다.")
   public SuccessResponse<PriorityInspectionOrderResponse> saveOrder(
       @AuthenticationPrincipal Jwt jwt,
       @Valid @RequestBody UpdatePriorityInspectionOrderRequest request) {

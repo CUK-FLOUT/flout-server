@@ -37,14 +37,20 @@ public class PriorityInspectionOrderService {
       throw new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND);
     if (found.stream().anyMatch(application -> !access.includes(application.getAddress())))
       throw new BaseException(PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    var current =
+    var designated =
         designations.findAllByOrderBySelectionOrderAscApplicationIdAsc().stream()
             .filter(designation -> access.includes(designation.getApplication().getAddress()))
             .collect(
                 Collectors.toMap(
                     designation -> designation.getApplicationId(), Function.identity()));
-    if (!current.keySet().containsAll(requested))
+    if (!designated.keySet().containsAll(requested))
       throw new BaseException(PriorityInspectionErrorCode.NOT_DESIGNATED);
+    var current =
+        designations.findAllWithoutCompletedInspections().stream()
+            .filter(designation -> access.includes(designation.getApplication().getAddress()))
+            .collect(
+                Collectors.toMap(
+                    designation -> designation.getApplicationId(), Function.identity()));
     if (!requested.equals(current.keySet()))
       throw new BaseException(PriorityInspectionErrorCode.ORDER_LIST_CHANGED);
     var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);

@@ -1375,6 +1375,40 @@ class PriorityInspectionDesignationTest {
   }
 
   @Test
+  void orderExcludesCompletedAndPreservesTheirDesignation() throws Exception {
+    var second = additionalApplication("부천시 길주로 211");
+    var third = additionalApplication("부천시 길주로 212");
+    bulk(List.of(applicationId, second, third), true).andExpect(status().isOk());
+    jdbc.update("UPDATE inspections SET status='COMPLETED' WHERE inspection_id=?", inspectionId);
+    var completed =
+        jdbc.queryForMap(
+            "SELECT * FROM priority_inspection_designations WHERE application_id=?", applicationId);
+    saveOrder(List.of(third, second))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications.length()").value(2))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(third))
+        .andExpect(jsonPath("$.result.applications[0].selectionOrder").value(1))
+        .andExpect(jsonPath("$.result.applications[1].selectionOrder").value(2));
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM priority_inspection_designations WHERE application_id=?",
+                applicationId))
+        .isEqualTo(completed);
+    var before =
+        jdbc.queryForList("SELECT * FROM priority_inspection_designations ORDER BY application_id");
+    saveOrder(List.of(third))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_409_2"));
+    saveOrder(List.of(third, second, applicationId))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PRIORITY_INSPECTION_409_2"));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM priority_inspection_designations ORDER BY application_id"))
+        .isEqualTo(before);
+  }
+
+  @Test
   void validatesOrderListAndDoesNotSavePartialChanges() throws Exception {
     var second = additionalApplication("부천시 길주로 211");
     designateApplication(applicationId);
