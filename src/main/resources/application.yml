@@ -17,6 +17,10 @@ management:
         include: health,info
 
 app:
+  fcm:
+    enabled: ${FCM_ENABLED:true}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    interval-millis: ${FCM_INTERVAL_MILLIS:5000}
   s3:
     region: ${AWS_REGION:}
     bucket: ${AWS_S3_BUCKET:}
