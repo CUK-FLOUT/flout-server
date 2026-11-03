@@ -94,7 +94,7 @@ class SupportAttachmentTest {
     jdbc.update("INSERT INTO inspections(application_id,status) VALUES(?,'IN_PROGRESS')", app);
     long inspection = jdbc.queryForObject("SELECT inspection_id FROM inspections", Long.class);
     jdbc.update(
-        "INSERT INTO inspection_results(inspection_id,result_status,summary,internal_memo) VALUES(?,'DRAFT','Keep source','Keep private')",
+        "INSERT INTO inspection_results(inspection_id,result_status,summary,internal_memo,published_at) VALUES(?,'PUBLISHED','Keep source','Keep private',CURRENT_TIMESTAMP)",
         inspection);
     jdbc.update(
         "INSERT INTO inspection_status_histories(inspection_id,previous_status,status,changed_by_user_id,change_source,changed_at) VALUES(?,'RECEIVED','IN_PROGRESS',?,'MANUAL',CURRENT_TIMESTAMP)",

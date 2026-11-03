@@ -1645,6 +1645,14 @@ public class OpenApiConfig {
                 "status",
                 "SUBMITTED",
                 "submittedAt",
+                "2026-10-21T14:00:00+09:00",
+                "receiptNumber",
+                "000101",
+                "applicantName",
+                "홍길동",
+                "programName",
+                "침수 예방시설 설치 지원",
+                "createdAt",
                 "2026-10-21T14:00:00+09:00")));
     addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(

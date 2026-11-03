@@ -1,5 +1,8 @@
 package com.flout.server.domain.supportapplication.service;
 
+import com.flout.server.domain.inspection.entity.ResultStatus;
+import com.flout.server.domain.inspection.repository.InspectionRepository;
+import com.flout.server.domain.inspection.repository.InspectionResultRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.supportapplication.dto.request.CreateSupportApplicationRequest;
 import com.flout.server.domain.supportapplication.dto.response.CreateSupportApplicationResponse;
@@ -11,6 +14,7 @@ import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import jakarta.persistence.EntityManager;
 import java.sql.SQLException;
 import java.util.Locale;
 import org.hibernate.exception.ConstraintViolationException;
@@ -27,6 +31,9 @@ public class SupportApplicationService {
   private final InspectionApplicationRepository applications;
   private final SupportProgramRepository programs;
   private final SupportApplicationRepository supports;
+  private final InspectionRepository inspections;
+  private final InspectionResultRepository results;
+  private final EntityManager entityManager;
   private final TransactionTemplate transaction;
 
   public SupportApplicationService(
@@ -34,11 +41,17 @@ public class SupportApplicationService {
       InspectionApplicationRepository applications,
       SupportProgramRepository programs,
       SupportApplicationRepository supports,
+      InspectionRepository inspections,
+      InspectionResultRepository results,
+      EntityManager entityManager,
       PlatformTransactionManager manager) {
     this.users = users;
     this.applications = applications;
     this.programs = programs;
     this.supports = supports;
+    this.inspections = inspections;
+    this.results = results;
+    this.entityManager = entityManager;
     transaction = new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -62,6 +75,18 @@ public class SupportApplicationService {
                         () -> new BaseException(SupportApplicationErrorCode.APPLICATION_NOT_FOUND));
             if (!source.getApplicant().getId().equals(userId))
               throw new BaseException(SupportApplicationErrorCode.APPLICATION_ACCESS_DENIED);
+            boolean published =
+                inspections
+                    .findByApplicationId(source.getId())
+                    .map(
+                        inspection ->
+                            results
+                                .findByInspectionIdAndResultStatus(
+                                    inspection.getId(), ResultStatus.PUBLISHED)
+                                .isPresent())
+                    .orElse(false);
+            if (!published)
+              throw new BaseException(SupportApplicationErrorCode.RESULT_NOT_PUBLISHED);
             var program =
                 programs
                     .findById(request.programId())
@@ -77,7 +102,7 @@ public class SupportApplicationService {
                 || source.getAddress().isBlank()
                 || source.getOccupancyType() == null)
               throw new BaseException(SupportApplicationErrorCode.SOURCE_INFORMATION_UNAVAILABLE);
-            return CreateSupportApplicationResponse.from(
+            var saved =
                 supports.saveAndFlush(
                     SupportApplication.submitted(
                         source,
@@ -85,7 +110,10 @@ public class SupportApplicationService {
                         user,
                         request.requestedFacility(),
                         request.preferredVisitDate(),
-                        request.preferredVisitTime())));
+                        request.preferredVisitTime()));
+
+            entityManager.refresh(saved);
+            return CreateSupportApplicationResponse.from(saved);
           });
     } catch (DataIntegrityViolationException e) {
       if (isDuplicate(e))
