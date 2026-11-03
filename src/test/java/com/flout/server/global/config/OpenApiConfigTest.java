@@ -14,6 +14,21 @@ import org.junit.jupiter.api.Test;
 
 class OpenApiConfigTest {
   @Test
+  void inspectionResultQueryDocumentsEmptyResultAndReadErrors() {
+    String path = "/api/admin/inspections/{inspectionId}/result";
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths().addPathItem(path, new PathItem().get(new Operation()).post(new Operation()));
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    var responses = api.getPaths().get(path).getGet().getResponses();
+    assertThat(responses).containsKeys("200", "400", "401", "403", "404", "406", "500");
+    assertThat(responses).doesNotContainKeys("409", "415");
+    assertThat(responses.get("200").getContent().get("application/json").getExamples())
+        .containsKeys("inspectionResult", "noSavedResult");
+    assertExampleMessage(responses, "403", "jurisdictionAccessDenied", "본인 관할 지역의 점검만 조회할 수 있습니다.");
+    assertExampleMessage(responses, "404", "inspectionNotFound", "점검을 찾을 수 없습니다.");
+  }
+
+  @Test
   void addressEndpointsDocumentSearchAndCoordinateErrorsSeparately() {
     var api = new OpenAPI().paths(new Paths());
     api.getPaths()

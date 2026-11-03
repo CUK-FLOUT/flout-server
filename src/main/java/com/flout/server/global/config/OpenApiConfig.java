@@ -301,6 +301,11 @@ public class OpenApiConfig {
                             }
 
                             if (path.equals("/api/admin/inspections/{inspectionId}/result")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeInspectionResultQuery(operation);
+                            }
+
+                            if (path.equals("/api/admin/inspections/{inspectionId}/result")
                                 && method == PathItem.HttpMethod.POST) {
                               addError(
                                   operation,
@@ -470,6 +475,63 @@ public class OpenApiConfig {
         .get("404")
         .description(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
     operation.getResponses().get("413").description("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다.");
+  }
+
+  private void describeInspectionResultQuery(Operation operation) {
+    var code = GeneralSuccessCode.SUCCESS_OK;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("점검 결과 조회 성공. 저장된 결과가 없으면 result는 null");
+    var result = new LinkedHashMap<String, Object>();
+    result.put("inspectionId", 1);
+    result.put("resultId", 2);
+    result.put("resultStatus", "DRAFT");
+    result.put("summary", "출입구 빗물 유입에 대비한 조치가 필요합니다.");
+    result.put(
+        "vulnerabilities",
+        List.of(
+            Map.of(
+                "type",
+                "ENTRANCE",
+                "title",
+                "낮은 출입구",
+                "expertOpinion",
+                "빗물이 유입될 수 있습니다.",
+                "fieldFindings",
+                "차수시설 없음")));
+    result.put("recommendedActions", List.of(Map.of("description", "출입구 물막이판 설치")));
+    result.put("followUpType", "INDIVIDUAL_HOUSE");
+    result.put("internalMemo", "지원 범위 확인 필요");
+    result.put("savedAt", "2026-11-04T00:30:00+09:00");
+    result.put("publishedAt", null);
+    result.put(
+        "photos",
+        List.of(
+            Map.of(
+                "photoId",
+                1,
+                "fileName",
+                "현장.png",
+                "url",
+                "https://example.com/temporary-photo-url",
+                "size",
+                100,
+                "contentType",
+                "image/png")));
+    addExample(success, "inspectionResult", envelope(true, code, code.getMessage(), result));
+    addExample(success, "noSavedResult", envelope(true, code, code.getMessage(), null));
+    addError(
+        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionAccessDenied",
+        InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED,
+        null);
+    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeInspectionResultDraft(Operation operation) {
