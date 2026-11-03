@@ -5,9 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.flout.server.domain.notification.entity.NotificationType;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.ErrorCode;
 import com.google.firebase.IncomingHttpResponse;
 import com.google.firebase.messaging.*;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,31 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class FirebasePushGatewayTest {
+  /** 인증정보 읽기 실패를 재시도로 분류하고 이후 같은 게이트웨이에서 발송 가능한지 검증합니다. */
+  @Test
+  void credentialReadFailureIsRetryableAndDoesNotCloseGateway() throws Exception {
+    var gateway = new FirebasePushGateway("");
+    try (var credentials = mockStatic(GoogleCredentials.class)) {
+      credentials
+          .when(GoogleCredentials::getApplicationDefault)
+          .thenThrow(new IOException("credentials unavailable"));
+      assertThatThrownBy(
+              () -> gateway.send("device", NotificationType.INSPECTION_RECEIVED, 1L, "event"))
+          .isInstanceOfSatisfying(
+              PushFailure.class,
+              failure -> {
+                assertThat(failure.getKind()).isEqualTo(PushFailure.Kind.RETRYABLE);
+                assertThat(failure.getCode()).isEqualTo("FIREBASE_CREDENTIALS_UNAVAILABLE");
+                assertThat(failure.getRetryAfterSeconds()).isZero();
+              });
+    }
+    var messaging = mock(FirebaseMessaging.class);
+    ReflectionTestUtils.setField(gateway, "messaging", messaging);
+    gateway.send("device", NotificationType.INSPECTION_RECEIVED, 1L, "event");
+    verify(messaging).send(any(Message.class));
+    gateway.close();
+  }
+
   // 알림 제목·내용 및 프론트 이동 데이터 매핑 검증
   @Test
   void mapsNotificationAndDataWithoutRealCredentials() throws Exception {

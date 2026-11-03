@@ -3,7 +3,7 @@
 `PUT /api/notifications/tokens`
 
 로그인한 주민·운영자 모두 사용할 수 있습니다. `Authorization: Bearer {accessToken}`이 필요하며 사용자 ID는 JWT에서 가져옵니다.
-Swagger 태그는 `알림`입니다. 경로·쿼리 파라미터는 없습니다.
+Swagger 태그는 `주민-알림`입니다. 경로·쿼리 파라미터는 없습니다.
 
 ## 요청
 

@@ -86,7 +86,7 @@ public class FirebasePushGateway implements PushGateway {
                   : PushFailure.Kind.PERMANENT;
       throw new PushFailure(kind, name, retryAfter(exception));
     } catch (IOException exception) {
-      throw new PushFailure(PushFailure.Kind.PERMANENT, "FIREBASE_CREDENTIALS_UNAVAILABLE", 0);
+      throw new PushFailure(PushFailure.Kind.RETRYABLE, "FIREBASE_CREDENTIALS_UNAVAILABLE", 0);
     } catch (IllegalArgumentException | IllegalStateException exception) {
       throw new PushFailure(PushFailure.Kind.PERMANENT, "FIREBASE_CONFIGURATION_INVALID", 0);
     }
