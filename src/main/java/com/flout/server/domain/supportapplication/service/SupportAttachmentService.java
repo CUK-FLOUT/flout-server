@@ -122,7 +122,6 @@ public class SupportAttachmentService {
   private SupportAttachmentType resolveType(SupportApplication application) {
     var occupancy = application.getOccupancyType();
     if (occupancy == OccupancyType.TENANT) return SupportAttachmentType.LANDLORD_CONSENT;
-    if (occupancy == OccupancyType.OWNER) return SupportAttachmentType.OWNERSHIP_PROOF;
     throw new BaseException(SupportAttachmentErrorCode.INVALID_OCCUPANCY);
   }
 

@@ -66,6 +66,7 @@ class SupportAttachmentTest {
         List.of(
             "support_attachments",
             "attachment_upload_intents",
+            "support_application_status_histories",
             "support_applications",
             "support_programs",
             "inspection_results",
@@ -86,7 +87,7 @@ class SupportAttachmentTest {
         uid);
     long risk = jdbc.queryForObject("SELECT assessment_id FROM risk_assessments", Long.class);
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'PROOF-TEST','경기도 부천시 원미구 길주로 210',37.5,126.76,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'PROOF-TEST','경기도 부천시 원미구 길주로 210',37.5,126.76,'010-0000-0000','TENANT','NO',FALSE,'RECEIVED')",
         uid,
         risk);
     app = jdbc.queryForObject("SELECT application_id FROM inspection_applications", Long.class);
@@ -189,7 +190,8 @@ class SupportAttachmentTest {
         jdbc.queryForList("SELECT * FROM inspections"),
         jdbc.queryForList("SELECT * FROM inspection_results"),
         jdbc.queryForList("SELECT * FROM application_status_histories"),
-        jdbc.queryForList("SELECT * FROM inspection_status_histories"));
+        jdbc.queryForList("SELECT * FROM inspection_status_histories"),
+        jdbc.queryForList("SELECT * FROM support_application_status_histories"));
   }
 
   void expireIntents() {
@@ -201,10 +203,6 @@ class SupportAttachmentTest {
 
   @ParameterizedTest
   @CsvSource({
-    "OWNER,OWNERSHIP_PROOF,pdf",
-    "OWNER,OWNERSHIP_PROOF,jpg",
-    "OWNER,OWNERSHIP_PROOF,jpeg",
-    "OWNER,OWNERSHIP_PROOF,png",
     "TENANT,LANDLORD_CONSENT,pdf",
     "TENANT,LANDLORD_CONSENT,jpg",
     "TENANT,LANDLORD_CONSENT,jpeg",
@@ -244,14 +242,20 @@ class SupportAttachmentTest {
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Integer.class))
         .isZero();
     assertThat(snapshot()).isEqualTo(before);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=?",
+                String.class,
+                support))
+        .isEqualTo("PENDING");
     verify(storage, never()).readUrl(anyString());
   }
 
   @ParameterizedTest
   @CsvSource({
-    "OWNER,LANDLORD_CONSENT,OWNERSHIP_PROOF",
+    "TENANT,LANDLORD_CONSENT,LANDLORD_CONSENT",
     "TENANT,OWNERSHIP_PROOF,LANDLORD_CONSENT",
-    "OWNER,UNKNOWN,OWNERSHIP_PROOF"
+    "TENANT,UNKNOWN,LANDLORD_CONSENT"
   })
   void ignoresClientTypeAndDeterminesFromDatabase(
       String occupancy, String suppliedType, String expectedType) throws Exception {
@@ -270,17 +274,23 @@ class SupportAttachmentTest {
         .isEqualTo(expectedType);
   }
 
-  @Test
-  void rejectsEtcFromDatabase() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"OWNER", "ETC"})
+  void rejectsNonTenantsBeforeS3OrMetadataCreation(String occupancy) throws Exception {
     jdbc.update(
         "UPDATE support_applications SET occupancy_type=? WHERE support_application_id=?",
-        "ETC",
+        occupancy,
         support);
+    var before = snapshot();
     upload(token, support, file("doc.pdf", pdf()))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("SUPPORT_ATTACHMENT_400_2"));
+        .andExpect(jsonPath("$.code").value("SUPPORT_ATTACHMENT_400_2"))
+        .andExpect(jsonPath("$.message").value("세입자만 임대인 동의서를 제출할 수 있습니다."));
     assertThat(count()).isZero();
     verifyNoInteractions(storage);
+    assertThat(snapshot()).isEqualTo(before);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Integer.class))
+        .isZero();
   }
 
   @Test
@@ -308,6 +318,106 @@ class SupportAttachmentTest {
     jdbc.update("UPDATE users SET role='ADMIN' WHERE user_id=?", uid);
     upload(jwt.issue(users.findById(uid).orElseThrow()).accessToken(), support, f)
         .andExpect(status().isForbidden());
+    assertThat(count()).isZero();
+    verifyNoInteractions(storage);
+  }
+
+  @Test
+  void ownerCannotEnableUploadsBySupplyingAttachmentType() throws Exception {
+    jdbc.update(
+        "UPDATE support_applications SET occupancy_type='OWNER' WHERE support_application_id=?",
+        support);
+    for (String type : List.of("LANDLORD_CONSENT", "OWNERSHIP_PROOF")) {
+      mvc.perform(
+              multipart("/api/resident/support-applications/" + support + "/attachments")
+                  .header("Authorization", "Bearer " + token)
+                  .param("attachmentType", type)
+                  .file(file("proof.pdf", pdf())))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("SUPPORT_ATTACHMENT_400_2"));
+    }
+    assertThat(count()).isZero();
+    verifyNoInteractions(storage);
+  }
+
+  @Test
+  void onlyLandlordConsentRemainsInJavaAndDatabaseEnum() {
+    assertThat(com.flout.server.domain.supportapplication.entity.SupportAttachmentType.values())
+        .containsExactly(
+            com.flout.server.domain.supportapplication.entity.SupportAttachmentType
+                .LANDLORD_CONSENT);
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'OWNERSHIP_PROOF','invalid-fixture/no-upload','fixture.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
+                    support))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThat(count()).isZero();
+    verifyNoInteractions(storage);
+  }
+
+  @Test
+  void ownerCanSubmitAndBeApprovedWithoutAnyDocument() throws Exception {
+    jdbc.update(
+        "UPDATE inspection_applications SET occupancy_type='OWNER' WHERE application_id=?", app);
+    jdbc.update(
+        "INSERT INTO support_programs(name,created_at) VALUES('소유자 무서류 검증 전용',CURRENT_TIMESTAMP)");
+    long program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
+    var submitted =
+        mvc.perform(
+                post("/api/resident/support-applications")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        mapper.writeValueAsString(
+                            Map.of(
+                                "applicationId",
+                                app,
+                                "programId",
+                                program,
+                                "requestedFacility",
+                                "출입구 물막이판",
+                                "preferredVisitDate",
+                                LocalDate.now().plusDays(7).toString(),
+                                "preferredVisitTime",
+                                "ANY"))))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long ownerSupport =
+        mapper
+            .readTree(submitted.getResponse().getContentAsString())
+            .path("result")
+            .path("supportApplicationId")
+            .asLong();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=?",
+                String.class,
+                ownerSupport))
+        .isEqualTo("NOT_REQUIRED");
+    var operator =
+        users.saveAndFlush(User.resident("proof-admin@example.test", "unused-test-hash", "검증운영자"));
+    jdbc.update(
+        "UPDATE users SET role='ADMIN',jurisdiction_id=(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시') WHERE user_id=?",
+        operator.getId());
+    var access = jwt.issue(users.findById(operator.getId()).orElseThrow()).accessToken();
+    mvc.perform(
+            post("/api/admin/support-applications/" + ownerSupport + "/approve")
+                .header("Authorization", "Bearer " + access)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    mapper.writeValueAsString(
+                        Map.of(
+                            "supportScope",
+                            "출입구 물막이판 설치 지원",
+                            "applicantHousingReviewed",
+                            true,
+                            "expertInspectionReviewed",
+                            true,
+                            "eligibilityDocumentsReviewed",
+                            true))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.status").value("APPROVED"));
     assertThat(count()).isZero();
     verifyNoInteractions(storage);
   }
@@ -518,7 +628,7 @@ class SupportAttachmentTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ETC", "TENANT"})
+  @ValueSource(strings = {"ETC", "OWNER"})
   void rechecksOccupancyAfterS3AndCleansRejectedFile(String occupancy) throws Exception {
     doAnswer(
             i -> {
@@ -565,6 +675,29 @@ class SupportAttachmentTest {
         "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].post";
     String properties = operation + ".requestBody.content['multipart/form-data'].schema.properties";
     documentation
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.SupportAttachmentResponse.properties.attachmentType.enum")
+                .value(org.hamcrest.Matchers.contains("LANDLORD_CONSENT")))
+        .andExpect(
+            jsonPath(operation + ".description")
+                .value(org.hamcrest.Matchers.containsString("TENANT인 경우에만")))
+        .andExpect(
+            jsonPath(operation + ".description")
+                .value(org.hamcrest.Matchers.containsString("OWNER·ETC의 업로드 요청은 400")))
+        .andExpect(
+            jsonPath(operation + ".description")
+                .value(org.hamcrest.Matchers.containsString("CONFIRMED로 변경하지 않")))
+        .andExpect(
+            jsonPath(
+                    operation
+                        + ".responses['201'].content['application/json'].examples.evidenceSubmitted.value.result.attachmentType")
+                .value("LANDLORD_CONSENT"))
+        .andExpect(
+            jsonPath(
+                    operation
+                        + ".responses['400'].content['application/json'].examples.INVALID_OCCUPANCY.value.message")
+                .value("세입자만 임대인 동의서를 제출할 수 있습니다."))
         .andExpect(jsonPath(properties + ".file.type").value("string"))
         .andExpect(jsonPath(properties + ".file.format").value("binary"))
         .andExpect(jsonPath(properties + ".attachmentType").doesNotExist())
