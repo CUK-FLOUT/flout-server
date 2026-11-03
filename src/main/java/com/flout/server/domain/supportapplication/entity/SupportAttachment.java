@@ -26,10 +26,7 @@ public class SupportAttachment {
   private SupportApplication application;
 
   @Enumerated(EnumType.STRING)
-  @Column(
-      name = "attachment_type",
-      nullable = false,
-      columnDefinition = "enum('LANDLORD_CONSENT','OWNERSHIP_PROOF')")
+  @Column(name = "attachment_type", nullable = false, columnDefinition = "enum('LANDLORD_CONSENT')")
   private SupportAttachmentType attachmentType;
 
   @Column(name = "object_key", nullable = false, length = 255)
