@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/support-applications")
-@Tag(name = "주민-지원 신청", description = "주민의 침수 예방시설 지원 신청")
+@Tag(name = "주민-지원신청", description = "주민의 침수 예방시설 지원 신청")
 public class SupportApplicationController {
   private final SupportApplicationService service;
 

@@ -108,7 +108,15 @@ public class OpenApiConfig {
       }
       if (api.getTags() != null) {
         var tagOrder =
-            List.of("인증/인가", "운영자-GIS 신청관리", "운영자-우선점검 관리", "운영자-현장점검 관리", "주민 주소", "현장점검 신청");
+            List.of(
+                "인증/인가",
+                "운영자-GIS 신청관리",
+                "운영자-우선점검 관리",
+                "운영자-현장점검 관리",
+                "운영자-지원관리",
+                "주민-AI취약도 분석",
+                "주민-현장점검 신청",
+                "주민-지원신청");
         var tags = new ArrayList<>(api.getTags());
         tags.sort(
             Comparator.comparingInt(
@@ -346,7 +354,7 @@ public class OpenApiConfig {
             Map.of(
                 "publicIssueId",
                 1,
-                "sourceInspectionId",
+                "inspectionId",
                 1,
                 "address",
                 "경기도 부천시 원미구 길주로 210",
@@ -370,12 +378,11 @@ public class OpenApiConfig {
           .addExamples(
               "registerPublicIssue",
               new Example()
+                  .summary("원본 점검 신청 주소로 등록 (address 생략)")
                   .value(
                       Map.of(
-                          "sourceInspectionId",
+                          "inspectionId",
                           1,
-                          "address",
-                          "경기도 부천시 원미구 길주로 210",
                           "issueType",
                           "REPEATED_FLOODING",
                           "description",

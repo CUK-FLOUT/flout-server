@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/public-issues")
-@Tag(name = "운영자-지역·공공 문제", description = "관할 지역의 지역·공공 문제 관리")
+@Tag(name = "운영자-현장점검 관리", description = "관할 지역의 현장점검 관리")
 public class AdminPublicIssueController {
   private final PublicIssueService service;
 
@@ -27,7 +27,7 @@ public class AdminPublicIssueController {
   @Operation(
       summary = "지역·공공 문제 등록",
       description =
-          "관할 원본 점검에 연결된 문제를 RECEIVED로 등록합니다. 모든 필드는 필수이며 주소는 255자, 상세 내용·현장 확인 내용은 각각 4000자까지 허용합니다. 동일 주소는 원본 좌표를 재사용하고 다른 주소는 기존 좌표 서비스를 호출합니다. 같은 점검에서 여러 건 등록할 수 있습니다.")
+          "관할 원본 점검에 연결된 문제를 RECEIVED로 등록합니다. 주소는 선택이며 생략·null이면 원본 점검 신청 주소를 사용합니다. 나머지 필드는 필수이며 주소는 255자, 상세 내용·현장 확인 내용은 각각 4000자까지 허용합니다. 동일 주소는 원본 좌표를 재사용하고 다른 주소는 기존 좌표 서비스를 호출합니다. 같은 점검에서 여러 건 등록할 수 있습니다.")
   public SuccessResponse<CreatePublicIssueResponse> register(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreatePublicIssueRequest request) {
     return SuccessResponse.of(

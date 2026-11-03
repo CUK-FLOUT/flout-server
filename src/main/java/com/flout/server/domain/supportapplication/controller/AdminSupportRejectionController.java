@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/support-applications")
-@Tag(name = "운영자-지원 신청", description = "ADMIN 및 부천시 관할 지원 신청 관리")
+@Tag(name = "운영자-지원관리", description = "ADMIN 및 부천시 관할 지원 신청 관리")
 public class AdminSupportRejectionController {
   private final SupportRejectionService service;
 

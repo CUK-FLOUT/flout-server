@@ -14,11 +14,15 @@ public record CreatePublicIssueRequest(
             type = "integer",
             implementation = Long.class,
             format = "int64",
-            description = "원본 점검 ID (양의 정수)",
+            description = "현장점검 조회 응답의 inspectionId (양의 정수). 해당 점검 신청 주소를 자동 사용",
             example = "1")
-        Long sourceInspectionId,
-    @NotBlank @Size(max = 255) @JsonDeserialize(using = StrictString.class)
-        @Schema(type = "string", example = "경기도 부천시 원미구 길주로 210")
+        Long inspectionId,
+    @Size(min = 1, max = 255) @JsonDeserialize(using = StrictString.class)
+        @Schema(
+            type = "string",
+            description = "문제 주소. 생략 또는 null이면 원본 점검 신청 주소 사용. 지정 시 공백 불가",
+            requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+            example = "경기도 부천시 원미구 길주로 210")
         String address,
     @NotBlank @Size(max = 50) @JsonDeserialize(using = StrictString.class)
         @Schema(

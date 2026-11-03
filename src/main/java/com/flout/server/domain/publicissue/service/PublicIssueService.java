@@ -53,7 +53,7 @@ public class PublicIssueService {
     var source =
         transactions.execute(
             status -> {
-              var inspection = authorize(operatorId, request.sourceInspectionId());
+              var inspection = authorize(operatorId, request.inspectionId());
               var app = inspection.getApplication();
               return new SourceLocation(app.getAddress(), app.getLatitude(), app.getLongitude());
             });
@@ -63,14 +63,15 @@ public class PublicIssueService {
     } catch (IllegalArgumentException | NullPointerException e) {
       throw new BaseException(PublicIssueErrorCode.INVALID_ISSUE_TYPE);
     }
-    boolean same = normalize(request.address()).equals(normalize(source.address()));
-    var point = same ? point(source.latitude(), source.longitude()) : geocode(request.address());
+    String address = request.address() == null ? source.address() : request.address();
+    boolean same = normalize(address).equals(normalize(source.address()));
+    var point = same ? point(source.latitude(), source.longitude()) : geocode(address);
     // 외부 주소 조회 동안 DB 트랜잭션을 유지하지 않고, 저장 시 다시 접근 권한을 확인합니다.
     return transactions.execute(
         status -> {
-          var inspection = authorize(operatorId, request.sourceInspectionId());
+          var inspection = authorize(operatorId, request.inspectionId());
           var app = inspection.getApplication();
-          boolean nowSame = normalize(request.address()).equals(normalize(app.getAddress()));
+          boolean nowSame = normalize(address).equals(normalize(app.getAddress()));
           if (same && !nowSame)
             throw new BaseException(PublicIssueErrorCode.COORDINATES_UNAVAILABLE);
           var savedPoint = nowSame ? point(app.getLatitude(), app.getLongitude()) : point;
@@ -78,7 +79,7 @@ public class PublicIssueService {
               issues.saveAndFlush(
                   PublicIssue.create(
                       inspection,
-                      request.address(),
+                      address,
                       savedPoint.latitude(),
                       savedPoint.longitude(),
                       type,
