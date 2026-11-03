@@ -684,6 +684,9 @@ class SupportAttachmentTest {
                 .value(org.hamcrest.Matchers.containsString("TENANT인 경우에만")))
         .andExpect(
             jsonPath(operation + ".description")
+                .value(org.hamcrest.Matchers.containsString("OWNER는 별도 증빙서류가 불필요합니다.")))
+        .andExpect(
+            jsonPath(operation + ".description")
                 .value(org.hamcrest.Matchers.containsString("OWNER·ETC의 업로드 요청은 400")))
         .andExpect(
             jsonPath(operation + ".description")
