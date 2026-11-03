@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -216,6 +217,65 @@ class InspectionResultDraftTest {
                 .content(mapper.writeValueAsString(full())))
         .andExpect(status().isConflict());
     assertThat(count("application_status_histories")).isEqualTo(1);
+  }
+
+  /** 내부 메모의 null·빈 문자열·공백 입력으로도 최종 공개할 수 있는지 검증합니다. */
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"   "})
+  void publishesWithOptionalInternalMemo(String memo) throws Exception {
+    completeInspection();
+    addPhoto();
+    var body = new HashMap<String, Object>(full());
+    body.put("internalMemo", memo);
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.resultStatus").value("PUBLISHED"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT internal_memo FROM inspection_results WHERE inspection_id=? AND result_status='PUBLISHED'",
+                String.class,
+                inspectionId))
+        .isEqualTo(memo);
+  }
+
+  /** 내부 메모를 생략한 최종 공개 요청은 null로 저장하는지 검증합니다. */
+  @Test
+  void publishesWithoutInternalMemo() throws Exception {
+    completeInspection();
+    addPhoto();
+    var body = new HashMap<String, Object>(full());
+    body.remove("internalMemo");
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT internal_memo FROM inspection_results WHERE inspection_id=? AND result_status='PUBLISHED'",
+                String.class,
+                inspectionId))
+        .isNull();
+  }
+
+  /** 선택 입력이어도 내부 메모의 최대 4000자 제한은 유지하는지 검증합니다. */
+  @Test
+  void publishingRejectsInternalMemoOverMaximumLength() throws Exception {
+    var body = new HashMap<String, Object>(full());
+    body.put("internalMemo", "가".repeat(4001));
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isBadRequest());
+    assertThat(count("inspection_results")).isZero();
   }
 
   @Test
