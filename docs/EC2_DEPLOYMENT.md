@@ -13,6 +13,7 @@
 5. 기존 `/opt/flout/flout-server.jar`를 이전 버전으로 백업하고 `flout` 서비스를 재시작합니다.
 6. `http://127.0.0.1:8080/actuator/health`가 `UP`인지 최대 90초간 확인합니다.
 7. Health check가 실패하면 이전 JAR로 자동 롤백합니다.
+8. 서버의 파일 잠금으로 원격 배포가 겹치지 않게 하며, Actions 대기 시간이 끝나면 실행 중인 SSM 명령의 취소를 요청합니다.
 
 동시 배포는 `flout-dev-deployment` concurrency group을 통해 직렬화됩니다. 자동 배포는 `dev` push에서 실행되며, GitHub Actions 화면에서 수동 실행할 수도 있습니다.
 
@@ -36,8 +37,8 @@ AWS 콘솔의 **Systems Manager → Fleet Manager → 관리형 노드**에 인�
 
 EC2에는 다음 항목이 필요합니다.
 
-- Java 21
-- `curl`, `tar`
+- JDK 21 (EC2에서 `./gradlew bootJar`를 실행하므로 JRE만으로는 부족합니다)
+- `curl`, `tar`, `flock`
 - 외부 GitHub 및 Gradle 배포 서버로 연결 가능한 아웃바운드 네트워크
 - `/opt/flout/flout-server.jar`
 - `/etc/flout/flout.env`
@@ -91,9 +92,12 @@ GitHub Actions 배포 역할에는 다음 인라인 정책을 연결합니다.
       ]
     },
     {
-      "Sid": "ReadDeploymentResult",
+      "Sid": "ControlDeploymentCommand",
       "Effect": "Allow",
-      "Action": "ssm:GetCommandInvocation",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:CancelCommand"
+      ],
       "Resource": "*"
     }
   ]
