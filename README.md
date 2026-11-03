@@ -99,3 +99,7 @@ com.flout.server
 - `main`에는 원칙적으로 `dev`만 병합합니다.
 
 자세한 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인해 주세요.
+
+## 배포
+
+개발 EC2 자동 배포 흐름과 GitHub Actions 설정은 [EC2 배포 문서](docs/EC2_DEPLOYMENT.md)를 확인해 주세요.
