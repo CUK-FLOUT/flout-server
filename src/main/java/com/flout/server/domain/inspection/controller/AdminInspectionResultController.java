@@ -2,8 +2,10 @@ package com.flout.server.domain.inspection.controller;
 
 import com.flout.server.domain.inspection.dto.request.PublishInspectionResultRequest;
 import com.flout.server.domain.inspection.dto.request.SaveInspectionResultDraftRequest;
+import com.flout.server.domain.inspection.dto.response.InspectionResultResponse;
 import com.flout.server.domain.inspection.dto.response.PublishInspectionResultResponse;
 import com.flout.server.domain.inspection.dto.response.SaveInspectionResultDraftResponse;
+import com.flout.server.domain.inspection.service.InspectionResultQueryService;
 import com.flout.server.domain.inspection.service.PublishInspectionResultService;
 import com.flout.server.domain.inspection.service.SaveInspectionResultDraftService;
 import com.flout.server.global.response.SuccessResponse;
@@ -48,6 +50,26 @@ public class AdminInspectionResultController {
 
   private final PublishInspectionResultService service;
   private final SaveInspectionResultDraftService draftService;
+  private final InspectionResultQueryService queryService;
+
+  /**
+   * 인증된 운영자의 관할 점검 결과를 공통 성공 응답으로 반환합니다.
+   *
+   * @param jwt 운영자 인증 정보
+   * @param inspectionId 현장점검 ID
+   * @return 초안 우선 조회 결과. 저장된 결과가 없으면 응답의 result는 null
+   */
+  @GetMapping(value = "/{inspectionId}/result", produces = "application/json")
+  @Operation(
+      summary = "점검 결과 조회",
+      description =
+          "관할 운영자가 저장된 점검 결과와 현장사진·내부 메모를 조회합니다. 초안(DRAFT)을 우선 반환하고 없으면 공개본(PUBLISHED)을 반환합니다. 저장된 결과가 없으면 result는 null입니다. 취약지점·권장 예방조치는 저장 순서, 사진은 등록 순서로 반환합니다. 조회로 상태나 내용을 변경하지 않습니다.")
+  public SuccessResponse<InspectionResultResponse> getResult(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable Long inspectionId) {
+    return SuccessResponse.of(
+        queryService.get(Long.valueOf(jwt.getSubject()), inspectionId),
+        GeneralSuccessCode.SUCCESS_OK);
+  }
 
   @PutMapping("/{inspectionId}/result/draft")
   @Operation(
