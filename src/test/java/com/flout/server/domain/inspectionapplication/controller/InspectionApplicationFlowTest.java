@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.inspection.repository.InspectionRepository;
+import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.inspectionapplication.service.ReceiptNumberGenerator;
 import com.flout.server.domain.riskassessment.entity.*;
@@ -377,6 +378,14 @@ class InspectionApplicationFlowTest {
   void documentsUpdateEndpoint() throws Exception {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].patch.responses['404'].description")
+                .value(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage()))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].patch.responses['409'].description")
+                .value(InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT.getMessage()))
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/applications/{applicationId}'].patch.responses['200'].content['application/json'].examples.draftUpdated.value.code")

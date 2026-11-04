@@ -1254,6 +1254,14 @@ public class OpenApiConfig {
         "applicationNotDraft",
         InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT,
         null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT.getMessage());
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
