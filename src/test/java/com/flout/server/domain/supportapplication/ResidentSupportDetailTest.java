@@ -211,11 +211,11 @@ class ResidentSupportDetailTest {
   }
 
   @Test
-  void legacySubmittedMappingIsResponseOnly() throws Exception {
+  void submittedStatusIsReturnedWithoutChangingIt() throws Exception {
     state("SUBMITTED");
     request("review")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.status").value("REVIEWING"));
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo("SUBMITTED");
   }

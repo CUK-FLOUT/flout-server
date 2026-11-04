@@ -147,6 +147,22 @@ class SupportApprovalTest {
   }
 
   @Test
+  void removedLandlordConfirmationIsNotDocumentedOrCallable() throws Exception {
+    mvc.perform(
+            patch("/api/admin/support-applications/{id}/landlord-consent", supportId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CONFIRMED\"}"))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/support-applications/{supportApplicationId}/landlord-consent']")
+                .doesNotExist());
+  }
+
+  @Test
   void approvesOwnerWithoutAnyDocumentAndPreservesSource() throws Exception {
     var before = snapshot();
     var request = body();
@@ -173,38 +189,31 @@ class SupportApprovalTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"CONFIRMED", "PENDING", "NOT_REQUIRED"})
-  void tenantRequiresConfirmedConsent(String consent) throws Exception {
+  void tenantRequiresDocumentRegardlessOfConfirmation(String consent) throws Exception {
     jdbc.update(
         "UPDATE support_applications SET occupancy_type='TENANT',landlord_consent_status=?",
         consent);
-    if (consent.equals("CONFIRMED")) send(supportId, body(), token).andExpect(status().isOk());
-    else {
-      send(supportId, body(), token)
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
-      unchanged();
-    }
-  }
-
-  @Test
-  void rejectsEtcEvenIfConsentConfirmed() throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET occupancy_type='ETC',landlord_consent_status='CONFIRMED'");
-    send(supportId, body(), token).andExpect(status().isBadRequest());
+    send(supportId, body(), token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
     unchanged();
   }
 
   @Test
-  void documentUploadDoesNotReplaceConsentConfirmation() throws Exception {
+  void approvesEtcWithoutDocument() throws Exception {
+    jdbc.update(
+        "UPDATE support_applications SET occupancy_type='ETC',landlord_consent_status='CONFIRMED'");
+    send(supportId, body(), token).andExpect(status().isOk());
+  }
+
+  @Test
+  void documentAllowsApprovalWithoutConsentConfirmation() throws Exception {
     jdbc.update(
         "UPDATE support_applications SET occupancy_type='TENANT',landlord_consent_status='PENDING'");
     jdbc.update(
         "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'LANDLORD_CONSENT','isolated-fixture/no-s3-object','fixture.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
         supportId);
-    send(supportId, body(), token)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
-    unchanged();
+    send(supportId, body(), token).andExpect(status().isOk());
   }
 
   @Test

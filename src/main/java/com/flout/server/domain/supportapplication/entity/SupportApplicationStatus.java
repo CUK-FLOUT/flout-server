@@ -1,6 +1,7 @@
 package com.flout.server.domain.supportapplication.entity;
 
 public enum SupportApplicationStatus {
+  DRAFT,
   SUBMITTED,
   REVIEWING,
   CONSENT_PENDING,
@@ -9,6 +10,6 @@ public enum SupportApplicationStatus {
   REJECTED;
 
   public boolean isReviewable() {
-    return this == SUBMITTED || this == REVIEWING || this == CONSENT_PENDING;
+    return this == SUBMITTED;
   }
 }

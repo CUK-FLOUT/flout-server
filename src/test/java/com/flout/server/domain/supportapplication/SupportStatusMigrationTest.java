@@ -23,6 +23,64 @@ class SupportStatusMigrationTest {
   }
 
   @Test
+  void migratesOnlySafelyClassifiedApplicationsAndPreservesLegacyTimesAndConsent() {
+    var url =
+        "jdbc:h2:mem:support-draft-migration-"
+            + UUID.randomUUID()
+            + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+    Flyway.configure().dataSource(url, "sa", "").target("40").load().migrate();
+    var jdbc = new JdbcTemplate(new DriverManagerDataSource(url, "sa", ""));
+    seedParent(jdbc);
+    jdbc.update(
+        "UPDATE support_applications SET status='REVIEWING', occupancy_type='OWNER', submitted_at='2020-01-02 03:04:05' WHERE support_application_id=1");
+    for (int id = 2; id <= 8; id++) {
+      jdbc.update(
+          "INSERT INTO support_programs(program_id,name,created_at) VALUES(?, 'fixture', CURRENT_TIMESTAMP)",
+          id);
+      jdbc.update(
+          "INSERT INTO support_applications(support_application_id,application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) SELECT ?,application_id,?,applicant_user_id,requested_facility,applicant_name,contact,address,'TENANT',preferred_visit_date,preferred_visit_time,'CONSENT_PENDING',submitted_at,'PENDING' FROM support_applications WHERE support_application_id=1",
+          id,
+          id);
+    }
+    jdbc.update(
+        "UPDATE support_applications SET status='REVIEWING' WHERE support_application_id IN (2,3)");
+    jdbc.update(
+        "UPDATE support_applications SET occupancy_type='ETC' WHERE support_application_id=6");
+    jdbc.update("UPDATE support_applications SET status='APPROVED' WHERE support_application_id=7");
+    jdbc.update(
+        "UPDATE support_applications SET landlord_consent_status='CONFIRMED' WHERE support_application_id=8");
+    for (int id : new int[] {2, 4})
+      jdbc.update(
+          "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES (?, 'LANDLORD_CONSENT', ?, 'consent.pdf', 1, 'application/pdf', CURRENT_TIMESTAMP)",
+          id,
+          "key" + id);
+    Flyway.configure().dataSource(url, "sa", "").load().migrate();
+    assertThat(
+            jdbc.queryForList(
+                "SELECT status FROM support_applications ORDER BY support_application_id",
+                String.class))
+        .containsExactly(
+            "SUBMITTED",
+            "SUBMITTED",
+            "REVIEWING",
+            "SUBMITTED",
+            "DRAFT",
+            "CONSENT_PENDING",
+            "APPROVED",
+            "CONSENT_PENDING");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM support_applications WHERE submitted_at <> '2020-01-02 03:04:05' OR created_at <> submitted_at",
+                Long.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=8",
+                String.class))
+        .isEqualTo("CONFIRMED");
+  }
+
+  @Test
   void upgradesExistingApplicationAndHistoryWithoutLosingOtherFields() {
     var url =
         "jdbc:h2:mem:support-status-migration-"

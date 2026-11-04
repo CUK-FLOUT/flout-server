@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupportApprovalService {
   private final SupportDecisionAccess access;
   private final SupportApplicationStatusHistoryRepository histories;
+  private final SupportAttachmentRepository attachments;
 
   @Transactional
   public ApproveSupportApplicationResponse approve(
@@ -25,11 +26,11 @@ public class SupportApprovalService {
     var decision = access.lockSubmitted(operatorId, id);
     var operator = decision.operator();
     var application = decision.application();
-    if (application.getOccupancyType() == OccupancyType.ETC
-        || application.getOccupancyType() == null)
+    if (application.getOccupancyType() == null)
       throw new BaseException(SupportApprovalErrorCode.INVALID_OCCUPANCY);
     if (application.getOccupancyType() == OccupancyType.TENANT
-        && application.getLandlordConsentStatus() != LandlordConsentStatus.CONFIRMED)
+        && !attachments.existsByApplicationIdAndAttachmentType(
+            id, SupportAttachmentType.LANDLORD_CONSENT))
       throw new BaseException(SupportApprovalErrorCode.CONSENT_NOT_CONFIRMED);
     var previousStatus = application.getStatus();
     application.approve(

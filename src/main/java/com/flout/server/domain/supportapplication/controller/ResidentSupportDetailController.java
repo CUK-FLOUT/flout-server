@@ -45,7 +45,7 @@ public class ResidentSupportDetailController {
   @Operation(
       summary = "주민 지원 검토 상세 조회",
       description =
-          "RESIDENT 본인 신청만 조회합니다. SUBMITTED, REVIEWING, CONSENT_PENDING, SCHEDULING 상태에서 허용하며 기존 SUBMITTED는 응답에서 REVIEWING으로 표시합니다. 신청일과 설치 희망 일정은 저장값을 사용합니다. 임대인 동의 CONFIRMED는 VERIFIED로 표시합니다. 안내 문구·진행 단계 표시는 프론트에서 status를 기준으로 구성합니다. 내부 메모·담당자·연락처·파일 URL은 반환하지 않으며 조회로 데이터를 변경하지 않습니다.")
+          "RESIDENT 본인 신청의 SUBMITTED, REVIEWING, CONSENT_PENDING, SCHEDULING 상태를 조회합니다. 신청일과 설치 희망 일정은 저장값을 사용합니다. 기존 임대인 동의 CONFIRMED는 VERIFIED로 표시합니다.")
   public SuccessResponse<ResidentSupportReviewResponse> review(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "지원 신청 ID. 점검 ID와 다릅니다.") @PathVariable Long supportApplicationId) {
