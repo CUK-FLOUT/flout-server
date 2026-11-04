@@ -1,5 +1,7 @@
 package com.flout.server.domain.supportapplication.service;
 
+import com.flout.server.domain.construction.entity.Construction;
+import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.supportapplication.dto.request.ApproveSupportApplicationRequest;
 import com.flout.server.domain.supportapplication.dto.response.ApproveSupportApplicationResponse;
@@ -19,6 +21,7 @@ public class SupportApprovalService {
   private final SupportDecisionAccess access;
   private final SupportApplicationStatusHistoryRepository histories;
   private final SupportAttachmentRepository attachments;
+  private final ConstructionRepository constructions;
 
   @Transactional
   public ApproveSupportApplicationResponse approve(
@@ -36,6 +39,8 @@ public class SupportApprovalService {
     application.approve(
         request.supportScope(), operator, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
     histories.saveAndFlush(SupportApplicationStatusHistory.approved(application, previousStatus));
-    return ApproveSupportApplicationResponse.from(application);
+    var construction =
+        constructions.saveAndFlush(Construction.pending(application, application.getApprovedAt()));
+    return ApproveSupportApplicationResponse.from(application, construction.getId());
   }
 }
