@@ -152,16 +152,49 @@ class ConstructionScheduleTest {
   }
 
   @Test
-  void canRescheduleBeforeWorkStartsWithoutCreatingAnotherConstruction() throws Exception {
+  void rejectsRepeatedSaveAndPreservesOriginalScheduleAndAssignment() throws Exception {
     save().andExpect(status().isOk());
+    var before = jdbc.queryForList("SELECT * FROM constructions");
+    save()
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_2"));
     save(
             Long.toString(constructionId),
             body().replace("2030-01-03", "2030-01-04").replace("10:00", "15:30"),
             token)
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.constructionTime").value("15:30"));
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class))
-        .isEqualTo(1);
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value("이미 배정되었거나 시공이 시작·완료되어 일정을 저장할 수 없습니다."));
+    assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"manager", "schedule", "state"})
+  void rejectsPartiallyAssignedOrScheduledConstruction(String existing) throws Exception {
+    switch (existing) {
+      case "manager" -> jdbc.update("UPDATE constructions SET manager_user_id=?", adminId);
+      case "schedule" -> jdbc.update("UPDATE constructions SET scheduled_at='2030-01-03 10:00:00'");
+      default -> jdbc.update("UPDATE constructions SET status='SCHEDULED'");
+    }
+    var before = jdbc.queryForList("SELECT * FROM constructions");
+    save()
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_2"));
+    assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
+  }
+
+  @Test
+  void anotherOperatorCannotOverwriteSavedAssignment() throws Exception {
+    save().andExpect(status().isOk());
+    var before = jdbc.queryForList("SELECT * FROM constructions");
+    var other = users.saveAndFlush(User.resident("other@construction.test", "unused", "다른운영자"));
+    jdbc.update(
+        "UPDATE users SET role='ADMIN',jurisdiction_id=(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시') WHERE user_id=?",
+        other.getId());
+    var otherToken = jwt.issue(users.findById(other.getId()).orElseThrow()).accessToken();
+    save(Long.toString(constructionId), body().replace("10:00", "11:00"), otherToken)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_2"));
+    assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
   }
 
   @ParameterizedTest
@@ -262,7 +295,7 @@ class ConstructionScheduleTest {
   }
 
   @Test
-  void concurrentSavesSerializeWithoutDuplicatingConstruction() throws Exception {
+  void concurrentSavesAllowOnlyOneInitialAssignment() throws Exception {
     var pool = Executors.newFixedThreadPool(2);
     var start = new CountDownLatch(1);
     try {
@@ -283,7 +316,7 @@ class ConstructionScheduleTest {
               });
       start.countDown();
       assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
-          .containsExactly(200, 200);
+          .containsExactlyInAnyOrder(200, 409);
       assertThat(jdbc.queryForObject("SELECT scheduled_at FROM constructions", LocalDateTime.class))
           .isIn(LocalDateTime.of(2030, 1, 3, 10, 0), LocalDateTime.of(2030, 1, 3, 11, 0));
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class))

@@ -69,9 +69,18 @@ public class Construction {
     return construction;
   }
 
+  /** 확정 시각이 된 예정 시공만 진행 중으로 전환하며 완료된 시공은 변경하지 않는다. */
+  public boolean startIfDue(LocalDateTime now) {
+    if (status != ConstructionStatus.SCHEDULED || scheduledAt == null || scheduledAt.isAfter(now))
+      return false;
+    this.status = ConstructionStatus.IN_PROGRESS;
+    this.updatedAt = now;
+    return true;
+  }
+
   public void schedule(User manager, LocalDateTime scheduledAt, LocalDateTime now) {
-    if (status != ConstructionStatus.PENDING && status != ConstructionStatus.SCHEDULED)
-      throw new IllegalStateException("시공 시작 전 일정만 저장할 수 있습니다.");
+    if (this.manager != null || this.scheduledAt != null || status != ConstructionStatus.PENDING)
+      throw new IllegalStateException("미배정 시공에만 최초 일정을 저장할 수 있습니다.");
     this.manager = manager;
     this.scheduledAt = scheduledAt;
     this.status = ConstructionStatus.SCHEDULED;

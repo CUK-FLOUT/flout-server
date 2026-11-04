@@ -50,8 +50,9 @@ public class ConstructionScheduleService {
         constructions
             .findForScheduleUpdate(id)
             .orElseThrow(() -> new BaseException(ConstructionErrorCode.NOT_FOUND));
-    if (construction.getStatus() != ConstructionStatus.PENDING
-        && construction.getStatus() != ConstructionStatus.SCHEDULED)
+    if (construction.getManager() != null
+        || construction.getScheduledAt() != null
+        || construction.getStatus() != ConstructionStatus.PENDING)
       throw new BaseException(ConstructionErrorCode.SCHEDULE_NOT_EDITABLE);
     var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     var scheduledAt = LocalDateTime.of(request.constructionDate(), request.constructionTime());
