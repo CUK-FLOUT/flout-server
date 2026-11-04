@@ -131,7 +131,7 @@ public class SupportApplication {
     if (status != SupportApplicationStatus.DRAFT)
       throw new IllegalStateException("임시 신청만 접수할 수 있습니다.");
     status = SupportApplicationStatus.SUBMITTED;
-    if (submittedAt == null) submittedAt = LocalDateTime.now();
+    submittedAt = LocalDateTime.now();
   }
 
   public void approve(String scope, User operator, LocalDateTime approvedAt) {

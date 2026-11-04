@@ -509,6 +509,28 @@ class SupportAttachmentTest {
   }
 
   @Test
+  void submissionReplacesExistingDraftSubmissionTime() throws Exception {
+    var oldSubmittedAt = LocalDateTime.of(2020, 1, 2, 3, 4, 5);
+    jdbc.update(
+        "UPDATE support_applications SET submitted_at=? WHERE support_application_id=?",
+        java.sql.Timestamp.valueOf(oldSubmittedAt),
+        support);
+    var before = LocalDateTime.now().minusSeconds(1);
+    upload(file("consent.pdf", pdf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
+    var after = LocalDateTime.now().plusSeconds(1);
+    var row =
+        jdbc.queryForMap(
+            "SELECT status, submitted_at FROM support_applications WHERE support_application_id=?",
+            support);
+    assertThat(row.get("STATUS")).isEqualTo("SUBMITTED");
+    assertThat(((java.sql.Timestamp) row.get("SUBMITTED_AT")).toLocalDateTime())
+        .isAfter(oldSubmittedAt)
+        .isBetween(before, after);
+  }
+
+  @Test
   void failedUploadKeepsDraftAndRetryReceivesSameApplication() throws Exception {
     var initial =
         jdbc.queryForMap(
