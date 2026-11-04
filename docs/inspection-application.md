@@ -40,9 +40,8 @@
 
 ## 접수 이후 점검 진행
 
-사진 등록 응답의 `result.inspectionId`로 `PATCH /api/admin/inspections/{inspectionId}/status`에
-`{"status":"SCHEDULED"}`를 보내고 배정 API로 담당자·확정 일정을 저장합니다.
-진행 → 완료 순서로 변경한 뒤 운영자 현장사진이 등록된 초안을 저장·주민 공개합니다.
+사진 등록 응답의 `result.inspectionId`로 배정 API를 호출하여 담당자·확정 일정을 저장하면 점검이 예정 상태가 됩니다.
+방문 시간이 되면 자동으로 진행 상태로 전환합니다. 운영자 현장사진이 등록된 초안을 최종 저장·주민 공개하면 점검과 신청이 함께 완료됩니다.
 주민 신청 사진과 운영자 점검 현장사진은 서로 다른 API로 등록합니다.
 `applicationId`와 `inspectionId`는 서로 다를 수 있으므로 응답의 식별자를 구분해 사용합니다.
 

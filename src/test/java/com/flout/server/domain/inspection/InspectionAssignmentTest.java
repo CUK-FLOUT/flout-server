@@ -72,6 +72,10 @@ class InspectionAssignmentTest {
     when(inspectionClock.instant()).thenReturn(NOW.atZone(SEOUL).toInstant());
     for (String table :
         List.of(
+            "inspection_result_photos",
+            "inspection_vulnerabilities",
+            "prevention_recommendations",
+            "inspection_results",
             "inspection_status_histories",
             "inspections",
             "application_inflow_locations",
@@ -144,15 +148,11 @@ class InspectionAssignmentTest {
   }
 
   private void schedule() {
-    service.change(operatorId, inspectionId, InspectionStatus.SCHEDULED);
+    jdbc.update("UPDATE inspections SET status='SCHEDULED' WHERE inspection_id=?", inspectionId);
   }
 
   @Test
-  void savesAssignmentOnlyAfterStatusWasPersistedAndPreservesApplication() throws Exception {
-    save(request())
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("INSPECTION_409_3"));
-    schedule();
+  void assignmentSchedulesReceivedInspectionAndPreservesApplication() throws Exception {
     save(request())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("INSPECTION_200_2"))
@@ -188,7 +188,6 @@ class InspectionAssignmentTest {
           (SELECT jurisdiction_id FROM jurisdictions WHERE name = '부천시'))
         """);
     Long inspectorId = users.findByEmail("other-inspector@example.com").orElseThrow().getId();
-    schedule();
     var body = request();
     body.put("inspectorId", inspectorId);
     save(body)
@@ -212,16 +211,12 @@ class InspectionAssignmentTest {
   @ValueSource(strings = {"IN_PROGRESS", "COMPLETED"})
   void rejectsAssignmentsOutsideScheduled(String state) throws Exception {
     jdbc.update("UPDATE inspections SET status = ? WHERE inspection_id = ?", state, inspectionId);
-    save(request())
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("INSPECTION_409_3"));
     assertThat(inspections.findById(inspectionId).orElseThrow().getScheduledAt()).isNull();
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"visitDate", "visitTime", "preVisitNotice"})
   void requiresDateTimeAndNotice(String field) throws Exception {
-    schedule();
     var body = request();
     body.remove(field);
     save(body)
@@ -259,7 +254,6 @@ class InspectionAssignmentTest {
 
   @Test
   void rejectsPastTimeUsingSeoulClockAndAcceptsCurrentTime() throws Exception {
-    schedule();
     var body = request();
     body.put("visitDate", "2030-01-02");
     body.put("visitTime", "13:59");
@@ -274,7 +268,6 @@ class InspectionAssignmentTest {
 
   @Test
   void ignoresSuppliedResidentIdAndUsesAuthenticatedOperator() throws Exception {
-    schedule();
     var body = request();
     body.put("inspectorId", resident.getId());
     save(body)
@@ -291,7 +284,6 @@ class InspectionAssignmentTest {
   // ID 오류와 점검 없음 구분
   @Test
   void checksMissingInspectionAndPositiveIds() throws Exception {
-    schedule();
     for (String id : List.of("0", "abc", "9223372036854775807")) {
       mvc.perform(
               post("/api/admin/inspections/" + id + "/assignment")
@@ -304,7 +296,6 @@ class InspectionAssignmentTest {
 
   @Test
   void preventsCrossJurisdictionWritesAndResidentAccess() throws Exception {
-    schedule();
     jdbc.update(
         "UPDATE inspection_applications SET address = '서울특별시 중구 세종대로 110' WHERE application_id = ?",
         applicationId);
@@ -338,13 +329,12 @@ class InspectionAssignmentTest {
     assertThat(service.startIfDue(inspectionId)).isTrue();
     assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
         .isEqualTo(InspectionStatus.IN_PROGRESS);
-    assertThat(histories.count()).isEqualTo(2);
+    assertThat(histories.count()).isEqualTo(1);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"SCHEDULED", "IN_PROGRESS", "COMPLETED"})
   void rejectsSecondAssignmentAndPreservesOriginalValues(String state) throws Exception {
-    schedule();
     save(request()).andExpect(status().isOk());
     jdbc.update("UPDATE inspections SET status = ? WHERE inspection_id = ?", state, inspectionId);
     var before =
@@ -365,7 +355,6 @@ class InspectionAssignmentTest {
   // 동시 요청의 중복 배정 방지
   @Test
   void concurrentAssignmentsSucceedOnlyOnce() throws Exception {
-    schedule();
     var gate = new CountDownLatch(1);
     try (var executor = Executors.newFixedThreadPool(2)) {
       java.util.concurrent.Callable<Integer> attempt =
@@ -397,8 +386,57 @@ class InspectionAssignmentTest {
                 .value("운영자-현장점검 관리"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/inspections/{inspectionId}/assignment'].post.responses['409'].content['application/json'].examples.scheduledRequired.value.code")
-                .value("INSPECTION_409_3"));
+                    "$.paths['/api/admin/inspections/{inspectionId}/assignment'].post.responses['409'].content['application/json'].examples.invalidStatusTransition.value.code")
+                .value("INSPECTION_409_1"));
+  }
+
+  /** 완료 이력 저장 실패 시 공개 내용과 신청·점검 상태가 모두 롤백되는지 검증합니다. */
+  @Test
+  void completionHistoryFailureRollsBackResultAndInspection() throws Exception {
+    save(request()).andExpect(status().isOk());
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
+        inspectionId);
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) SELECT result_id,'rollback-photo','test.png',100,'image/png' FROM inspection_results WHERE inspection_id=?",
+        inspectionId);
+    doThrow(new IllegalStateException("history failure")).when(histories).saveAndFlush(any());
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"summary\":\"결과\",\"vulnerabilities\":[{\"type\":\"ENTRANCE\",\"title\":\"출입구\",\"expertOpinion\":\"의견\"}],\"recommendedActions\":[{\"description\":\"조치\"}],\"followUpType\":\"INDIVIDUAL_HOUSE\"}"))
+        .andExpect(status().isInternalServerError());
+    assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
+        .isEqualTo(InspectionStatus.SCHEDULED);
+    assertThat(applications.findById(applicationId).orElseThrow().getStatus())
+        .isEqualTo(InspectionApplicationStatus.RECEIVED);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT result_status FROM inspection_results WHERE inspection_id=?",
+                String.class,
+                inspectionId))
+        .isEqualTo("DRAFT");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT summary FROM inspection_results WHERE inspection_id=?",
+                String.class,
+                inspectionId))
+        .isNull();
+    assertThat(histories.count()).isEqualTo(1);
+  }
+
+  /** 배정 이력 저장 실패 시 담당자·일정·상태가 모두 롤백되는지 검증합니다. */
+  @Test
+  void assignmentHistoryFailureRollsBackAssignmentAndStatus() throws Exception {
+    doThrow(new IllegalStateException("history failure")).when(histories).saveAndFlush(any());
+    save(request()).andExpect(status().isInternalServerError());
+    var inspection = inspections.findById(inspectionId).orElseThrow();
+    assertThat(inspection.getStatus()).isEqualTo(InspectionStatus.RECEIVED);
+    assertThat(inspection.getInspector()).isNull();
+    assertThat(inspection.getScheduledAt()).isNull();
+    assertThat(histories.count()).isZero();
   }
 
   // 배정 저장과 자동 전환 간 경합
@@ -438,7 +476,7 @@ class InspectionAssignmentTest {
           .isEqualTo(saved ? InspectionStatus.SCHEDULED : InspectionStatus.IN_PROGRESS);
       assertThat(inspection.getScheduledAt())
           .isEqualTo(saved ? LocalDateTime.of(2030, 1, 3, 14, 0) : NOW);
-      assertThat(histories.count()).isEqualTo(saved ? 1 : 2);
+      assertThat(histories.count()).isEqualTo(saved ? 0 : 1);
     }
   }
 }

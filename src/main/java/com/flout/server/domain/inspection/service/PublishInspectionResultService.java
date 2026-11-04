@@ -11,6 +11,8 @@ import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -19,6 +21,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -36,8 +39,11 @@ public class PublishInspectionResultService {
   private final InspectionResultPhotoRepository photos;
   private final Clock inspectionClock;
   private final ApplicationStatusHistoryRepository applicationStatusHistories;
+  private final InspectionStatusHistoryRepository inspectionStatusHistories;
+  private final EntityManager entityManager;
 
-  @Transactional
+  /** 선행 상태 변경 없이 결과를 공개하고 점검·신청 완료와 이력을 같은 트랜잭션으로 저장합니다. */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public PublishInspectionResultResponse publish(
       Long operatorId, Long inspectionId, PublishInspectionResultRequest request) {
     // 점검ID 검증
@@ -55,6 +61,9 @@ public class PublishInspectionResultService {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     }
 
+    // 선정 순서 저장과 동일하게 관할 → 점검 순서로 잠금
+    if (operator.getJurisdiction() != null)
+      entityManager.lock(operator.getJurisdiction(), LockModeType.PESSIMISTIC_WRITE);
     // 점검 조회(동시 수정 방지)
     Inspection inspection =
         inspections
@@ -66,11 +75,6 @@ public class PublishInspectionResultService {
         || !"부천시".equals(operator.getJurisdiction().getName())
         || !BUCHEON_ADDRESS.matcher(inspection.getApplication().getAddress().strip()).find()) {
       throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    }
-
-    // PATCH 상태 변경으로 완료된 점검만 공개 가능
-    if (inspection.getStatus() != InspectionStatus.COMPLETED) {
-      throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
     }
 
     // 이미 공개된 결과가 있는지 확인
@@ -120,6 +124,13 @@ public class PublishInspectionResultService {
 
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     result.publish(now);
+
+    var previous = inspection.getStatus();
+    if (previous != InspectionStatus.COMPLETED) {
+      inspection.complete(now);
+      inspectionStatusHistories.saveAndFlush(
+          InspectionStatusHistory.changed(inspection, previous, operator, now));
+    }
 
     inspection.getApplication().completeInspection();
 

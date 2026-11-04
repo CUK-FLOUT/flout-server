@@ -300,11 +300,6 @@ public class OpenApiConfig {
                               describeInspectionDetail(operation);
                             }
 
-                            if (path.equals("/api/admin/inspections/{inspectionId}/status")
-                                && method == PathItem.HttpMethod.PATCH) {
-                              describeInspectionStatus(operation);
-                            }
-
                             if (path.equals("/api/admin/inspections/{inspectionId}/result")
                                 && method == PathItem.HttpMethod.GET) {
                               describeInspectionResultQuery(operation);
@@ -1189,57 +1184,9 @@ public class OpenApiConfig {
     addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
     operation.getResponses().get("404").setDescription("점검을 찾을 수 없습니다.");
     addError(
-        operation, "scheduledRequired", InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED, null);
-    addError(operation, "alreadyAssigned", InspectionErrorCode.ALREADY_ASSIGNED, null);
-    operation.getResponses().get("409").setDescription("이미 배정된 점검이거나 예정 상태로 저장되지 않은 점검입니다.");
-    addError(
-        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
-    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
-  }
-
-  // 상태 변경 응답과 오류 예시
-  private void describeInspectionStatus(Operation operation) {
-    var code = InspectionSuccessCode.STATUS_CHANGED;
-    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
-    success.setDescription(code.getMessage());
-    addExample(
-        success,
-        "inspectionStatusChanged",
-        envelope(
-            true,
-            code,
-            code.getMessage(),
-            Map.of(
-                "inspectionId",
-                1,
-                "receiptNo",
-                "000001",
-                "status",
-                "SCHEDULED",
-                "updatedAt",
-                "2026-10-28T19:00:00")));
-    addError(
-        operation, "statusRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "점검 상태를 선택해주세요.");
-    addError(operation, "invalidStatusOrBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
-    addError(
-        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
-    addError(
-        operation,
-        "jurisdictionAccessDenied",
-        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
-        null);
-    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
-    operation
-        .getResponses()
-        .get("404")
-        .setDescription(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
-    addError(
         operation, "invalidStatusTransition", InspectionErrorCode.INVALID_STATUS_TRANSITION, null);
-    addError(operation, "visitTimeNotReached", InspectionErrorCode.VISIT_TIME_NOT_REACHED, null);
-    operation
-        .getResponses()
-        .get("409")
-        .setDescription(InspectionErrorCode.INVALID_STATUS_TRANSITION.getMessage());
+    addError(operation, "alreadyAssigned", InspectionErrorCode.ALREADY_ASSIGNED, null);
+    operation.getResponses().get("409").setDescription("이미 배정되었거나 배정할 수 없는 상태의 점검입니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
