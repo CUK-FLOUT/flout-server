@@ -41,4 +41,51 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
 
     long getApprovedCount();
   }
+
+  String ADMIN_SEARCH_FILTER =
+      """
+      FROM support_applications s
+      WHERE REGEXP_LIKE(TRIM(s.address), :addressPattern)
+        AND (:keyword = '' OR LOCATE(:keyword, s.applicant_name) > 0
+          OR LOCATE(:keyword, LPAD(CONCAT('', s.application_id),
+            GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0')) > 0)
+      """;
+
+  @org.springframework.data.jpa.repository.Query(
+      value =
+          """
+      SELECT s.support_application_id AS supportApplicationId,
+        LPAD(CONCAT('', s.application_id), GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0') AS receiptNo,
+        s.applicant_name AS applicantName, s.requested_facility AS requestedFacility,
+        s.landlord_consent_status AS landlordConsentStatus, s.status AS status
+      """
+              + ADMIN_SEARCH_FILTER
+              + " ORDER BY s.support_application_id DESC LIMIT :limit OFFSET :offset",
+      nativeQuery = true)
+  java.util.List<AdminListItem> searchAdminApplications(
+      @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
+      @org.springframework.data.repository.query.Param("keyword") String keyword,
+      @org.springframework.data.repository.query.Param("limit") int limit,
+      @org.springframework.data.repository.query.Param("offset") long offset);
+
+  @org.springframework.data.jpa.repository.Query(
+      value = "SELECT COUNT(*) " + ADMIN_SEARCH_FILTER,
+      nativeQuery = true)
+  long countAdminApplications(
+      @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
+      @org.springframework.data.repository.query.Param("keyword") String keyword);
+
+  interface AdminListItem {
+    Long getSupportApplicationId();
+
+    String getReceiptNo();
+
+    String getApplicantName();
+
+    String getRequestedFacility();
+
+    String getLandlordConsentStatus();
+
+    String getStatus();
+  }
 }
