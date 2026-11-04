@@ -51,6 +51,7 @@ class SupportDetailTest {
             "support_applications",
             "support_programs",
             "prevention_recommendations",
+            "inspection_vulnerabilities",
             "inspection_results",
             "inspection_status_histories",
             "inspections",
@@ -146,11 +147,11 @@ class SupportDetailTest {
         .andExpect(
             jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", sourceId)))
         .andExpect(jsonPath("$.result.applicantName").value("김주민"))
-        .andExpect(jsonPath("$.result.contact").value("010-****-0002"))
+        .andExpect(jsonPath("$.result.contact").value("010-1234-0002"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
         .andExpect(jsonPath("$.result.housingType").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.result.residentRequest").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.residentRequest").value("점검 전용 요청 사유"))
         .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
         .andExpect(jsonPath("$.result.requestedFacility").value("출입구 물막이판"))
         .andExpect(jsonPath("$.result.preferredConstructionDate").value("2026-10-21"))
@@ -306,17 +307,21 @@ class SupportDetailTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"01012340002", "010-1234-0002", "010 1234 0002"})
-  void masksStoredPhoneFormats(String contact) throws Exception {
+  void bothRoutesReturnTheStoredPhoneFormatWithoutMasking(String contact) throws Exception {
     jdbc.update("UPDATE support_applications SET contact=?", contact);
-    detail()
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.contact").value("010-****-0002"));
+    detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.contact").value(contact));
+    review().andExpect(status().isOk()).andExpect(jsonPath("$.result.contact").value(contact));
   }
 
   @Test
-  void malformedContactDoesNotLeakPersonalInformation() throws Exception {
+  void legacyContactIsReturnedWithoutReformatting() throws Exception {
     jdbc.update("UPDATE support_applications SET contact='invalid-123456789'");
-    detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.contact").value("****"));
+    detail()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.contact").value("invalid-123456789"));
+    review()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.contact").value("invalid-123456789"));
   }
 
   @Test
@@ -345,5 +350,144 @@ class SupportDetailTest {
     assertThat(operation.get("responses").has("404")).isTrue();
     assertThat(paths.has("/api/admin/support-applications")).isTrue();
     assertThat(paths.has("/api/admin/support-applications/status")).isTrue();
+    assertThat(
+            paths
+                .get("/api/admin/support-applications/{supportApplicationId}/histories")
+                .get("get")
+                .get("summary")
+                .asString())
+        .isEqualTo("지원 자격 검토 정보 조회");
+  }
+
+  ResultActions review(String id, String access) throws Exception {
+    var request = get("/api/admin/support-applications/" + id + "/histories");
+    if (access != null) request.header("Authorization", "Bearer " + access);
+    return mvc.perform(request);
+  }
+
+  ResultActions review() throws Exception {
+    return review(Long.toString(supportId), token);
+  }
+
+  @Test
+  void reviewReturnsTheScreenDataAndOriginalInspectionRequest() throws Exception {
+    publish();
+    attach();
+    when(storage.readUrl("private/consent")).thenReturn("https://private.example.test/consent");
+    jdbc.update(
+        "UPDATE inspection_applications SET detail_address='101호',request_reason='출입구 통행을 확보해주세요'");
+    jdbc.update(
+        "UPDATE support_applications SET occupancy_type='TENANT',support_scope='물막이판 설치',preferred_visit_date='2026-11-10',preferred_visit_time='MORNING'");
+    jdbc.update(
+        "UPDATE support_programs SET target_description='부천시 침수 취약 주택',description='설치 지원',operating_status='OPEN'");
+    long result = jdbc.queryForObject("SELECT result_id FROM inspection_results", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_vulnerabilities(result_id,type,sort_order) VALUES(?,'DRAIN',2),(?,'ENTRANCE',0),(?,'ENTRANCE',1)",
+        result,
+        result,
+        result);
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,'배수구 정비',1),(?,'물막이판 설치',0)",
+        result,
+        result);
+    var before = jdbc.queryForList("SELECT * FROM support_applications");
+    long applicationId =
+        jdbc.queryForObject("SELECT application_id FROM inspection_applications", Long.class);
+    review()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("COMMON_200"))
+        .andExpect(jsonPath("$.result.supportApplicationId").value(supportId))
+        .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+        .andExpect(
+            jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", applicationId)))
+        .andExpect(jsonPath("$.result.applicantName").value("테스트주민"))
+        .andExpect(jsonPath("$.result.contact").value("010-0000-0000"))
+        .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
+        .andExpect(jsonPath("$.result.detailAddress").value("101호"))
+        .andExpect(jsonPath("$.result.housingType").doesNotExist())
+        .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
+        .andExpect(
+            jsonPath("$.result.vulnerabilityTypes")
+                .value(org.hamcrest.Matchers.contains("ENTRANCE", "DRAIN")))
+        .andExpect(
+            jsonPath("$.result.recommendedActions")
+                .value(org.hamcrest.Matchers.contains("물막이판 설치", "배수구 정비")))
+        .andExpect(jsonPath("$.result.residentRequest").value("출입구 통행을 확보해주세요"))
+        .andExpect(jsonPath("$.result.requestedFacility").value("출입구 물막이판"))
+        .andExpect(jsonPath("$.result.inspectionId").value(inspectionId()))
+        .andExpect(jsonPath("$.result.inspectionResultPublished").value(true))
+        .andExpect(jsonPath("$.result.preferredConstructionDate").value("2026-11-10"))
+        .andExpect(jsonPath("$.result.preferredTimeSlot").value("MORNING"))
+        .andExpect(jsonPath("$.result.landlordConsentRequired").value(true))
+        .andExpect(jsonPath("$.result.program.name").value("검증용 지원사업"))
+        .andExpect(jsonPath("$.result.program.targetDescription").value("부천시 침수 취약 주택"))
+        .andExpect(jsonPath("$.result.supportScope").value("물막이판 설치"))
+        .andExpect(jsonPath("$.result.attachments[0].originalName").value("임대인 동의서.pdf"))
+        .andExpect(
+            jsonPath("$.result.attachments[0].fileUrl")
+                .value("https://private.example.test/consent"));
+    assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
+  }
+
+  @Test
+  void reviewDoesNotExposeDraftVulnerabilitiesOrInventMissingFiles() throws Exception {
+    long result = jdbc.queryForObject("SELECT result_id FROM inspection_results", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_vulnerabilities(result_id,type,sort_order) VALUES(?,'DRAIN',0)",
+        result);
+    review()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.vulnerabilityTypes").isEmpty())
+        .andExpect(jsonPath("$.result.recommendedActions").isEmpty())
+        .andExpect(jsonPath("$.result.attachments").isEmpty())
+        .andExpect(jsonPath("$.result.landlordConsentRequired").value(false))
+        .andExpect(jsonPath("$.result.inspectionResultPublished").value(false));
+    verifyNoInteractions(storage);
+  }
+
+  @Test
+  void reviewAllowsMissingInspectionAndNullRequestReason() throws Exception {
+    jdbc.update("DELETE FROM inspection_results");
+    jdbc.update("DELETE FROM inspections");
+    review()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.inspectionId").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.residentRequest").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.vulnerabilityTypes").isEmpty());
+  }
+
+  @Test
+  void reviewRejectsUnauthenticatedAndResidentRequests() throws Exception {
+    review(Long.toString(supportId), null).andExpect(status().isUnauthorized());
+    review(Long.toString(supportId), residentToken).andExpect(status().isForbidden());
+    jdbc.update("UPDATE users SET jurisdiction_id=NULL WHERE user_id=?", adminId);
+    review().andExpect(status().isForbidden());
+    verifyNoInteractions(storage);
+  }
+
+  @Test
+  void reviewRejectsMissingOrOutsideJurisdictionBeforeReadingAttachments() throws Exception {
+    attach();
+    jdbc.update("UPDATE support_applications SET address='서울특별시 강남구'");
+    review().andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("SUPPORT_404_1"));
+    review(Long.toString(Long.MAX_VALUE), token).andExpect(status().isNotFound());
+    verifyNoInteractions(storage);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "-1", "abc", "9223372036854775808"})
+  void reviewRejectsInvalidIds(String id) throws Exception {
+    review(id, token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+  }
+
+  @Test
+  void reviewPropagatesAttachmentReadFailure() throws Exception {
+    attach();
+    when(storage.readUrl(anyString())).thenThrow(new IllegalStateException("unavailable"));
+    review()
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.code").value("SUPPORT_DETAIL_500_1"));
   }
 }
