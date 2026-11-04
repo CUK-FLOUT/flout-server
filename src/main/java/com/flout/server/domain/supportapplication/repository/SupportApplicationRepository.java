@@ -42,6 +42,14 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
     long getApprovedCount();
   }
 
+  @org.springframework.data.jpa.repository.Query(
+      value =
+          "SELECT s.* FROM support_applications s WHERE s.support_application_id = :id AND REGEXP_LIKE(TRIM(s.address), :addressPattern)",
+      nativeQuery = true)
+  java.util.Optional<SupportApplication> findAdminDetail(
+      @org.springframework.data.repository.query.Param("id") Long id,
+      @org.springframework.data.repository.query.Param("addressPattern") String addressPattern);
+
   String ADMIN_SEARCH_FILTER =
       """
       FROM support_applications s
