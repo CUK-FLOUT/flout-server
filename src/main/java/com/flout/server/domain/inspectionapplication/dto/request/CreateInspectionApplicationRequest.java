@@ -4,6 +4,7 @@ import com.flout.server.domain.inspectionapplication.entity.FloodExperience;
 import com.flout.server.domain.inspectionapplication.entity.InflowLocation;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.inspectionapplication.entity.PreferredTimeSlot;
+import com.flout.server.domain.inspectionapplication.validation.KoreanMobileNumber;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -37,8 +38,9 @@ public record CreateInspectionApplicationRequest(
             example = "126.7985672",
             requiredMode = Schema.RequiredMode.REQUIRED)
         BigDecimal longitude,
-    @NotBlank(message = "연락처는 필수입니다.") @Size(max = 50, message = "연락처는 50자 이하여야 합니다.") @Schema(
-            description = "연락 가능한 전화번호(최대 50자)",
+    @NotNull(message = "연락처는 필수입니다.") @KoreanMobileNumber
+        @Schema(
+            description = "국내 휴대전화 번호 (하이픈 포함 또는 제외)",
             example = "010-1234-5678",
             requiredMode = Schema.RequiredMode.REQUIRED)
         String contact,

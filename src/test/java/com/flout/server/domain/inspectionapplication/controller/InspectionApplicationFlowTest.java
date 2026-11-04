@@ -1,6 +1,7 @@
 package com.flout.server.domain.inspectionapplication.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -104,6 +105,52 @@ class InspectionApplicationFlowTest {
   }
 
   @Test
+  void validatesContactFormatOnPostAndPatchAndKeepsPatchContactOptional() throws Exception {
+    for (String invalid :
+        List.of("abc123", "010-123", "     ", "011234", "010-12345678", "010-1234-56789")) {
+      var body = request();
+      body.put("contact", invalid);
+      mvc.perform(
+              post("/api/resident/applications")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(body)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("국내 휴대전화")));
+    }
+    var missing = request();
+    missing.remove("contact");
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(missing)))
+        .andExpect(status().isBadRequest());
+
+    long id = createDraft();
+    update(id, "{\"requestReason\":\"필드 생략\"}", token).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT contact FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo("010-1234-5678");
+    update(id, "{\"contact\":null}", token).andExpect(status().isBadRequest());
+    for (String invalid : List.of("abc123", "010-123", "   ", "010-1234-56789")) {
+      update(id, "{\"contact\":\"" + invalid + "\"}", token)
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("국내 휴대전화")));
+    }
+    update(id, "{\"contact\":\"01012345678\"}", token).andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT contact FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo("01012345678");
+  }
+
+  @Test
   void changedApplicantNameDoesNotReuseDraft() throws Exception {
     submit().andExpect(status().isCreated());
     var body = request();
@@ -157,6 +204,229 @@ class InspectionApplicationFlowTest {
             .content(mapper.writeValueAsString(request())));
   }
 
+  private long createDraft() throws Exception {
+    var response =
+        submit().andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    return mapper.readTree(response).get("result").get("applicationId").asLong();
+  }
+
+  private org.springframework.test.web.servlet.ResultActions update(
+      long id, String body, String accessToken) throws Exception {
+    return mvc.perform(
+        patch("/api/resident/applications/{id}", id)
+            .header("Authorization", "Bearer " + accessToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
+  }
+
+  @Test
+  void updatesOnlyProvidedFieldsAndPreservesIdentity() throws Exception {
+    long id = createDraft();
+    var original =
+        jdbc.queryForMap(
+            "SELECT application_id, assessment_id, receipt_no, created_at, submitted_at, address FROM inspection_applications WHERE application_id=?",
+            id);
+    update(
+            id,
+            """
+        {"applicantName":"  수정 이름  ","contact":"01012345678","occupancyType":"TENANT",
+         "floodExperience":"NO","existingFacility":true,"requestReason":"사유",
+         "preferredVisitDate":"2099-01-01","preferredTimeSlot":"AFTERNOON",
+         "inflowLocations":["DRAIN","ENTRANCE","DRAIN"]}
+        """,
+            token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("APPLICATION_200_4"))
+        .andExpect(jsonPath("$.result.applicationId").value(id))
+        .andExpect(jsonPath("$.result.status").value("DRAFT"));
+    mvc.perform(
+            get("/api/resident/applications/{id}", id).header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applicant.name").value("수정 이름"))
+        .andExpect(jsonPath("$.result.applicant.phone").value("01012345678"))
+        .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
+        .andExpect(jsonPath("$.result.floodExperience").value("NO"))
+        .andExpect(jsonPath("$.result.existingFacility").value(true))
+        .andExpect(jsonPath("$.result.requestReason").value("사유"))
+        .andExpect(jsonPath("$.result.preferredVisitDate").value("2099-01-01"))
+        .andExpect(jsonPath("$.result.preferredTimeSlot").value("AFTERNOON"))
+        .andExpect(jsonPath("$.result.inflowLocations.length()").value(2));
+    update(id, "{\"contact\":\"010-9999-9999\"}", token).andExpect(status().isOk());
+    var changed =
+        jdbc.queryForMap(
+            "SELECT application_id, assessment_id, receipt_no, created_at, submitted_at, address FROM inspection_applications WHERE application_id=?",
+            id);
+    assertThat(changed).isEqualTo(original);
+    mvc.perform(
+            get("/api/resident/applications/{id}", id).header("Authorization", "Bearer " + token))
+        .andExpect(jsonPath("$.result.applicant.name").value("수정 이름"))
+        .andExpect(jsonPath("$.result.requestReason").value("사유"))
+        .andExpect(jsonPath("$.result.inflowLocations.length()").value(2));
+    update(
+            id,
+            "{\"requestReason\":null,\"preferredVisitDate\":null,\"preferredTimeSlot\":null,\"inflowLocations\":[]}",
+            token)
+        .andExpect(status().isOk());
+    mvc.perform(
+            get("/api/resident/applications/{id}", id).header("Authorization", "Bearer " + token))
+        .andExpect(jsonPath("$.result.requestReason").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.preferredVisitDate").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.preferredTimeSlot").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.inflowLocations").isEmpty());
+  }
+
+  @Test
+  void rejectsInvalidUpdatesAndEnforcesOwnershipAndDraftStatus() throws Exception {
+    long id = createDraft();
+    var other = users.saveAndFlush(User.resident("other-flow@example.com", "hash", "다른 주민"));
+    update(id, "{\"contact\":\"010-9999-9999\"}", jwt.issue(other).accessToken())
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("APPLICATION_403_7"));
+    update(0, "{}", token).andExpect(status().isBadRequest());
+    update(Long.MAX_VALUE, "{}", token).andExpect(status().isNotFound());
+    for (String body :
+        List.of(
+            "{\"applicantName\":null}",
+            "{\"contact\":null}",
+            "{\"occupancyType\":null}",
+            "{\"floodExperience\":null}",
+            "{\"existingFacility\":null}",
+            "{\"inflowLocations\":null}",
+            "{\"inflowLocations\":[null]}",
+            "{\"contact\":\"   \"}",
+            "{\"preferredVisitDate\":\"2000-01-01\"}",
+            "{\"assessmentId\":2}",
+            "{\"address\":\"다른 주소\"}")) {
+      update(id, body, token).andExpect(status().isBadRequest());
+    }
+    mvc.perform(
+            multipart("/api/resident/applications/{id}/attachments", id)
+                .file(png())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isCreated());
+    update(id, "{\"contact\":\"010-9999-9999\"}", token)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("APPLICATION_409_5"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT contact FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo("010-1234-5678");
+  }
+
+  @Test
+  void updateWaitsForPhotoReceiptAndRejectsAfterCommit() throws Exception {
+    long id = createDraft();
+    var holding = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              holding.countDown();
+              if (!release.await(30, java.util.concurrent.TimeUnit.SECONDS))
+                throw new IllegalStateException("timeout");
+              var inspection = inspections.save(invocation.getArgument(0));
+              inspections.flush();
+              return inspection;
+            })
+        .when(inspections)
+        .saveAndFlush(any());
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      var upload =
+          executor.submit(
+              () ->
+                  mvc.perform(
+                          multipart("/api/resident/applications/{id}/attachments", id)
+                              .file(png())
+                              .header("Authorization", "Bearer " + token))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      assertThat(holding.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      var patchStarted = new java.util.concurrent.CountDownLatch(1);
+      var patch =
+          executor.submit(
+              () -> {
+                patchStarted.countDown();
+                return update(id, "{\"contact\":\"010-9999-9999\"}", token)
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+              });
+      assertThat(patchStarted.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      assertThatThrownBy(() -> patch.get(500, java.util.concurrent.TimeUnit.MILLISECONDS))
+          .isInstanceOf(java.util.concurrent.TimeoutException.class);
+      release.countDown();
+      assertThat(upload.get(30, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(201);
+      assertThat(patch.get(30, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(409);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT contact FROM inspection_applications WHERE application_id=?",
+                  String.class,
+                  id))
+          .isEqualTo("010-1234-5678");
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      reset(inspections);
+    }
+  }
+
+  @Test
+  void documentsUpdateEndpoint() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].patch.responses['200'].content['application/json'].examples.draftUpdated.value.code")
+                .value("APPLICATION_200_4"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].patch.responses['409'].content['application/json'].examples.applicationNotDraft.value.code")
+                .value("APPLICATION_409_5"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].patch.requestBody.content['application/json'].examples.partialUpdate.value.contact")
+                .value("010-1234-5678"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].patch.responses['400'].content['application/json'].examples.invalidContact.value.message")
+                .value(org.hamcrest.Matchers.containsString("01012345678")))
+        .andExpect(
+            jsonPath("$.components.schemas.UpdateInspectionApplicationRequest.properties.contact")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.UpdateInspectionApplicationRequest.properties.requestReasonProvided")
+                .doesNotExist());
+  }
+
+  @Test
+  void acceptsHyphenatedAndUnhyphenatedMobileNumbersOnPost() throws Exception {
+    for (String contact : List.of("010-1234-5678", "01012345678")) {
+      var body = request();
+      body.put("contact", contact);
+      mvc.perform(
+              post("/api/resident/applications")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(body)))
+          .andExpect(status().isCreated());
+      if (contact.equals("010-1234-5678")) {
+        assessmentId =
+            assessments
+                .saveAndFlush(
+                    RiskAssessment.completedDemo(
+                        users.findByEmail("flow@example.com").orElseThrow(),
+                        "경기도 부천시 원미구 길주로 211",
+                        "202호",
+                        RiskLevel.HIGH))
+                .getId();
+      }
+    }
+  }
+
   @Test
   void inspectionLookupFailureRollsBackPhotoAndReceiptAndRetryDoesNotDuplicate() throws Exception {
     var response =
@@ -181,6 +451,13 @@ class InspectionApplicationFlowTest {
                 String.class,
                 applicationId))
         .isEqualTo("DRAFT");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT submitted_at FROM inspection_applications WHERE application_id=?",
+                java.sql.Timestamp.class,
+                applicationId))
+        .isNull();
+    update(applicationId, "{\"contact\":\"010-9999-9999\"}", token).andExpect(status().isOk());
     reset(inspections);
     mvc.perform(
             multipart("/api/resident/applications/{id}/attachments", applicationId)
@@ -189,6 +466,12 @@ class InspectionApplicationFlowTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.result.inspectionId").isNumber())
         .andExpect(jsonPath("$.result.attachments.length()").value(1));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT contact FROM inspection_applications WHERE application_id=?",
+                String.class,
+                applicationId))
+        .isEqualTo("010-9999-9999");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_attachments", Long.class))
         .isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isEqualTo(1);
@@ -218,9 +501,19 @@ class InspectionApplicationFlowTest {
     assertThat(application.get("applicant_name")).isEqualTo("신청자");
     assertThat(application.get("address")).isEqualTo("경기도 부천시 원미구 길주로 211");
     assertThat(application.get("detail_address")).isEqualTo("202호");
+    jdbc.update(
+        "UPDATE inspection_applications SET created_at='2020-01-01 00:00:00' WHERE application_id=?",
+        applicationId);
+    mvc.perform(
+            get("/api/resident/applications/{id}", applicationId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.nullValue()));
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_status_histories", Long.class))
         .isZero();
+    var beforeReceipt =
+        java.time.LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
     mvc.perform(
             multipart("/api/resident/applications/{id}/attachments", applicationId)
                 .file(png())
@@ -235,6 +528,21 @@ class InspectionApplicationFlowTest {
                         Long.class,
                         applicationId)))
         .andExpect(jsonPath("$.result.attachments[0].attachmentId").isNumber());
+    var submittedAt =
+        jdbc.queryForObject(
+                "SELECT submitted_at FROM inspection_applications WHERE application_id=?",
+                java.sql.Timestamp.class,
+                applicationId)
+            .toLocalDateTime();
+    assertThat(submittedAt)
+        .isAfterOrEqualTo(beforeReceipt)
+        .isBeforeOrEqualTo(java.time.LocalDateTime.now().plusSeconds(1));
+    mvc.perform(
+            get("/api/resident/applications/{id}", applicationId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.createdAt").value("2020-01-01T00:00:00"))
+        .andExpect(jsonPath("$.result.submittedAt").value(submittedAt.toString()));
     mvc.perform(
             multipart("/api/resident/applications/{id}/attachments", applicationId)
                 .file(png())
@@ -249,6 +557,13 @@ class InspectionApplicationFlowTest {
                         Long.class,
                         applicationId)))
         .andExpect(jsonPath("$.result.attachments[0].attachmentId").isNumber());
+    assertThat(
+            jdbc.queryForObject(
+                    "SELECT submitted_at FROM inspection_applications WHERE application_id=?",
+                    java.sql.Timestamp.class,
+                    applicationId)
+                .toLocalDateTime())
+        .isEqualTo(submittedAt);
     assertThat(
             jdbc.queryForObject(
                 "SELECT status FROM inspection_applications WHERE application_id=?",

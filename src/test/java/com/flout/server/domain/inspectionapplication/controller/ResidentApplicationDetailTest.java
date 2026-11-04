@@ -139,6 +139,7 @@ class ResidentApplicationDetailTest {
         .andExpect(jsonPath("$.result.inspectionStatus").value("RECEIVED"))
         .andExpect(jsonPath("$.result.resultPublished").value(false))
         .andExpect(jsonPath("$.result.createdAt").isNotEmpty())
+        .andExpect(jsonPath("$.result.submittedAt").value(nullValue()))
         .andExpect(jsonPath("$.result.internalMemo").doesNotExist());
   }
 
@@ -213,6 +214,14 @@ class ResidentApplicationDetailTest {
   void swaggerShowsOwnershipErrorsAndTheStateFields() throws Exception {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.ResidentApplicationDetailResponse.properties.submittedAt")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/applications/{applicationId}'].get.responses['200'].content['application/json'].examples.residentApplicationDetail.value.result.submittedAt")
+                .value("2026-10-21T22:35:00"))
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/applications/{applicationId}'].get.responses['403'].content['application/json'].examples.applicationAccessDenied.value.code")

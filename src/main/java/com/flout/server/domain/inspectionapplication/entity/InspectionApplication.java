@@ -1,6 +1,7 @@
 package com.flout.server.domain.inspectionapplication.entity;
 
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
+import com.flout.server.domain.inspectionapplication.dto.request.UpdateInspectionApplicationRequest;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
 import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
@@ -84,6 +85,9 @@ public class InspectionApplication {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
+  @Column(name = "submitted_at")
+  private LocalDateTime submittedAt;
+
   // 신청 즉시 접수
   public static InspectionApplication received(
       User applicant,
@@ -126,6 +130,21 @@ public class InspectionApplication {
       throw new IllegalStateException("임시 신청만 접수할 수 있습니다.");
     }
     status = InspectionApplicationStatus.RECEIVED;
+    submittedAt = LocalDateTime.now();
+  }
+
+  public void updateDraft(UpdateInspectionApplicationRequest request) {
+    if (status != InspectionApplicationStatus.DRAFT) {
+      throw new IllegalStateException("임시 신청만 수정할 수 있습니다.");
+    }
+    if (request.getApplicantName() != null) applicantName = request.getApplicantName().strip();
+    if (request.getContact() != null) contact = request.getContact().strip();
+    if (request.getOccupancyType() != null) occupancyType = request.getOccupancyType();
+    if (request.getFloodExperience() != null) floodExperience = request.getFloodExperience();
+    if (request.getExistingFacility() != null) existingFacility = request.getExistingFacility();
+    if (request.requestReasonProvided()) requestReason = request.getRequestReason();
+    if (request.preferredVisitDateProvided()) preferredVisitDate = request.getPreferredVisitDate();
+    if (request.preferredTimeSlotProvided()) preferredTimeSlot = request.getPreferredTimeSlot();
   }
 
   @PrePersist
