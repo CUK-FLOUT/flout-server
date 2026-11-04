@@ -31,9 +31,10 @@ public class SupportApprovalService {
     if (application.getOccupancyType() == OccupancyType.TENANT
         && application.getLandlordConsentStatus() != LandlordConsentStatus.CONFIRMED)
       throw new BaseException(SupportApprovalErrorCode.CONSENT_NOT_CONFIRMED);
+    var previousStatus = application.getStatus();
     application.approve(
         request.supportScope(), operator, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
-    histories.saveAndFlush(SupportApplicationStatusHistory.approved(application));
+    histories.saveAndFlush(SupportApplicationStatusHistory.approved(application, previousStatus));
     return ApproveSupportApplicationResponse.from(application);
   }
 }

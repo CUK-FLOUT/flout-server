@@ -15,8 +15,7 @@ import org.springframework.transaction.annotation.*;
 @Component
 @RequiredArgsConstructor
 public class SupportDecisionAccess {
-  private static final Pattern BUCHEON_ADDRESS =
-      Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
+  static final Pattern BUCHEON_ADDRESS = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
   private final UserRepository users;
   private final SupportApplicationRepository applications;
 
@@ -24,6 +23,24 @@ public class SupportDecisionAccess {
   public Decision lockSubmitted(Long operatorId, Long id) {
     if (id == null || id <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    var operator = requireOperator(operatorId, true);
+    var application =
+        applications
+            .findForApproval(id)
+            .orElseThrow(() -> new BaseException(SupportApprovalErrorCode.APPLICATION_NOT_FOUND));
+    if (!BUCHEON_ADDRESS.matcher(application.getAddress().strip()).find())
+      throw new BaseException(SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED);
+    if (!application.getStatus().isReviewable())
+      throw new BaseException(SupportApprovalErrorCode.ALREADY_DECIDED);
+    return new Decision(operator, application);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+  public User requireOperator(Long operatorId) {
+    return requireOperator(operatorId, false);
+  }
+
+  private User requireOperator(Long operatorId, boolean decision) {
     var operator =
         users
             .findById(operatorId)
@@ -31,16 +48,11 @@ public class SupportDecisionAccess {
     if (operator.getRole() != UserRole.ADMIN)
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED);
-    var application =
-        applications
-            .findForApproval(id)
-            .orElseThrow(() -> new BaseException(SupportApprovalErrorCode.APPLICATION_NOT_FOUND));
-    if (!BUCHEON_ADDRESS.matcher(application.getAddress().strip()).find())
-      throw new BaseException(SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED);
-    if (application.getStatus() != SupportApplicationStatus.SUBMITTED)
-      throw new BaseException(SupportApprovalErrorCode.ALREADY_DECIDED);
-    return new Decision(operator, application);
+      throw new BaseException(
+          decision
+              ? SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED
+              : GeneralErrorCode.ACCESS_DENIED_REQUEST);
+    return operator;
   }
 
   public record Decision(User operator, SupportApplication application) {}

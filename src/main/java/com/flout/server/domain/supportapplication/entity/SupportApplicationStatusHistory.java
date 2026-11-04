@@ -23,11 +23,15 @@ public class SupportApplicationStatusHistory {
   @Column(
       name = "previous_status",
       nullable = false,
-      columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
+      columnDefinition =
+          "enum('SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
   private SupportApplicationStatus previousStatus;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
+  @Column(
+      nullable = false,
+      columnDefinition =
+          "enum('SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)
@@ -43,14 +47,16 @@ public class SupportApplicationStatusHistory {
   @Column(name = "changed_at", nullable = false, updatable = false)
   private LocalDateTime changedAt;
 
-  public static SupportApplicationStatusHistory approved(SupportApplication application) {
-    return changed(application);
+  public static SupportApplicationStatusHistory approved(
+      SupportApplication application, SupportApplicationStatus previousStatus) {
+    return changed(application, previousStatus);
   }
 
-  private static SupportApplicationStatusHistory changed(SupportApplication application) {
+  private static SupportApplicationStatusHistory changed(
+      SupportApplication application, SupportApplicationStatus previousStatus) {
     var history = new SupportApplicationStatusHistory();
     history.application = application;
-    history.previousStatus = SupportApplicationStatus.SUBMITTED;
+    history.previousStatus = previousStatus;
     history.status = application.getStatus();
     history.supportScope = application.getSupportScope();
     history.changedBy = application.getApprovedBy();
@@ -58,8 +64,9 @@ public class SupportApplicationStatusHistory {
     return history;
   }
 
-  public static SupportApplicationStatusHistory rejected(SupportApplication application) {
-    var history = changed(application);
+  public static SupportApplicationStatusHistory rejected(
+      SupportApplication application, SupportApplicationStatus previousStatus) {
+    var history = changed(application, previousStatus);
     history.rejectionReason = application.getRejectionReason();
     return history;
   }
