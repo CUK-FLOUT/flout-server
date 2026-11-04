@@ -240,4 +240,83 @@ class SupportStatusTest {
                     "{\"supportScope\":\"물막이판\",\"applicantHousingReviewed\":true,\"expertInspectionReviewed\":true,\"eligibilityDocumentsReviewed\":true}"))
         .andExpect(status().isConflict());
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"OWNER", "TENANT", "ETC"})
+  void submissionSetsActualConsentStateAndConfirmationUpdatesCounts(String occupancy)
+      throws Exception {
+    var source =
+        jdbc.queryForObject(
+            "SELECT application_id FROM support_applications WHERE support_application_id=?",
+            Long.class,
+            supportId);
+    var program =
+        jdbc.queryForObject(
+            "SELECT program_id FROM support_applications WHERE support_application_id=?",
+            Long.class,
+            supportId);
+    jdbc.update("DELETE FROM support_applications");
+    jdbc.update(
+        "UPDATE inspection_applications SET occupancy_type=? WHERE application_id=?",
+        occupancy,
+        source);
+    jdbc.update(
+        "UPDATE inspection_results SET result_status='PUBLISHED',published_at=CURRENT_TIMESTAMP");
+    var body =
+        Map.of(
+            "applicationId",
+            source,
+            "programId",
+            program,
+            "requestedFacility",
+            "출입구 물막이판",
+            "preferredVisitDate",
+            java.time.LocalDate.now().plusDays(1).toString(),
+            "preferredVisitTime",
+            "ANY");
+    boolean tenant = "TENANT".equals(occupancy);
+    mvc.perform(
+            post("/api/resident/support-applications")
+                .header("Authorization", "Bearer " + residentToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.status").value(tenant ? "CONSENT_PENDING" : "REVIEWING"));
+    statusRequest(token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.consentRequiredCount").value(tenant ? 1 : 0))
+        .andExpect(jsonPath("$.result.reviewingCount").value(tenant ? 0 : 1));
+    if (!tenant) return;
+    var id =
+        jdbc.queryForObject("SELECT support_application_id FROM support_applications", Long.class);
+    mvc.perform(
+            patch("/api/admin/support-applications/" + id + "/landlord-consent")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CONFIRMED\"}"))
+        .andExpect(status().isBadRequest());
+    statusRequest(token).andExpect(jsonPath("$.result.consentRequiredCount").value(1));
+    jdbc.update(
+        "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'LANDLORD_CONSENT','isolated-fixture/no-s3-upload','consent.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
+        id);
+    mvc.perform(
+            patch("/api/admin/support-applications/" + id + "/landlord-consent")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CONFIRMED\"}"))
+        .andExpect(status().isOk());
+    statusRequest(token)
+        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.consentRequiredCount").value(0))
+        .andExpect(jsonPath("$.result.reviewingCount").value(1));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT landlord_consent_status FROM support_applications", String.class))
+        .isEqualTo("CONFIRMED");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM support_application_status_histories", Long.class))
+        .isZero();
+  }
 }

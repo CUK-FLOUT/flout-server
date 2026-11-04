@@ -116,12 +116,17 @@ public class SupportApplication {
             : LandlordConsentStatus.PENDING;
     support.preferredVisitDate = preferredVisitDate;
     support.preferredVisitTime = preferredVisitTime;
-    support.status = SupportApplicationStatus.REVIEWING;
+    support.status =
+        source.getOccupancyType() == OccupancyType.TENANT
+            ? SupportApplicationStatus.CONSENT_PENDING
+            : SupportApplicationStatus.REVIEWING;
     return support;
   }
 
   public void confirmLandlordConsent() {
     this.landlordConsentStatus = LandlordConsentStatus.CONFIRMED;
+    if (this.status == SupportApplicationStatus.CONSENT_PENDING)
+      this.status = SupportApplicationStatus.REVIEWING;
   }
 
   public void approve(String scope, User operator, LocalDateTime approvedAt) {

@@ -34,7 +34,11 @@ class SupportStatusMigrationTest {
     jdbc.update(
         "INSERT INTO support_application_status_histories(support_application_id,previous_status,status,changed_by_user_id,changed_at) VALUES(1,'SUBMITTED','APPROVED',1,CURRENT_TIMESTAMP)");
     var source = jdbc.queryForMap("SELECT * FROM support_applications");
-    var history = jdbc.queryForMap("SELECT * FROM support_application_status_histories");
+    jdbc.update(
+        "INSERT INTO support_application_status_histories(support_application_id,previous_status,status,changed_by_user_id,changed_at) VALUES(1,'SUBMITTED','SUBMITTED',1,CURRENT_TIMESTAMP)");
+    var history =
+        jdbc.queryForList(
+            "SELECT * FROM support_application_status_histories ORDER BY support_application_status_history_id");
     var migration = Flyway.configure().dataSource(url, "sa", "").target("39").load();
     migration.migrate();
     migration.validate();
@@ -42,10 +46,10 @@ class SupportStatusMigrationTest {
     assertThat(updated.remove("STATUS")).isEqualTo("REVIEWING");
     source.remove("STATUS");
     assertThat(updated).isEqualTo(source);
-    var changed = jdbc.queryForMap("SELECT * FROM support_application_status_histories");
-    assertThat(changed.remove("PREVIOUS_STATUS")).isEqualTo("REVIEWING");
-    history.remove("PREVIOUS_STATUS");
-    assertThat(changed).isEqualTo(history);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT * FROM support_application_status_histories ORDER BY support_application_status_history_id"))
+        .isEqualTo(history);
     for (var status :
         new String[] {"REVIEWING", "CONSENT_PENDING", "SCHEDULING", "APPROVED", "REJECTED"}) {
       jdbc.update("UPDATE support_applications SET status=?", status);

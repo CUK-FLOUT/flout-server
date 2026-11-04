@@ -161,7 +161,9 @@ class SupportApplicationTest {
             .andExpect(jsonPath("$.code").value("SUPPORT_201_1"))
             .andExpect(jsonPath("$.result.applicationId").value(applicationId))
             .andExpect(jsonPath("$.result.programId").value(programId))
-            .andExpect(jsonPath("$.result.status").value("REVIEWING"))
+            .andExpect(
+                jsonPath("$.result.status")
+                    .value("TENANT".equals(occupancy) ? "CONSENT_PENDING" : "REVIEWING"))
             .andExpect(
                 jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
             .andExpect(
