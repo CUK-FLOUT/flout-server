@@ -60,7 +60,7 @@ public class ResidentSupportDetailController {
   @Operation(
       summary = "주민 지원 승인 상세 조회",
       description =
-          "RESIDENT 본인의 APPROVED 신청만 조회합니다. 승인 시각과 지원 범위는 DB 저장값을 사용하며, 신청 시설(requestedFacility)과 확정된 지원 범위(supportScope)는 구분합니다. 확정 시공 일정 저장 구조가 없어 scheduledConstructionDate/Time은 null입니다. 희망 일정으로 대체하거나 시공 진행 상태를 추정하지 않습니다. 내부 관리 정보는 반환하지 않습니다.")
+          "RESIDENT 본인의 APPROVED 신청만 조회합니다. 승인 시각과 지원 범위는 DB 저장값을 사용하며, 신청 시설(requestedFacility)과 확정된 지원 범위(supportScope)는 구분합니다. scheduledConstructionDate/Time은 시공 일정 저장 API로 확정한 일정이며 미배정이면 null입니다. 희망 일정으로 대체하거나 시공 진행 상태를 추정하지 않습니다. 내부 관리 정보는 반환하지 않습니다.")
   public SuccessResponse<ResidentSupportApprovalResponse> approval(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "지원 신청 ID") @PathVariable Long supportApplicationId) {

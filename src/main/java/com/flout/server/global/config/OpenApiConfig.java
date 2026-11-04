@@ -116,6 +116,7 @@ public class OpenApiConfig {
                 "운영자-우선점검 관리",
                 "운영자-현장점검 관리",
                 "운영자-지원관리",
+                "운영자-시공관리",
                 "주민-AI취약도 분석",
                 "주민-현장점검 신청",
                 "주민-지원신청");
@@ -1639,6 +1640,8 @@ public class OpenApiConfig {
                 "출입구 물막이판 설치 지원",
                 "approvedByUserId",
                 1,
+                "constructionId",
+                301,
                 "approvedAt",
                 "2026-11-02T15:00:00+09:00")));
     operation

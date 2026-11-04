@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationStatusHistoryRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
@@ -44,13 +45,14 @@ class SupportApprovalTest {
   @Autowired ObjectMapper mapper;
   @Autowired JwtEncoder encoder;
   @MockitoSpyBean SupportApplicationStatusHistoryRepository histories;
+  @MockitoSpyBean ConstructionRepository constructions;
   long supportId, adminId, residentId;
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
 
   @BeforeEach
   void setup() {
-    reset(histories);
+    reset(histories, constructions);
     for (var table :
         List.of(
             "support_attachments",
@@ -136,6 +138,7 @@ class SupportApprovalTest {
   }
 
   void unchanged() {
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class)).isZero();
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo("SUBMITTED");
     assertThat(
@@ -173,6 +176,7 @@ class SupportApprovalTest {
         .andExpect(jsonPath("$.result.status").value("APPROVED"))
         .andExpect(jsonPath("$.result.supportScope").value(SCOPE))
         .andExpect(jsonPath("$.result.approvedByUserId").value(adminId))
+        .andExpect(jsonPath("$.result.constructionId").isNumber())
         .andExpect(jsonPath("$.result.approvedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
     var row = jdbc.queryForMap("SELECT * FROM support_applications");
     var history = jdbc.queryForMap("SELECT * FROM support_application_status_histories");
@@ -185,6 +189,8 @@ class SupportApprovalTest {
     assertThat(history.get("CHANGED_AT")).isEqualTo(row.get("APPROVED_AT"));
     assertThat(history.get("SUPPORT_SCOPE")).isEqualTo(SCOPE);
     assertThat(snapshot()).isEqualTo(before);
+    assertThat(jdbc.queryForObject("SELECT support_application_id FROM constructions", Long.class))
+        .isEqualTo(supportId);
   }
 
   @ParameterizedTest
@@ -303,6 +309,8 @@ class SupportApprovalTest {
   void repeatedApprovalIs409() throws Exception {
     send(supportId, body(), token).andExpect(status().isOk());
     send(supportId, body(), token).andExpect(status().isConflict());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class))
+        .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM support_application_status_histories", Integer.class))
@@ -342,6 +350,15 @@ class SupportApprovalTest {
     unchanged();
     assertThat(jdbc.queryForObject("SELECT approved_at FROM support_applications", Object.class))
         .isNull();
+  }
+
+  @Test
+  void constructionCreationFailureRollsBackApprovalAndHistory() throws Exception {
+    doThrow(new IllegalStateException("simulated construction failure"))
+        .when(constructions)
+        .saveAndFlush(any());
+    send(supportId, body(), token).andExpect(status().isInternalServerError());
+    unchanged();
   }
 
   @Test

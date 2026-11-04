@@ -1,4 +1,7 @@
 app:
+  construction:
+    auto-start:
+      enabled: false
   fcm:
     enabled: false
 
