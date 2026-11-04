@@ -9,10 +9,7 @@ import com.flout.server.global.exception.BaseException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Locale;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,26 +20,16 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class SignupService {
   private final UserRepository users;
-  private final UserConsentRepository consents;
   private final PasswordEncoder encoder;
-  private final String termsVersion;
-  private final String privacyVersion;
 
-  public SignupService(
-      UserRepository users,
-      UserConsentRepository consents,
-      PasswordEncoder encoder,
-      @Value("${app.consent.terms-version:1.0}") String termsVersion,
-      @Value("${app.consent.privacy-version:1.0}") String privacyVersion) {
+  public SignupService(UserRepository users, PasswordEncoder encoder) {
     this.users = users;
-    this.consents = consents;
     this.encoder = encoder;
-    this.termsVersion = termsVersion;
-    this.privacyVersion = privacyVersion;
   }
 
   @Transactional
-  public SignupResponse signup(@NotNull @Valid SignupRequest request) {
+  public SignupResponse signup(
+      @NotNull(message = "회원가입 정보를 입력해주세요.") @Valid SignupRequest request) {
     if (!request.password().equals(request.passwordConfirm())) {
       throw new BaseException(UserErrorCode.PASSWORD_MISMATCH);
     }
@@ -64,11 +51,6 @@ public class SignupService {
       }
       throw e;
     }
-    LocalDateTime agreedAt = LocalDateTime.now();
-    consents.saveAll(
-        List.of(
-            UserConsent.agree(user, ConsentType.TERMS, termsVersion, agreedAt),
-            UserConsent.agree(user, ConsentType.PRIVACY, privacyVersion, agreedAt)));
     return SignupResponse.from(user);
   }
 

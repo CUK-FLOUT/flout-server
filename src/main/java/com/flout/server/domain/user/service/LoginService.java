@@ -41,7 +41,6 @@ public class LoginService {
     if (user == null || !matches || user.getRole() != requiredRole) {
       throw new BaseException(UserErrorCode.LOGIN_FAILED);
     }
-    LoginResponse response = tokens.issue(user);
     // 인증 도중 계정이 변경됐다면 토큰을 반환하지 않음
     int updated =
         users.updateLoginTime(
@@ -49,6 +48,10 @@ public class LoginService {
     if (updated != 1) {
       throw new BaseException(UserErrorCode.LOGIN_FAILED);
     }
-    return response;
+    User authenticated =
+        users
+            .findById(user.getId())
+            .orElseThrow(() -> new BaseException(UserErrorCode.LOGIN_FAILED));
+    return tokens.issue(authenticated);
   }
 }

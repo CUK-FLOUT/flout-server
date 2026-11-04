@@ -1,8 +1,6 @@
 package com.flout.server.domain.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -52,10 +50,9 @@ class SignupTest {
       String terms,
       String privacy) {
     return """
-        {"email":"%s","password":"%s","passwordConfirm":"%s","name":"%s",
-         "termsAgreed":%s,"privacyAgreed":%s,"role":"ADMIN"}
+        {"email":"%s","password":"%s","passwordConfirm":"%s","name":"%s","role":"ADMIN"}
         """
-        .formatted(email, password, confirmation, name, terms, privacy);
+        .formatted(email, password, confirmation, name);
   }
 
   private String valid() {
@@ -63,7 +60,7 @@ class SignupTest {
   }
 
   @Test
-  void createsResidentAndBothConsentsWithoutExposingPassword() throws Exception {
+  void createsResidentWithoutConsentsOrExposingPassword() throws Exception {
     String body =
         mvc.perform(
                 post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(valid()))
@@ -80,14 +77,7 @@ class SignupTest {
     assertThat(user.getRole()).isEqualTo(UserRole.RESIDENT);
     assertThat(encoder.matches("password123", user.getPasswordHash())).isTrue();
     assertThat(body).doesNotContain("password", user.getPasswordHash());
-    assertThat(consents.findAll())
-        .hasSize(2)
-        .allSatisfy(
-            consent -> {
-              assertThat(consent.isAgreed()).isTrue();
-              assertThat(consent.getVersion()).isEqualTo("1.0");
-              assertThat(consent.getAgreedAt()).isNotNull();
-            });
+    assertThat(consents.count()).isZero();
   }
 
   @Test
@@ -101,7 +91,7 @@ class SignupTest {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("USER_409_1"));
     assertThat(users.count()).isEqualTo(1);
-    assertThat(consents.count()).isEqualTo(2);
+    assertThat(consents.count()).isZero();
   }
 
   @ParameterizedTest
@@ -120,27 +110,13 @@ class SignupTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "email",
-        "password",
-        "name",
-        "terms",
-        "privacy",
-        "missingConsent",
-        "mismatch",
-        "bytes"
-      })
+  @ValueSource(strings = {"email", "password", "name", "mismatch", "bytes"})
   void rejectsInvalidSignupWithoutSaving(String scenario) throws Exception {
     String body =
         switch (scenario) {
           case "email" -> valid().replace("Resident@example.com", "invalid");
           case "password" -> valid().replace("password123", "short");
           case "name" -> valid().replace("주민", " ");
-          case "terms" -> valid().replace("\"termsAgreed\":true", "\"termsAgreed\":false");
-          case "privacy" -> valid().replace("\"privacyAgreed\":true", "\"privacyAgreed\":false");
-          case "missingConsent" ->
-              valid().replace("\"privacyAgreed\":true", "\"privacyAgreed\":null");
           case "mismatch" ->
               valid()
                   .replace(
@@ -151,15 +127,6 @@ class SignupTest {
     mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.isSuccess").value(false));
-    assertThat(users.count()).isZero();
-    assertThat(consents.count()).isZero();
-  }
-
-  @Test
-  void consentFailureRollsBackUser() throws Exception {
-    doThrow(new IllegalStateException("storage failed")).when(consents).saveAll(any());
-    mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(valid()))
-        .andExpect(status().isInternalServerError());
     assertThat(users.count()).isZero();
     assertThat(consents.count()).isZero();
   }

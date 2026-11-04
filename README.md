@@ -30,6 +30,8 @@ Tree 계열과 Boosting 계열 모델을 학습 데이터 내 교차 검증으�
 cp .env.example .env
 ```
 
+주소 검색 API를 사용하려면 `.env`의 `KAKAO_REST_API_KEY`에 Kakao Developers에서 발급한 REST API 키를 설정합니다. `.env`는 Git에서 제외되므로 실제 키를 커밋하지 않습니다.
+
 이후 실행 스크립트를 사용하면 `.env`를 환경변수로 로드하고 MySQL이 준비된 다음
 Spring Boot 서버가 시작됩니다.
 
@@ -42,6 +44,22 @@ Spring Boot 서버가 시작됩니다.
 - Health check: `http://localhost:8080/actuator/health`
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+### Windows IntelliJ 실행
+
+1. Docker Desktop에서 MySQL을 먼저 실행합니다. Git Bash에서는 `./scripts/run-local.sh`로 `.env`를 포함해 실행할 수 있습니다.
+2. IntelliJ에서는 `Run` → `Edit Configurations...` → Spring Boot 실행 구성의 `Environment variables`에 `.env`의 DB 설정값과 `KAKAO_REST_API_KEY`를 추가합니다.
+3. `Active profiles`는 `local`로 유지하고 `FloutServerApplication`을 실행합니다.
+
+`KAKAO_REST_API_KEY`에는 실제 REST API 키를 입력하며, `.env.example`의 예시 값은 사용하지 않습니다.
+
+### 현장점검 사진 저장
+
+사진 등록을 사용하려면 환경변수 `AWS_REGION`(예: `ap-northeast-2`)과 `AWS_S3_BUCKET`에 비공개 S3 버킷 이름을 설정합니다. 설정이 없더라도 서버는 시작되지만 사진 업로드는 실패합니다. 버킷은 퍼블릭 접근을 차단하고, 실행 주체에 해당 버킷의 `applications/*` 객체에 대한 `s3:PutObject`와 `s3:DeleteObject` 권한을 부여합니다. 기본 AWS 자격 증명 공급자 체인을 사용하므로 로컬에서는 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`와 필요한 경우 `AWS_SESSION_TOKEN` 환경변수 또는 AWS 프로파일을 사용할 수 있으며, 배포 환경에서는 IAM 역할을 사용할 수 있습니다. 실제 자격 증명은 저장소에 추가하지 않습니다.
+
+프론트엔드는 사진이 없으면 신청 API를 호출하지 않고 사진 등록 안내를 표시합니다. 사진이 있으면 신청 생성 응답의 `applicationId`로 `POST /api/resident/applications/{applicationId}/attachments`에 `multipart/form-data`의 `files` 필드를 전송합니다. 신청 생성은 `DRAFT` 임시 저장이며 `inspectionId`와 `submittedAt`은 null입니다. 첫 사진 업로드가 성공해야 `RECEIVED`로 접수되므로 업로드 성공 전에는 신청 완료를 표시하지 않습니다. 실패 시 같은 임시 신청과 같은 업로드 요청 키를 사용해 재시도합니다. 동일한 임시 신청 재요청은 기존 ID를 반환하고 내용이 다르면 409를 반환합니다. 사진은 JPG/JPEG/PNG만 허용하며 파일당 15MB, 신청서당 기존 사진을 포함해 최대 5장입니다. 서버의 요청 전체 제한은 80MB입니다. 추가 업로드마다 고유한 `Idempotency-Key` 헤더를 생성하고, 응답이 유실되거나 실패해 재시도할 때는 같은 키와 같은 파일·파일명·순서를 사용하면 중복 등록을 방지할 수 있습니다. 키는 영문자, 숫자, `.`, `_`, `:`, `-`로 구성된 최대 128자이며, 같은 키로 다른 내용을 보내면 409가 반환됩니다. 키를 생략한 재시도는 중복 등록될 수 있습니다.
+
+업로드 시도 기록은 DB에 남으며 실패 또는 서버 중단 시 객체 정리를 재시도합니다. 실패한 정리는 한 시간 이후 주기적으로 다시 시도하고 로그에 기록합니다. S3 버킷과 리전 설정은 정리 완료 전까지 유지해야 하며 S3 삭제 권한과 미완료 정리 기록을 운영 중 점검해야 합니다.
 
 ## 테스트와 코드 스타일
 
@@ -81,3 +99,7 @@ com.flout.server
 - `main`에는 원칙적으로 `dev`만 병합합니다.
 
 자세한 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인해 주세요.
+
+## 배포
+
+개발 EC2 자동 배포 흐름과 GitHub Actions 설정은 [EC2 배포 문서](docs/EC2_DEPLOYMENT.md)를 확인해 주세요.

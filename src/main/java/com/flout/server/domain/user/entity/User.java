@@ -24,12 +24,19 @@ public class User {
   @Column(name = "password_hash", nullable = false, length = 255)
   private String passwordHash;
 
+  @Column(name = "google_subject", unique = true, length = 255)
+  private String googleSubject;
+
   @Column(nullable = false, length = 50)
   private String name;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private UserRole role;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "jurisdiction_id", foreignKey = @ForeignKey(name = "fk_users_jurisdiction"))
+  private Jurisdiction jurisdiction;
 
   @Column(name = "last_login_at")
   private LocalDateTime lastLoginAt;
@@ -47,6 +54,14 @@ public class User {
     user.name = name;
     user.role = UserRole.RESIDENT;
     return user;
+  }
+
+  public void connectGoogle(String subject) {
+    this.googleSubject = subject;
+  }
+
+  public void recordLogin() {
+    this.lastLoginAt = LocalDateTime.now();
   }
 
   @PrePersist

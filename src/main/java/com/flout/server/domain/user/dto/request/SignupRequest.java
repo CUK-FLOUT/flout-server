@@ -5,7 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
 public record SignupRequest(
-    @NotBlank @Email @Size(max = 100) @Schema(example = "resident@example.com") String email,
+    @NotBlank(message = "이메일을 입력해주세요.") @Email(message = "올바른 이메일 형식으로 입력해주세요.") @Size(max = 100, message = "이메일은 100자 이하여야 합니다.") @Schema(example = "resident@example.com")
+        String email,
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         @NotBlank(message = "비밀번호를 입력해주세요.") @Size(max = 64, message = "비밀번호는 64자 이하여야 합니다.") @Pattern(
             regexp = "^(?=.*[A-Za-z])(?=.*[0-9])\\S{8,}$",
@@ -16,12 +17,10 @@ public record SignupRequest(
             example = "password123")
         String password,
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-        @NotBlank @Schema(format = "password", example = "password123")
+        @NotBlank(message = "비밀번호 확인을 입력해주세요.") @Schema(format = "password", example = "password123")
         String passwordConfirm,
-    @NotBlank @Size(max = 50) @Schema(example = "홍길동") String name,
-    @NotNull @AssertTrue(message = "이용약관 동의는 필수입니다.") @Schema(example = "true") Boolean termsAgreed,
-    @NotNull @AssertTrue(message = "개인정보 수집 및 이용 동의는 필수입니다.") @Schema(example = "true")
-        Boolean privacyAgreed) {
+    @NotBlank(message = "이름을 입력해주세요.") @Size(max = 50, message = "이름은 50자 이하여야 합니다.") @Schema(example = "홍길동")
+        String name) {
   @Override
   public String toString() {
     return "SignupRequest[REDACTED]";

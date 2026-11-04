@@ -1,0 +1,139 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: flout-main-deployment
+      cancel-in-progress: false
+    name: Build and Deploy to EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+    steps:
+      - name: Checkout deployment revision
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        run: ./gradlew clean build --no-daemon
+
+      - name: Validate deployment settings
+        run: |
+          set -euo pipefail
+          : "${AWS_REGION:?AWS_REGION repository variable is required}"
+          : "${EC2_INSTANCE_ID:?EC2_INSTANCE_ID repository variable is required}"
+          : "${AWS_DEPLOY_ROLE_ARN:?AWS_DEPLOY_ROLE_ARN repository variable is required}"
+
+      - name: Configure temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: flout-deploy-${{ github.run_id }}
+          mask-aws-account-id: true
+
+      - name: Deploy through AWS Systems Manager
+        run: |
+          set -euo pipefail
+
+          jq -n \
+            --arg source_url "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.tar.gz" \
+            '{executionTimeout: ["900"], commands: [
+              "bash <<\u0027FLOUT_DEPLOY\u0027",
+              "set -Eeuo pipefail",
+              "work_dir=$(mktemp -d /tmp/flout-deploy-XXXXXX)",
+              "trap \u0027rm -rf \"$work_dir\"\u0027 EXIT",
+              "curl --fail --location --silent --show-error " + ($source_url | @sh) + " | tar -xz -C \"$work_dir\" --strip-components=1",
+              "cd \"$work_dir\"",
+              "chmod +x gradlew",
+              "./gradlew bootJar --no-daemon",
+              "mapfile -t executable_jars < <(find build/libs -maxdepth 1 -type f -name \u0027*.jar\u0027 ! -name \u0027*-plain.jar\u0027 -print)",
+              "if [[ ${#executable_jars[@]} -ne 1 ]]; then echo \"Expected exactly one executable JAR, found ${#executable_jars[@]}.\" >&2; exit 1; fi",
+              "bash scripts/deploy-remote.sh \"${executable_jars[0]}\"",
+              "FLOUT_DEPLOY"
+            ]}' > "$RUNNER_TEMP/ssm-parameters.json"
+
+          command_id=""
+          command_finished=false
+
+          cancel_remote_command() {
+            if [[ -n "$command_id" && "$command_finished" != "true" ]]; then
+              echo "Cancelling unfinished SSM command: $command_id"
+              aws ssm cancel-command \
+                --command-id "$command_id" \
+                --instance-ids "$EC2_INSTANCE_ID" >/dev/null || true
+              command_finished=true
+            fi
+          }
+
+          handle_termination() {
+            cancel_remote_command
+            exit 1
+          }
+          trap cancel_remote_command EXIT
+          trap handle_termination INT TERM
+
+          command_id="$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy FLOUT $GITHUB_SHA" \
+            --timeout-seconds 120 \
+            --parameters "file://$RUNNER_TEMP/ssm-parameters.json" \
+            --query 'Command.CommandId' \
+            --output text)"
+
+          echo "SSM command: $command_id"
+
+          for attempt in $(seq 1 180); do
+            if invocation="$(aws ssm get-command-invocation \
+              --command-id "$command_id" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --output json 2>/dev/null)"; then
+              status="$(jq -r '.Status' <<< "$invocation")"
+              case "$status" in
+                Success)
+                  command_finished=true
+                  trap - EXIT INT TERM
+                  jq -r '.StandardOutputContent' <<< "$invocation"
+                  exit 0
+                  ;;
+                Pending|InProgress|Delayed)
+                  ;;
+                *)
+                  command_finished=true
+                  trap - EXIT INT TERM
+                  jq -r '.StandardOutputContent' <<< "$invocation"
+                  jq -r '.StandardErrorContent' <<< "$invocation" >&2
+                  echo "Deployment failed with SSM status: $status" >&2
+                  exit 1
+                  ;;
+              esac
+            fi
+            sleep 5
+          done
+
+          cancel_remote_command
+          trap - EXIT INT TERM
+          echo "Timed out waiting for the SSM deployment command." >&2
+          exit 1

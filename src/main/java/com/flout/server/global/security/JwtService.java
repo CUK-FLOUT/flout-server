@@ -2,36 +2,47 @@ package com.flout.server.global.security;
 
 import com.flout.server.domain.user.dto.response.LoginResponse;
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.domain.user.service.ConsentService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class JwtService {
   private final JwtEncoder encoder;
   private final long expiresIn;
   private final String issuer;
+  private final RefreshTokenStore refreshTokens;
+  private final ConsentService consents;
 
   public JwtService(
       JwtEncoder encoder,
       @Value("${app.jwt.access-token-seconds:3600}") long expiresIn,
-      @Value("${app.jwt.issuer:flout}") String issuer) {
+      @Value("${app.jwt.issuer:flout}") String issuer,
+      RefreshTokenStore refreshTokens,
+      ConsentService consents) {
     if (expiresIn <= 0 || expiresIn > 86400) {
       throw new IllegalArgumentException("액세스 토큰 유효 시간은 1~86400초여야 합니다.");
     }
     this.encoder = encoder;
     this.expiresIn = expiresIn;
     this.issuer = issuer;
+    this.refreshTokens = refreshTokens;
+    this.consents = consents;
   }
 
+  @Transactional
   public LoginResponse issue(User user) {
     Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     Instant expiresAt = now.plusSeconds(expiresIn);
     JwtClaimsSet claims =
         JwtClaimsSet.builder()
+            .id(UUID.randomUUID().toString())
             .issuer(issuer)
             .subject(user.getId().toString())
             .issuedAt(now)
@@ -42,6 +53,7 @@ public class JwtService {
         encoder
             .encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
             .getTokenValue();
+    var refresh = refreshTokens.issue(user);
     return new LoginResponse(
         token,
         "Bearer",
@@ -50,6 +62,10 @@ public class JwtService {
         user.getId(),
         user.getEmail(),
         user.getName(),
-        user.getRole());
+        user.getRole(),
+        refresh.token(),
+        refresh.expiresIn(),
+        refresh.expiresAt(),
+        consents.requiresConsent(user));
   }
 }

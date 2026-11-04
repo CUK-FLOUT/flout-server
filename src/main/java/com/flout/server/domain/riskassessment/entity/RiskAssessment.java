@@ -28,7 +28,7 @@ public class RiskAssessment {
   @Column(nullable = false, length = 255)
   private String address;
 
-  @Column(name = "detail_address", length = 255)
+  @Column(name = "detail_address", nullable = false, length = 255)
   private String detailAddress;
 
   @Enumerated(EnumType.STRING)
@@ -50,6 +50,9 @@ public class RiskAssessment {
     RiskAssessment assessment = new RiskAssessment();
     assessment.user = Objects.requireNonNull(user);
     assessment.address = Objects.requireNonNull(address);
+    if (detailAddress == null || detailAddress.isBlank()) {
+      throw new IllegalArgumentException("상세 주소는 필수입니다.");
+    }
     assessment.detailAddress = detailAddress;
     assessment.riskLevel = Objects.requireNonNull(riskLevel);
     assessment.status = RiskAssessmentStatus.COMPLETED;

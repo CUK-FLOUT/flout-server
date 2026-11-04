@@ -4,7 +4,6 @@ import com.flout.server.global.response.ErrorResponse;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
@@ -26,6 +26,13 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ErrorResponse<?>> handleMaxUploadSizeExceededException(
+      MaxUploadSizeExceededException e) {
+    ErrorResponse<?> response = ErrorResponse.from(GeneralErrorCode.PAYLOAD_TOO_LARGE);
+    return ResponseEntity.status(response.getStatus()).body(response);
+  }
 
   // 요청 본문 검증 실패
   @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -167,8 +174,7 @@ public class GlobalExceptionHandler {
       }
     }
     // 예외의 상세 사유는 응답에 노출하지 않음
-    HttpStatus httpStatus = HttpStatus.resolve(status);
-    String message = httpStatus == null ? "요청 처리에 실패했습니다." : httpStatus.getReasonPhrase();
+    String message = "요청 처리에 실패했습니다.";
     return ResponseEntity.status(status)
         .body(ErrorResponse.of(status, "COMMON_" + status + "_1", message));
   }
