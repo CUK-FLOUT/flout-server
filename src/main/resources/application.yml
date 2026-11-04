@@ -17,6 +17,8 @@ management:
         include: health,info
 
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   fcm:
     enabled: ${FCM_ENABLED:true}
     project-id: ${FIREBASE_PROJECT_ID:}

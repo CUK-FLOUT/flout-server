@@ -1,6 +1,6 @@
 # EC2 배포
 
-`dev` 브랜치에 반영된 커밋은 GitHub Actions의 `CD` 워크플로를 통해 개발 EC2에 배포됩니다. GitHub와 EC2 사이의 SSH 접속이나 PEM 키 대신 GitHub OIDC와 AWS Systems Manager(SSM)를 사용합니다.
+`main` 브랜치에 반영된 커밋은 GitHub Actions의 `CD` 워크플로를 통해 EC2에 배포됩니다. GitHub와 EC2 사이의 SSH 접속이나 PEM 키 대신 GitHub OIDC와 AWS Systems Manager(SSM)를 사용합니다.
 
 현재 저장소가 공개되어 있으므로 EC2가 GitHub에서 배포 대상 커밋의 소스를 직접 내려받아 JAR를 빌드합니다. 저장소를 비공개로 전환할 때는 S3, ECR 등의 인증된 산출물 전달 방식으로 변경해야 합니다.
 
@@ -15,7 +15,7 @@
 7. Health check가 실패하면 이전 JAR로 자동 롤백합니다.
 8. 서버의 파일 잠금으로 원격 배포가 겹치지 않게 하며, Actions 대기 시간이 끝나면 실행 중인 SSM 명령의 취소를 요청합니다.
 
-동시 배포는 `flout-dev-deployment` concurrency group을 통해 직렬화됩니다. 자동 배포는 `dev` push에서 실행되며, GitHub Actions 화면에서 수동 실행할 수도 있습니다.
+동시 배포는 `flout-main-deployment` concurrency group을 통해 직렬화됩니다. 자동 배포는 `main` push에서만 실행됩니다. GitHub Actions 화면의 수동 실행도 `main` 브랜치를 선택해야 합니다.
 
 ## 1. EC2 사전 설정
 
@@ -68,7 +68,10 @@ AWS IAM의 **자격 증명 공급자**에서 다음 OIDC 공급자를 한 번만
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:CUK-FLOUT/flout-server:ref:refs/heads/dev"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:CUK-FLOUT/flout-server:ref:refs/heads/main",
+            "repo:CUK-FLOUT@343158041/flout-server@1421181234:ref:refs/heads/main"
+          ]
         }
       }
     }
@@ -115,6 +118,75 @@ Repository의 **Settings → Secrets and variables → Actions → Variables**�
 | `EC2_INSTANCE_ID` | 개발 EC2 인스턴스 ID (`i-...`) |
 
 AWS 액세스 키, 시크릿 키, PEM 파일은 GitHub에 등록하거나 저장소에 커밋하지 않습니다.
+
+## 4. API 도메인과 HTTPS 연결
+
+프론트엔드와 API 도메인을 분리하기 위해 백엔드는 `api.flout.shop`을 사용합니다. 도메인을 구매한 계정의 가비아 DNS 관리 화면에서 다음 레코드를 등록합니다.
+
+| 타입 | 호스트 | 값 | TTL |
+| --- | --- | --- | --- |
+| `A` | `api` | `43.200.201.210` | `600` |
+
+DNS가 전파되어 아래 명령이 EC2의 탄력적 IP를 반환하는지 먼저 확인합니다.
+
+```bash
+dig +short api.flout.shop
+```
+
+EC2 보안 그룹은 HTTP 80과 HTTPS 443 인바운드를 허용합니다. 애플리케이션 포트 8080은 외부에 열지 않습니다. `/etc/nginx/sites-available/flout`을 다음과 같이 설정합니다.
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.flout.shop;
+
+    location / {
+        client_max_body_size 80m;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+설정 문법을 검사한 뒤 NGINX를 다시 불러옵니다.
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/flout /etc/nginx/sites-enabled/flout
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+`api.flout.shop`의 DNS 조회와 HTTP 접속이 모두 성공한 다음에만 Let's Encrypt 인증서를 발급합니다.
+
+```bash
+sudo snap install --classic certbot
+sudo /snap/bin/certbot --nginx -d api.flout.shop --redirect
+sudo /snap/bin/certbot renew --dry-run
+curl --fail https://api.flout.shop/actuator/health
+```
+
+## 5. 프론트엔드 CORS 설정
+
+브라우저에서 API를 호출할 프론트엔드 출처를 `/etc/flout/flout.env`에 쉼표로 구분해 등록합니다. URL 끝에는 `/`를 붙이지 않습니다.
+
+```dotenv
+CORS_ALLOWED_ORIGINS=https://flout.shop,https://www.flout.shop
+```
+
+로컬 또는 별도 프리뷰 프론트엔드가 실제로 API를 호출해야 할 때만 해당 출처를 명시적으로 추가합니다. 와일드카드(`*`)는 사용하지 않습니다. 환경변수를 수정한 뒤 서비스를 재시작하고 CORS preflight를 확인합니다.
+
+```bash
+sudo systemctl restart flout
+curl -i -X OPTIONS https://api.flout.shop/api/auth/login \
+  -H 'Origin: https://flout.shop' \
+  -H 'Access-Control-Request-Method: POST'
+```
+
+응답에 `Access-Control-Allow-Origin: https://flout.shop`이 포함되어야 합니다.
 
 ## 수동 상태 확인
 

@@ -2,19 +2,19 @@ name: CD
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
 
-concurrency:
-  group: flout-dev-deployment
-  cancel-in-progress: false
-
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: flout-main-deployment
+      cancel-in-progress: false
     name: Build and Deploy to EC2
     runs-on: ubuntu-latest
     timeout-minutes: 25
