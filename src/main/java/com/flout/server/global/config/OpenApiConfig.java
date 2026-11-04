@@ -92,6 +92,7 @@ public class OpenApiConfig {
       if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
         for (String schemaName :
             List.of(
+                "UpdateInspectionApplicationRequest",
                 "InspectionDetailResponse",
                 "InspectionApplicationDetailResponse",
                 "ResidentApplicationDetailResponse")) {
@@ -267,6 +268,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/applications/{applicationId}")
                                 && method == PathItem.HttpMethod.GET) {
                               describeResidentApplicationDetail(operation);
+                            }
+
+                            if (path.equals("/api/resident/applications/{applicationId}")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeResidentApplicationUpdate(operation);
                             }
 
                             if (path.equals("/api/admin/applications/{applicationId}")
@@ -1206,6 +1212,61 @@ public class OpenApiConfig {
   }
 
   // GIS 신청 응답 예시와 ID·관할 오류 문서화
+  private void describeResidentApplicationUpdate(Operation operation) {
+    var requestExample = new LinkedHashMap<String, Object>();
+    requestExample.put("contact", "010-1234-5678");
+    requestExample.put("requestReason", null);
+    requestExample.put("inflowLocations", List.of("DRAIN", "ENTRANCE"));
+    var request = operation.getRequestBody();
+    if (request != null && request.getContent() != null && request.getContent().get(JSON) != null) {
+      request
+          .getContent()
+          .get(JSON)
+          .addExamples("partialUpdate", new Example().value(requestExample));
+    }
+    var code = InspectionApplicationSuccessCode.DRAFT_UPDATED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "draftUpdated",
+        envelope(true, code, code.getMessage(), Map.of("applicationId", 1, "status", "DRAFT")));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "invalidContact",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "연락처는 국내 휴대전화 형식이어야 합니다. 예: 010-1234-5678 또는 01012345678.");
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "applicationUpdateAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_UPDATE_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(
+        operation,
+        "applicationNotDraft",
+        InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT.getMessage());
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
   private void describeResidentApplicationDetail(Operation operation) {
     var code = InspectionApplicationSuccessCode.DETAIL_FOUND;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
@@ -1228,6 +1289,7 @@ public class OpenApiConfig {
     result.put("inspectionStatus", "RECEIVED");
     result.put("resultPublished", false);
     result.put("createdAt", "2026-10-21T22:30:00");
+    result.put("submittedAt", "2026-10-21T22:35:00");
     addExample(
         success, "residentApplicationDetail", envelope(true, code, code.getMessage(), result));
     addError(
@@ -1417,6 +1479,11 @@ public class OpenApiConfig {
         "위도는 -90 이상이어야 합니다.");
     addError(
         operation, "contactRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "연락처는 필수입니다.");
+    addError(
+        operation,
+        "invalidContact",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "연락처는 국내 휴대전화 형식이어야 합니다. 예: 010-1234-5678 또는 01012345678.");
     addError(
         operation,
         "guideNotLinkedToAssessment",
