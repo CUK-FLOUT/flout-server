@@ -10,7 +10,7 @@ class InspectionApplicationSubmittedAtMigrationTest {
   @Test
   void leavesLegacyReceiptTimeUnknownEvenWhenReceivedHistoryExists() throws Exception {
     String url = "jdbc:h2:mem:submitted-at-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    Flyway.configure().dataSource(url, "sa", "").target("36").load().migrate();
+    Flyway.configure().dataSource(url, "sa", "").target("39").load().migrate();
     try (var connection = DriverManager.getConnection(url, "sa", "");
         var statement = connection.createStatement()) {
       statement.executeUpdate(
