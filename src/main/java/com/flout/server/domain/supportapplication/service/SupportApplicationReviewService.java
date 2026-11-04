@@ -60,7 +60,7 @@ public class SupportApplicationReviewService {
         detail.inspectionResultPublished(),
         detail.recommendedActions(),
         detail.requestedFacility(),
-        application.getApplication().getRequestReason(),
+        detail.residentRequest(),
         detail.preferredConstructionDate(),
         detail.preferredTimeSlot(),
         detail.occupancyType() == OccupancyType.TENANT,

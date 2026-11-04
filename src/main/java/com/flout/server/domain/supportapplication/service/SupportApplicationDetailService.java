@@ -10,7 +10,6 @@ import com.flout.server.domain.supportapplication.response.code.SupportDetailErr
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.*;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SupportApplicationDetailService {
-  private static final Pattern PHONE = Pattern.compile("^(02|0[0-9]{2})([0-9]{3,4})([0-9]{4})$");
   private final SupportDecisionAccess access;
   private final SupportApplicationRepository applications;
   private final InspectionRepository inspections;
@@ -54,14 +52,14 @@ public class SupportApplicationDetailService {
         application.getId(),
         String.format(Locale.ROOT, "%06d", source.getId()),
         application.getApplicantName(),
-        maskContact(application.getContact()),
+        application.getContact(),
         application.getAddress(),
         source.getDetailAddress(),
         null,
         application.getOccupancyType(),
         actions,
         application.getRequestedFacility(),
-        null,
+        source.getRequestReason(),
         application.getPreferredVisitDate(),
         application.getPreferredVisitTime(),
         inspection.map(Inspection::getId).orElse(null),
@@ -86,11 +84,5 @@ public class SupportApplicationDetailService {
     } catch (RuntimeException e) {
       throw new BaseException(SupportDetailErrorCode.ATTACHMENT_READ_FAILED);
     }
-  }
-
-  private String maskContact(String contact) {
-    if (contact == null || contact.isBlank()) return null;
-    var matcher = PHONE.matcher(contact.replaceAll("[ -]", ""));
-    return matcher.matches() ? matcher.group(1) + "-****-" + matcher.group(3) : "****";
   }
 }

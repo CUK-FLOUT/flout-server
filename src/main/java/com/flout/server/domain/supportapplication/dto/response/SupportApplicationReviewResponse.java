@@ -14,7 +14,7 @@ public record SupportApplicationReviewResponse(
     Long applicationId,
     @Schema(description = "원본 현장점검 신청 ID의 최소 6자리 접수번호") String receiptNo,
     String applicantName,
-    @Schema(description = "가운데 번호를 마스킹한 신청 당시 연락처") String contact,
+    @Schema(description = "지원 신청 당시 저장된 전체 연락처", example = "010-1234-0002") String contact,
     String address,
     String detailAddress,
     OccupancyType occupancyType,

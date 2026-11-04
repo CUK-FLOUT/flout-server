@@ -147,11 +147,11 @@ class SupportDetailTest {
         .andExpect(
             jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", sourceId)))
         .andExpect(jsonPath("$.result.applicantName").value("김주민"))
-        .andExpect(jsonPath("$.result.contact").value("010-****-0002"))
+        .andExpect(jsonPath("$.result.contact").value("010-1234-0002"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
         .andExpect(jsonPath("$.result.housingType").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.result.residentRequest").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.result.residentRequest").value("점검 전용 요청 사유"))
         .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
         .andExpect(jsonPath("$.result.requestedFacility").value("출입구 물막이판"))
         .andExpect(jsonPath("$.result.preferredConstructionDate").value("2026-10-21"))
@@ -307,17 +307,21 @@ class SupportDetailTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"01012340002", "010-1234-0002", "010 1234 0002"})
-  void masksStoredPhoneFormats(String contact) throws Exception {
+  void bothRoutesReturnTheStoredPhoneFormatWithoutMasking(String contact) throws Exception {
     jdbc.update("UPDATE support_applications SET contact=?", contact);
-    detail()
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.contact").value("010-****-0002"));
+    detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.contact").value(contact));
+    review().andExpect(status().isOk()).andExpect(jsonPath("$.result.contact").value(contact));
   }
 
   @Test
-  void malformedContactDoesNotLeakPersonalInformation() throws Exception {
+  void legacyContactIsReturnedWithoutReformatting() throws Exception {
     jdbc.update("UPDATE support_applications SET contact='invalid-123456789'");
-    detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.contact").value("****"));
+    detail()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.contact").value("invalid-123456789"));
+    review()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.contact").value("invalid-123456789"));
   }
 
   @Test
@@ -397,7 +401,7 @@ class SupportDetailTest {
         .andExpect(
             jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", applicationId)))
         .andExpect(jsonPath("$.result.applicantName").value("테스트주민"))
-        .andExpect(jsonPath("$.result.contact").value("010-****-0000"))
+        .andExpect(jsonPath("$.result.contact").value("010-0000-0000"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
         .andExpect(jsonPath("$.result.housingType").doesNotExist())
