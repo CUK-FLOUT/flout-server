@@ -30,7 +30,7 @@ public class AdminLandlordConsentController {
   @Operation(
       summary = "임대인 동의 확인",
       description =
-          "ADMIN 및 부천시 관할 운영자만 호출할 수 있습니다. SUBMITTED인 TENANT 신청에 LANDLORD_CONSENT 첨부파일이 제출되어 있고 현재 PENDING일 때만 CONFIRMED로 변경합니다. 업로드만으로 확인 완료되지 않으며, 확인 후 별도 승인 API의 체크리스트와 자격 검증을 통과해야 승인됩니다. OWNER·ETC는 400, 이미 처리된 신청 및 중복 확인은 409입니다. 지원 신청 상태와 승인·미승인 이력은 변경하지 않습니다.")
+          "ADMIN 및 부천시 관할 운영자만 호출할 수 있습니다. 검토 중(REVIEWING·CONSENT_PENDING, 기존 SUBMITTED 호환)인 TENANT 신청에 LANDLORD_CONSENT 첨부파일이 제출되어 있고 현재 PENDING일 때만 CONFIRMED로 변경합니다. 업로드만으로 확인 완료되지 않으며, 확인 후 별도 승인 API의 체크리스트와 자격 검증을 통과해야 승인됩니다. OWNER·ETC는 400, 이미 처리된 신청 및 중복 확인은 409입니다. 동의 확인 후 CONSENT_PENDING 신청은 REVIEWING으로 전환하며, 기존 REVIEWING·SUBMITTED 상태는 유지합니다. 승인·미승인 이력은 변경하지 않습니다.")
   public SuccessResponse<ConfirmLandlordConsentResponse> confirm(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "지원 신청 ID (양의 정수)", required = true, schema = @Schema(minimum = "1"))

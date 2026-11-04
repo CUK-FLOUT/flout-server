@@ -1725,7 +1725,7 @@ public class OpenApiConfig {
                 "programId",
                 1,
                 "status",
-                "SUBMITTED",
+                "REVIEWING",
                 "submittedAt",
                 "2026-10-21T14:00:00+09:00",
                 "receiptNumber",

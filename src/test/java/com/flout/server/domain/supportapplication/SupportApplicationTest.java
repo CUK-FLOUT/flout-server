@@ -161,7 +161,9 @@ class SupportApplicationTest {
             .andExpect(jsonPath("$.code").value("SUPPORT_201_1"))
             .andExpect(jsonPath("$.result.applicationId").value(applicationId))
             .andExpect(jsonPath("$.result.programId").value(programId))
-            .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
+            .andExpect(
+                jsonPath("$.result.status")
+                    .value("TENANT".equals(occupancy) ? "CONSENT_PENDING" : "REVIEWING"))
             .andExpect(
                 jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
             .andExpect(
@@ -435,7 +437,7 @@ class SupportApplicationTest {
     b.put("status", "COMPLETED");
     send(b, token).andExpect(status().isCreated());
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
-        .isEqualTo("SUBMITTED");
+        .isEqualTo("REVIEWING");
   }
 
   @Test

@@ -59,7 +59,10 @@ public class SupportApplication {
   private PreferredTimeSlot preferredVisitTime;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
+  @Column(
+      nullable = false,
+      columnDefinition =
+          "enum('SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)
@@ -113,12 +116,17 @@ public class SupportApplication {
             : LandlordConsentStatus.PENDING;
     support.preferredVisitDate = preferredVisitDate;
     support.preferredVisitTime = preferredVisitTime;
-    support.status = SupportApplicationStatus.SUBMITTED;
+    support.status =
+        source.getOccupancyType() == OccupancyType.TENANT
+            ? SupportApplicationStatus.CONSENT_PENDING
+            : SupportApplicationStatus.REVIEWING;
     return support;
   }
 
   public void confirmLandlordConsent() {
     this.landlordConsentStatus = LandlordConsentStatus.CONFIRMED;
+    if (this.status == SupportApplicationStatus.CONSENT_PENDING)
+      this.status = SupportApplicationStatus.REVIEWING;
   }
 
   public void approve(String scope, User operator, LocalDateTime approvedAt) {

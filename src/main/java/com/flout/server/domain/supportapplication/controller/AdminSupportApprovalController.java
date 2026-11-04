@@ -28,7 +28,7 @@ public class AdminSupportApprovalController {
   @Operation(
       summary = "지원 신청 승인",
       description =
-          "SUBMITTED만 APPROVED로 변경하며 재처리는 409이고, 검토 3항목은 모두 true여야 합니다. OWNER는 동의·증빙서류가 필요 없고 TENANT는 운영자 동의 확인 상태 CONFIRMED가 필요합니다.")
+          "검토 중(REVIEWING·CONSENT_PENDING, 기존 SUBMITTED 호환)만 APPROVED로 변경하며 재처리는 409이고, 검토 3항목은 모두 true여야 합니다. OWNER는 동의·증빙서류가 필요 없고 TENANT는 운영자 동의 확인 상태 CONFIRMED가 필요합니다.")
   public SuccessResponse<ApproveSupportApplicationResponse> approve(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long supportApplicationId,

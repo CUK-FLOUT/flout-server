@@ -21,9 +21,10 @@ public class SupportRejectionService {
       Long operatorId, Long id, RejectSupportApplicationRequest request) {
     var decision = access.lockSubmitted(operatorId, id);
     var application = decision.application();
+    var previousStatus = application.getStatus();
     application.reject(
         request.reason(), decision.operator(), LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
-    histories.saveAndFlush(SupportApplicationStatusHistory.rejected(application));
+    histories.saveAndFlush(SupportApplicationStatusHistory.rejected(application, previousStatus));
     return RejectSupportApplicationResponse.from(application);
   }
 }
