@@ -8,6 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.inspectionapplication.service.S3AttachmentStorage;
+import com.flout.server.domain.supportapplication.dto.response.SupportAttachmentResponse;
+import com.flout.server.domain.supportapplication.repository.SupportAttachmentRepository;
+import com.flout.server.domain.supportapplication.service.ResidentSupportDetailService;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
@@ -40,6 +43,7 @@ class ResidentSupportProgressTest {
   @Autowired UserRepository users;
   @Autowired JwtService jwt;
   @Autowired ObjectMapper mapper;
+  @Autowired SupportAttachmentRepository attachments;
   @MockitoBean AttachmentStorage storage;
   long supportId, adminId, residentId;
   String token, residentToken;
@@ -201,7 +205,22 @@ class ResidentSupportProgressTest {
                 .value(contentType.equals("application/pdf") ? "임대인 동의서.pdf" : "임대인 동의서.png"))
         .andExpect(jsonPath("$.result.attachments[0].size").value(2048))
         .andExpect(jsonPath("$.result.attachments[0].contentType").value(contentType))
-        .andExpect(jsonPath("$.result.attachments[0].submittedAt").value("2026-11-05T10:20:00"))
+        .andExpect(
+            result -> {
+              var timestamp =
+                  mapper
+                      .readTree(result.getResponse().getContentAsString())
+                      .get("result")
+                      .get("attachments")
+                      .get(0)
+                      .get("submittedAt")
+                      .asString();
+              var uploadTime =
+                  SupportAttachmentResponse.from(attachments.findById(id).orElseThrow())
+                      .submittedAt();
+              assertThat(java.time.OffsetDateTime.parse(timestamp)).isEqualTo(uploadTime);
+              assertThat(timestamp).endsWith("+09:00");
+            })
         .andExpect(
             jsonPath("$.result.attachments[0].fileUrl")
                 .value("https://files.example.test/signed-test-url"));
@@ -217,6 +236,40 @@ class ResidentSupportProgressTest {
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.code").value("SUPPORT_DETAIL_500_1"))
         .andExpect(jsonPath("$.result").value(org.hamcrest.Matchers.nullValue()));
+  }
+
+  @Test
+  void failureLogIncludesApplicationAndOriginalStackWithoutKeysOrUrls() throws Exception {
+    attach("application/pdf");
+    var failure =
+        new IllegalStateException(
+            "private/progress/consent https://files.example.test/signed?token=secret");
+    when(storage.readUrl(anyString())).thenThrow(failure);
+    var logger =
+        (ch.qos.logback.classic.Logger)
+            org.slf4j.LoggerFactory.getLogger(ResidentSupportDetailService.class);
+    var appender =
+        new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      request("attachments")
+          .andExpect(status().isInternalServerError())
+          .andExpect(jsonPath("$.code").value("SUPPORT_DETAIL_500_1"));
+      assertThat(appender.list).hasSize(1);
+      var event = appender.list.getFirst();
+      assertThat(event.getLevel()).isEqualTo(ch.qos.logback.classic.Level.ERROR);
+      assertThat(event.getFormattedMessage())
+          .contains(
+              "supportApplicationId=" + supportId,
+              failure.getClass().getName(),
+              failure.getStackTrace()[0].toString())
+          .doesNotContain("private/progress/consent", "https://", "token=secret");
+      assertThat(event.getThrowableProxy()).isNull();
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
   }
 
   @Test

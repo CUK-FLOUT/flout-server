@@ -16,10 +16,12 @@ import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ResidentSupportDetailService {
@@ -136,10 +138,15 @@ public class ResidentSupportDetailService {
                           document.getOriginalFilename(),
                           document.getFileSize(),
                           document.getContentType(),
-                          document.getSubmittedAt(),
+                          SupportAttachmentResponse.from(document).submittedAt(),
                           storage.readUrl(document.getObjectKey())))
               .toList();
     } catch (RuntimeException e) {
+      log.error(
+          "증빙서류 조회 실패. supportApplicationId={}, failureType={}, stackTrace={}",
+          a.getId(),
+          e.getClass().getName(),
+          Arrays.toString(e.getStackTrace()));
       throw new BaseException(SupportDetailErrorCode.ATTACHMENT_READ_FAILED);
     }
     return new ResidentSupportAttachmentsResponse(a.getId(), consent(a), files);
