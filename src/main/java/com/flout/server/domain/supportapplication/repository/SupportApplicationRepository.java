@@ -22,11 +22,11 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       value =
           """
       SELECT COUNT(*) AS totalCount,
-             COALESCE(SUM(CASE WHEN status = 'REVIEWING' THEN 1 ELSE 0 END), 0) AS reviewingCount,
+             COALESCE(SUM(CASE WHEN status IN ('SUBMITTED', 'REVIEWING') THEN 1 ELSE 0 END), 0) AS reviewingCount,
              COALESCE(SUM(CASE WHEN status = 'CONSENT_PENDING' THEN 1 ELSE 0 END), 0) AS consentRequiredCount,
              COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedCount
       FROM support_applications
-      WHERE REGEXP_LIKE(TRIM(address), :addressPattern)
+      WHERE status <> 'DRAFT' AND REGEXP_LIKE(TRIM(address), :addressPattern)
       """,
       nativeQuery = true)
   StatusCounts countStatusByJurisdiction(
@@ -44,7 +44,7 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
 
   @org.springframework.data.jpa.repository.Query(
       value =
-          "SELECT s.* FROM support_applications s WHERE s.support_application_id = :id AND REGEXP_LIKE(TRIM(s.address), :addressPattern)",
+          "SELECT s.* FROM support_applications s WHERE s.support_application_id = :id AND s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)",
       nativeQuery = true)
   java.util.Optional<SupportApplication> findAdminDetail(
       @org.springframework.data.repository.query.Param("id") Long id,
@@ -53,7 +53,7 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
   String ADMIN_SEARCH_FILTER =
       """
       FROM support_applications s
-      WHERE REGEXP_LIKE(TRIM(s.address), :addressPattern)
+      WHERE s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)
         AND (:keyword = '' OR LOCATE(:keyword, s.applicant_name) > 0
           OR LOCATE(:keyword, LPAD(CONCAT('', s.application_id),
             GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0')) > 0)

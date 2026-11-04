@@ -26,7 +26,7 @@ public class AdminSupportListController {
   @Operation(
       summary = "지원 신청 목록 조회·검색",
       description =
-          "인증된 운영자의 관할 내 지원 신청을 접수번호·지원 신청에 저장된 신청자 이름으로 부분 검색합니다. 검색어는 255자 검증 후 앞뒤 공백을 제거하며 %와 _는 문자 그대로 검색합니다. 지원 신청 ID 내림차순으로 정렬하고 검색·관할 조건을 적용한 전체 건수와 페이지 정보를 반환합니다. 접수번호는 기존 지원 신청 응답과 동일하게 현장점검 신청 ID를 최소 6자리로 표시합니다. DB 동의 확인 상태 CONFIRMED는 VERIFIED로, 기존 SUBMITTED는 REVIEWING으로 응답에만 변환합니다. 지역·지원 상태·동의 상태 필터는 이번 API에 포함하지 않습니다.")
+          "인증된 운영자의 관할 내 지원 신청을 검색합니다. DRAFT는 제외하며 신청 ID 내림차순으로 정렬합니다. DB 동의 확인 상태 CONFIRMED는 호환성을 위해 VERIFIED로 표시합니다.")
   @ApiResponse(
       responseCode = "400",
       description = "COMMON_400_3: page·size 범위, 검색어 길이 또는 파라미터 타입 오류",

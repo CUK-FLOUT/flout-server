@@ -43,6 +43,6 @@ public class SupportApplicationListService {
         row.getApplicantName(),
         row.getRequestedFacility(),
         consent == LandlordConsentStatus.CONFIRMED ? "VERIFIED" : consent.name(),
-        status == SupportApplicationStatus.SUBMITTED ? SupportApplicationStatus.REVIEWING : status);
+        status);
   }
 }

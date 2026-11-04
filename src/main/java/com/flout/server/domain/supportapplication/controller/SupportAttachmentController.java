@@ -30,7 +30,7 @@ public class SupportAttachmentController {
   @Operation(
       summary = "주민 지원 신청 증빙서류 제출",
       description =
-          "file 한 개만 요청받습니다. 서버 DB의 거주 형태가 TENANT인 경우에만 임대인 동의서(LANDLORD_CONSENT)로 자동 지정하여 저장합니다. OWNER는 별도 증빙서류가 불필요합니다. OWNER·ETC의 업로드 요청은 400을 반환합니다. PDF/JPG/JPEG/PNG, 최대 15 MiB이며 중복 제출은 409입니다. 업로드만으로 임대인 동의 상태를 CONFIRMED로 변경하지 않습니다.")
+          "TENANT의 DRAFT 신청에 임대인 동의서 한 개를 등록하면 SUBMITTED로 접수됩니다. OWNER·ETC는 업로드할 수 없습니다. PDF/JPG/JPEG/PNG, 최대 15 MiB이며 중복 제출은 409입니다.")
   public SuccessResponse<SupportAttachmentResponse> submit(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long supportApplicationId,

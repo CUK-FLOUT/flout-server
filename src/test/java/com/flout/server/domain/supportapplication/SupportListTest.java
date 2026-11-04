@@ -254,9 +254,7 @@ class SupportListTest {
     jdbc.update("UPDATE support_applications SET status=?", state);
     list(token, "", 0, 10)
         .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.result.supportApplications[0].status")
-                .value("SUBMITTED".equals(state) ? "REVIEWING" : state));
+        .andExpect(jsonPath("$.result.supportApplications[0].status").value(state));
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo(state);
   }

@@ -125,9 +125,7 @@ public class ResidentSupportDetailService {
   }
 
   private SupportApplicationStatus displayStatus(SupportApplication a) {
-    return a.getStatus() == SupportApplicationStatus.SUBMITTED
-        ? SupportApplicationStatus.REVIEWING
-        : a.getStatus();
+    return a.getStatus();
   }
 
   private String consent(SupportApplication a) {

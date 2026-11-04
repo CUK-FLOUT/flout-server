@@ -22,7 +22,7 @@ public class AdminSupportStatusController {
   @Operation(
       summary = "지원 신청 현황 건수 조회",
       description =
-          "인증된 운영자의 관할 전체 지원 신청과 REVIEWING, CONSENT_PENDING, APPROVED 건수를 동일한 집계 쿼리로 반환합니다. 검색 및 페이지 조건은 적용하지 않으며 관할 정보가 없거나 지원하지 않는 관할이면 403입니다.")
+          "관할 지원 신청 중 DRAFT를 제외하여 집계합니다. reviewingCount는 SUBMITTED와 기존 REVIEWING을 포함합니다. 관할 정보가 없거나 지원하지 않는 관할이면 403입니다.")
   public SuccessResponse<SupportApplicationStatusResponse> getStatus(
       @AuthenticationPrincipal Jwt jwt) {
     return SuccessResponse.ok(service.getStatus(Long.valueOf(jwt.getSubject())));

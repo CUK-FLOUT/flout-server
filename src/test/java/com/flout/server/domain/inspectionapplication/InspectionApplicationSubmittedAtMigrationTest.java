@@ -21,7 +21,13 @@ class InspectionApplicationSubmittedAtMigrationTest {
           "INSERT INTO inspection_applications (applicant_user_id, applicant_name, assessment_id, receipt_no, address, latitude, longitude, contact, occupancy_type, flood_experience, existing_facility, status) VALUES (1, 'resident', 1, 'legacy', 'address', 37.5, 126.7, 'contact', 'TENANT', 'NO', FALSE, 'RECEIVED')");
       statement.executeUpdate(
           "INSERT INTO application_status_histories (application_id, status, created_at) VALUES (1, 'RECEIVED', '2020-01-01 00:00:00')");
-      assertThat(Flyway.configure().dataSource(url, "sa", "").load().migrate().migrationsExecuted)
+      assertThat(
+              Flyway.configure()
+                  .dataSource(url, "sa", "")
+                  .target("40")
+                  .load()
+                  .migrate()
+                  .migrationsExecuted)
           .isEqualTo(1);
       try (var rows =
           statement.executeQuery(
