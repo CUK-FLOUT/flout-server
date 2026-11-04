@@ -69,14 +69,21 @@ public class Inspection {
   // 재배정 방지
   public void assign(User operator, LocalDateTime scheduledAt, String notice, LocalDateTime now) {
     if (this.inspector != null) throw new IllegalStateException("이미 배정된 점검입니다.");
-    if (status != InspectionStatus.SCHEDULED)
-      throw new IllegalStateException("예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
+    if (status != InspectionStatus.RECEIVED && status != InspectionStatus.SCHEDULED)
+      throw new IllegalStateException("접수 또는 예정 상태에서만 배정과 일정을 저장할 수 있습니다.");
+    this.status = InspectionStatus.SCHEDULED;
     this.inspector = operator;
     this.scheduledAt = scheduledAt;
     this.preVisitNotice = notice;
     this.scheduledBy = operator;
     this.assignedAt = now;
     this.updatedAt = now;
+  }
+
+  /** 결과 공개와 같은 트랜잭션에서 점검을 완료합니다. */
+  public void complete(LocalDateTime now) {
+    status = InspectionStatus.COMPLETED;
+    updatedAt = now;
   }
 
   @PrePersist

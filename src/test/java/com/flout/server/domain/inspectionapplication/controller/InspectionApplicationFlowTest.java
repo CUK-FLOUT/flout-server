@@ -289,10 +289,11 @@ class InspectionApplicationFlowTest {
         """);
     var admin = users.findByEmail("flow-admin@example.com").orElseThrow();
     mvc.perform(
-            patch("/api/admin/inspections/" + inspectionId + "/status")
+            post("/api/admin/inspections/" + inspectionId + "/assignment")
                 .header("Authorization", "Bearer " + jwt.issue(admin).accessToken())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"SCHEDULED\"}"))
+                .content(
+                    "{\"visitDate\":\"2030-01-03\",\"visitTime\":\"14:00\",\"preVisitNotice\":\"방문 안내\"}"))
         .andExpect(status().isOk());
   }
 
