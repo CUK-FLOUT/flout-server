@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum SupportDetailErrorCode implements BaseResponseCode {
   APPLICATION_NOT_FOUND(404, "SUPPORT_404_1", "요청한 지원 신청 내역이 존재하지 않습니다."),
+  STATE_NOT_AVAILABLE(409, "SUPPORT_DETAIL_409_1", "현재 지원 신청 상태에서는 해당 상세 화면을 조회할 수 없습니다."),
   ATTACHMENT_READ_FAILED(500, "SUPPORT_DETAIL_500_1", "지원 신청 첨부자료를 조회할 수 없습니다.");
   private final int status;
   private final String code;
