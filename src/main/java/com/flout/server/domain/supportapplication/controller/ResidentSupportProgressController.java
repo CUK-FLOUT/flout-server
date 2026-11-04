@@ -1,0 +1,73 @@
+package com.flout.server.domain.supportapplication.controller;
+
+import com.flout.server.domain.supportapplication.dto.response.*;
+import com.flout.server.domain.supportapplication.service.ResidentSupportDetailService;
+import com.flout.server.global.response.SuccessResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/resident/support-applications/{supportApplicationId}")
+@Tag(name = "주민-지원신청")
+@ApiResponse(
+    responseCode = "400",
+    description = "COMMON_400_3: 양의 Long 형식이 아닌 지원 신청 ID",
+    content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+@ApiResponse(
+    responseCode = "403",
+    description = "COMMON_403_1: 주민이 아니거나 타인의 지원 신청",
+    content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+@ApiResponse(
+    responseCode = "404",
+    description = "SUPPORT_404_1: 지원 신청 없음",
+    content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+public class ResidentSupportProgressController {
+  private final ResidentSupportDetailService service;
+
+  @GetMapping(value = "/schedule", produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "주민 지원 일정 조율중 상세 조회",
+      description =
+          "RESIDENT 본인의 SCHEDULING 지원 신청만 조회합니다. 실제 신청 정보·사업명·신청 시설·동의 상태를 반환합니다. 확정 시공 일정 저장 구조가 없어 scheduledConstructionDate/Time은 null이며 희망 일정으로 대체하지 않습니다. 단계와 고정 안내 문구는 프론트에서 status로 구성합니다. 기존 시공 일정 조회 API와 별개이며 GET으로 데이터를 변경하지 않습니다.")
+  @ApiResponse(responseCode = "200", description = "일정 조율중 상세 조회 성공", useReturnTypeSchema = true)
+  @ApiResponse(
+      responseCode = "409",
+      description = "SUPPORT_DETAIL_409_1: SCHEDULING이 아닌 상태",
+      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+  public SuccessResponse<ResidentSupportScheduleResponse> schedule(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "지원 신청 ID. 점검·시공 ID와 다릅니다.") @PathVariable
+          Long supportApplicationId) {
+    return SuccessResponse.ok(
+        service.schedule(Long.valueOf(jwt.getSubject()), supportApplicationId));
+  }
+
+  @GetMapping(value = "/attachments", produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "주민 지원 신청 증빙서류 조회",
+      description =
+          "RESIDENT 본인 신청의 실제 증빙서류 메타데이터·동의 상태·15분 유효 열람 URL을 반환합니다. 신청 상태에 관계없이 본인 자료를 조회할 수 있습니다. 서류가 없으면 attachments=[]이며 S3를 호출하지 않습니다. 파일이 있으면 기존 AttachmentStorage로 URL을 발급하며 AWS_REGION/AWS_S3_BUCKET 및 AWS 기본 자격 증명 체인을 사용합니다. 설정·인증·서명 실패 시 500이며 가짜 URL·빈 목록으로 숨기지 않습니다. 객체 존재 확인이나 파일 바이트 다운로드는 수행하지 않아 실제 열람 시 S3에서 403/404가 발생할 수 있습니다. 내부 객체 키는 노출하지 않으며 발급된 URL은 만료 전 외부 공유하지 않아야 합니다. PDF·이미지는 contentType과 fileUrl로 열람하고 프론트 뷰어 UI는 포함하지 않습니다. 별도 다운로드 API는 추가하지 않습니다.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "증빙서류 조회 성공. 미제출 시 빈 배열",
+      useReturnTypeSchema = true)
+  @ApiResponse(
+      responseCode = "500",
+      description = "SUPPORT_DETAIL_500_1: 파일 열람 URL 발급 실패",
+      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+  public SuccessResponse<ResidentSupportAttachmentsResponse> attachments(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "지원 신청 ID") @PathVariable Long supportApplicationId) {
+    return SuccessResponse.ok(
+        service.attachments(Long.valueOf(jwt.getSubject()), supportApplicationId));
+  }
+}
