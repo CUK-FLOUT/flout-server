@@ -5,5 +5,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ConstructionPhotoRepository extends JpaRepository<ConstructionPhoto, Long> {
+  boolean existsByConstructionId(Long constructionId);
+
   List<ConstructionPhoto> findByConstructionIdOrderByIdAsc(Long constructionId);
 }
