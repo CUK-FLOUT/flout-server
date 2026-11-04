@@ -142,6 +142,7 @@ server {
     server_name api.flout.shop;
 
     location / {
+        client_max_body_size 80m;
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -154,6 +155,7 @@ server {
 설정 문법을 검사한 뒤 NGINX를 다시 불러옵니다.
 
 ```bash
+sudo ln -sf /etc/nginx/sites-available/flout /etc/nginx/sites-enabled/flout
 sudo nginx -t
 sudo systemctl reload nginx
 ```
