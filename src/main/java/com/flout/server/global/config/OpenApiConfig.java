@@ -282,6 +282,12 @@ public class OpenApiConfig {
                               describeResidentApplicationDetail(operation);
                             }
 
+                            if (path.equals(
+                                    "/api/resident/applications/{applicationId}/recommendations")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeResidentRecommendations(operation);
+                            }
+
                             if (path.equals("/api/resident/applications/{applicationId}")
                                 && method == PathItem.HttpMethod.PATCH) {
                               describeResidentApplicationUpdate(operation);
@@ -1276,6 +1282,37 @@ public class OpenApiConfig {
         .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT.getMessage());
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeResidentRecommendations(Operation operation) {
+    var code = InspectionApplicationSuccessCode.RECOMMENDATIONS_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result =
+        Map.of(
+            "applicationId",
+            5,
+            "recommendedActions",
+            List.of(
+                Map.of("description", "출입구: 빗물 유입을 줄이는 물막이판 설치를 검토해요."),
+                Map.of("description", "배수구: 주변을 정리하고 막힘 여부와 배수 상태를 확인해요.")));
+    addExample(success, "residentRecommendations", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", InspectionApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 

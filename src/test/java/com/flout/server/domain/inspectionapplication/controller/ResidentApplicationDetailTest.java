@@ -2,6 +2,7 @@ package com.flout.server.domain.inspectionapplication.controller;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.inspection.entity.Inspection;
@@ -18,13 +19,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
@@ -44,6 +48,7 @@ class ResidentApplicationDetailTest {
   @Autowired ApplicationAttachmentRepository attachments;
   @Autowired InspectionRepository inspections;
   @Autowired JwtService jwt;
+  @Autowired ObjectMapper mapper;
   Long applicationId;
   Long inspectionId;
   String ownerToken;
@@ -238,5 +243,153 @@ class ResidentApplicationDetailTest {
             jsonPath(
                     "$.paths['/api/resident/applications/{applicationId}'].get.responses['200'].content['application/json'].examples.residentApplicationDetail.value.result.vulnerability")
                 .doesNotExist());
+  }
+
+  private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
+      recommendations(String token) {
+    return get("/api/resident/applications/{applicationId}/recommendations", applicationId)
+        .header("Authorization", "Bearer " + token);
+  }
+
+  @Test
+  void returnsPublishedPostDescriptionsExactlyInOrderAndNeverDraft() throws Exception {
+    jdbc.update(
+        "INSERT INTO users(email,password_hash,name,role,jurisdiction_id) VALUES('recommendations-admin@example.com','hash','운영자','ADMIN',(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시'))");
+    var admin = users.findByEmail("recommendations-admin@example.com").orElseThrow();
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
+        inspectionId);
+    Long resultId =
+        jdbc.queryForObject(
+            "SELECT result_id FROM inspection_results WHERE inspection_id=? AND result_status='DRAFT'",
+            Long.class,
+            inspectionId);
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) VALUES(?,'result-photo','사진.png',100,'image/png')",
+        resultId);
+    String first = "  출입구: 물막이판 설치를 검토해요.\n원문 유지  ";
+    String second = "배수구: 막힘 여부를 확인해요.";
+    var request =
+        Map.of(
+            "summary",
+            "점검 결과",
+            "vulnerabilities",
+            List.of(Map.of("type", "ENTRANCE", "title", "출입구", "expertOpinion", "의견")),
+            "recommendedActions",
+            List.of(Map.of("description", first), Map.of("description", second)),
+            "followUpType",
+            "INDIVIDUAL_HOUSE");
+    mvc.perform(
+            post("/api/admin/inspections/{id}/result", inspectionId)
+                .header("Authorization", "Bearer " + jwt.issue(admin).accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(request)))
+        .andExpect(status().isOk());
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
+        inspectionId);
+    Long draftId =
+        jdbc.queryForObject(
+            "SELECT result_id FROM inspection_results WHERE inspection_id=? AND result_status='DRAFT'",
+            Long.class,
+            inspectionId);
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,'비공개 초안',0)",
+        draftId);
+    mvc.perform(recommendations(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("APPLICATION_200_8"))
+        .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.recommendedActions", hasSize(2)))
+        .andExpect(jsonPath("$.result.recommendedActions[0].description").value(first))
+        .andExpect(jsonPath("$.result.recommendedActions[1].description").value(second));
+  }
+
+  @Test
+  void returnsEmptyArrayAndOrdersByStoredSortOrder() throws Exception {
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'PUBLISHED')",
+        inspectionId);
+    Long resultId =
+        jdbc.queryForObject(
+            "SELECT result_id FROM inspection_results WHERE inspection_id=?",
+            Long.class,
+            inspectionId);
+    mvc.perform(recommendations(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.recommendedActions", hasSize(0)));
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,'두 번째',2),(?,'첫 번째',0)",
+        resultId,
+        resultId);
+    mvc.perform(recommendations(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.recommendedActions[0].description").value("첫 번째"))
+        .andExpect(jsonPath("$.result.recommendedActions[1].description").value("두 번째"));
+  }
+
+  @Test
+  void recommendationsEnforceAccessBeforePublicationAndValidateRequests() throws Exception {
+    mvc.perform(get("/api/resident/applications/{id}/recommendations", applicationId))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(recommendations(otherToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("APPLICATION_403_6"));
+    mvc.perform(recommendations(ownerToken))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("APPLICATION_400_5"));
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
+        inspectionId);
+    mvc.perform(recommendations(ownerToken))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("APPLICATION_400_5"));
+    jdbc.update("DELETE FROM inspection_results WHERE inspection_id=?", inspectionId);
+    jdbc.update("DELETE FROM inspections WHERE inspection_id=?", inspectionId);
+    mvc.perform(recommendations(ownerToken))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("APPLICATION_400_5"));
+    mvc.perform(
+            get("/api/resident/applications/9223372036854775807/recommendations")
+                .header("Authorization", "Bearer " + ownerToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("APPLICATION_404_2"));
+    mvc.perform(
+            get("/api/resident/applications/0/recommendations")
+                .header("Authorization", "Bearer " + ownerToken))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            get("/api/resident/applications/abc/recommendations")
+                .header("Authorization", "Bearer " + ownerToken))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void swaggerDocumentsRecommendationsAndErrors() throws Exception {
+    String path =
+        "$.paths['/api/resident/applications/{applicationId}/recommendations'].get.responses";
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    path
+                        + "['200'].content['application/json'].examples.residentRecommendations.value.result.recommendedActions[0].description")
+                .isNotEmpty())
+        .andExpect(
+            jsonPath(
+                    path
+                        + "['400'].content['application/json'].examples.resultNotPublished.value.code")
+                .value("APPLICATION_400_5"))
+        .andExpect(
+            jsonPath(
+                    path
+                        + "['403'].content['application/json'].examples.applicationAccessDenied.value.code")
+                .value("APPLICATION_403_6"))
+        .andExpect(
+            jsonPath(
+                    path
+                        + "['404'].content['application/json'].examples.applicationNotFound.value.code")
+                .value("APPLICATION_404_2"))
+        .andExpect(jsonPath(path + "['404'].description").value("현장점검 신청을 찾을 수 없음"));
   }
 }
