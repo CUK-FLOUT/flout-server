@@ -8,7 +8,6 @@ import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.publicissue.dto.response.FacilityActionImageUploadResponse;
 import com.flout.server.domain.publicissue.entity.FacilityActionImage;
 import com.flout.server.domain.publicissue.entity.PublicIssueAction;
-import com.flout.server.domain.publicissue.entity.PublicIssueActionStatus;
 import com.flout.server.domain.publicissue.repository.FacilityActionImageRepository;
 import com.flout.server.domain.publicissue.repository.PublicIssueActionRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
@@ -131,8 +130,6 @@ public class FacilityActionImageService {
             .orElseThrow(() -> new BaseException(PublicIssueErrorCode.ACTION_NOT_FOUND));
     if (!action.getReview().getLocalProblem().getId().equals(issue.getId()))
       throw new BaseException(PublicIssueErrorCode.ACTION_NOT_FOUND);
-    if (action.getStatus() == PublicIssueActionStatus.COMPLETED)
-      throw new BaseException(PublicIssueErrorCode.ACTION_IMAGE_UPLOAD_NOT_ALLOWED);
     return action;
   }
 

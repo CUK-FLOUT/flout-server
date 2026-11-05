@@ -15,10 +15,9 @@ public enum PublicIssueErrorCode implements BaseResponseCode {
   PUBLIC_ISSUE_NOT_FOUND(404, "PUBLIC_ISSUE_404_1", "공공시설 문제를 찾을 수 없습니다."),
   FACILITY_NOT_FOUND(404, "PUBLIC_ISSUE_404_2", "공공시설을 찾을 수 없습니다."),
   ACTION_NOT_FOUND(404, "PUBLIC_ISSUE_404_3", "공공시설 조치를 찾을 수 없습니다."),
-  ACTION_NOT_ALLOWED(409, "PUBLIC_ISSUE_409_1", "현재 상태에서는 공공시설 조치를 등록할 수 없습니다."),
+  ACTION_NOT_ALLOWED(409, "PUBLIC_ISSUE_409_1", "이미 완료된 공공시설 문제입니다."),
   REVIEW_REQUIRED(409, "PUBLIC_ISSUE_409_2", "공공시설 검토 내용을 먼저 저장해 주세요."),
   REVIEW_NOT_ALLOWED(409, "PUBLIC_ISSUE_409_3", "완료된 공공시설 문제의 검토 내용은 변경할 수 없습니다."),
-  ACTION_IMAGE_UPLOAD_NOT_ALLOWED(409, "PUBLIC_ISSUE_409_4", "완료된 공공시설 조치에는 사진을 추가할 수 없습니다."),
   ACTION_IMAGE_UPLOAD_FAILED(500, "PUBLIC_ISSUE_500_1", "공공시설 조치 사진 등록에 실패했습니다.");
   private final int status;
   private final String code;

@@ -31,7 +31,7 @@ public class AdminFacilityActionImageController {
   @Operation(
       summary = "공공시설 조치 사진 업로드",
       description =
-          "진행 중인 공공시설 조치에 JPG/JPEG/PNG 사진을 추가합니다. 파일당 최대 10MiB이며 응답 URL은 15분 유효한 비공개 S3 서명 URL입니다.")
+          "완료 처리 응답의 actionId를 사용해 JPG/JPEG/PNG 사진을 추가합니다. 파일당 최대 10MiB이며 응답 URL은 15분 유효한 비공개 S3 서명 URL입니다.")
   public ResponseEntity<SuccessResponse<FacilityActionImageUploadResponse>> upload(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long publicIssueId,

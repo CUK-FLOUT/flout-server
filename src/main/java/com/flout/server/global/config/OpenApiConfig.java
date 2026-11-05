@@ -220,7 +220,7 @@ public class OpenApiConfig {
                             }
                             if (path.equals("/api/admin/public-issues/{publicIssueId}/actions")
                                 && method == PathItem.HttpMethod.POST) {
-                              describePublicIssueActionRegistration(operation);
+                              describePublicIssueActionCompletion(operation);
                             }
                             if (path.equals("/api/admin/public-issues/{publicIssueId}/review")
                                 && method == PathItem.HttpMethod.POST) {
@@ -436,13 +436,13 @@ public class OpenApiConfig {
     operation.getResponses().get("404").description("원본 점검이 존재하지 않습니다.");
   }
 
-  private void describePublicIssueActionRegistration(Operation operation) {
-    var code = PublicIssueSuccessCode.ACTION_REGISTERED;
+  private void describePublicIssueActionCompletion(Operation operation) {
+    var code = PublicIssueSuccessCode.ACTION_COMPLETED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(code.getMessage());
     addExample(
         success,
-        "publicIssueActionRegistered",
+        "publicIssueActionCompleted",
         envelope(
             true,
             code,
@@ -457,10 +457,12 @@ public class OpenApiConfig {
                 "actionDescription",
                 "빗물받이 퇴적물 제거 및 주변 배수로 정비",
                 "actionStatus",
-                "IN_PROGRESS",
+                "COMPLETED",
+                "reviewStatus",
+                "COMPLETED",
                 "publicIssueStatus",
-                "ACTION_IN_PROGRESS",
-                "createdAt",
+                "COMPLETED",
+                "completedAt",
                 "2026-11-05T10:00:00+09:00")));
     if (operation.getRequestBody() != null
         && operation.getRequestBody().getContent() != null
@@ -470,9 +472,9 @@ public class OpenApiConfig {
           .getContent()
           .get(JSON)
           .addExamples(
-              "registerPublicIssueAction",
+              "completePublicIssueAction",
               new Example()
-                  .summary("실제 점검·조치 결과 등록")
+                  .summary("실제 점검·조치 결과 저장 및 완료 처리")
                   .value(Map.of("actionDescription", "빗물받이 퇴적물 제거 및 주변 배수로 정비")));
     }
     addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
@@ -548,11 +550,6 @@ public class OpenApiConfig {
     addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
     addError(operation, "actionNotFound", PublicIssueErrorCode.ACTION_NOT_FOUND, null);
     addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
-    addError(
-        operation,
-        "imageUploadNotAllowed",
-        PublicIssueErrorCode.ACTION_IMAGE_UPLOAD_NOT_ALLOWED,
-        null);
     addError(
         operation,
         "imageTooLarge",

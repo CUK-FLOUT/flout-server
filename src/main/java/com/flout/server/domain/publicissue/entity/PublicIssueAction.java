@@ -36,11 +36,13 @@ public class PublicIssueAction {
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
-  public static PublicIssueAction create(FacilityReview review, String actionDescription) {
+  public static PublicIssueAction complete(
+      FacilityReview review, String actionDescription, LocalDateTime completedAt) {
     var action = new PublicIssueAction();
     action.review = review;
     action.actionDescription = actionDescription;
-    action.status = PublicIssueActionStatus.IN_PROGRESS;
+    action.status = PublicIssueActionStatus.COMPLETED;
+    action.completedAt = completedAt;
     return action;
   }
 

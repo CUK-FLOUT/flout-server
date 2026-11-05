@@ -79,8 +79,8 @@ public class FacilityReview {
     this.reviewedAt = reviewedAt;
   }
 
-  public void startAction() {
-    reviewStatus = FacilityReviewStatus.ACTION_IN_PROGRESS;
+  public void completeAction() {
+    reviewStatus = FacilityReviewStatus.COMPLETED;
   }
 
   @PrePersist

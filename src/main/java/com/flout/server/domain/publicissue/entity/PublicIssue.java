@@ -80,8 +80,8 @@ public class PublicIssue {
     return issue;
   }
 
-  public void startAction() {
-    status = PublicIssueStatus.ACTION_IN_PROGRESS;
+  public void completeAction() {
+    status = PublicIssueStatus.COMPLETED;
   }
 
   public void saveReview(FacilityReviewStatus reviewStatus) {

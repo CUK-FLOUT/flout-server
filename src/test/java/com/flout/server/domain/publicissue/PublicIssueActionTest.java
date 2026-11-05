@@ -261,7 +261,7 @@ class PublicIssueActionTest {
   }
 
   @Test
-  void registersTrimmedActionAndMovesIssueToInProgress() throws Exception {
+  void completesActionReviewAndIssueAtomically() throws Exception {
     postAction(publicIssueId, token, body("  빗물받이 퇴적물 제거 및 주변 배수로 정비  "))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.isSuccess").value(true))
@@ -270,26 +270,28 @@ class PublicIssueActionTest {
         .andExpect(jsonPath("$.result.reviewId").value(reviewId))
         .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
         .andExpect(jsonPath("$.result.actionDescription").value("빗물받이 퇴적물 제거 및 주변 배수로 정비"))
-        .andExpect(jsonPath("$.result.actionStatus").value("IN_PROGRESS"))
-        .andExpect(jsonPath("$.result.publicIssueStatus").value("ACTION_IN_PROGRESS"))
-        .andExpect(jsonPath("$.result.createdAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
+        .andExpect(jsonPath("$.result.actionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.result.reviewStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.result.publicIssueStatus").value("COMPLETED"))
+        .andExpect(
+            jsonPath("$.result.completedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
     var action = jdbc.queryForMap("SELECT * FROM facility_action");
     assertThat(action.get("ACTION_DESCRIPTION")).isEqualTo("빗물받이 퇴적물 제거 및 주변 배수로 정비");
-    assertThat(action.get("ACTION_STATUS").toString()).isEqualTo("IN_PROGRESS");
+    assertThat(action.get("ACTION_STATUS").toString()).isEqualTo("COMPLETED");
     assertThat(((Number) action.get("REVIEW_ID")).longValue()).isEqualTo(reviewId);
-    assertThat(action.get("COMPLETED_AT")).isNull();
+    assertThat(action.get("COMPLETED_AT")).isNotNull();
     assertThat(
             jdbc.queryForObject(
                 "SELECT review_status FROM facility_review WHERE review_id=?",
                 String.class,
                 reviewId))
-        .isEqualTo("ACTION_IN_PROGRESS");
+        .isEqualTo("COMPLETED");
     assertThat(
             jdbc.queryForObject(
                 "SELECT status FROM public_issues WHERE public_issue_id=?",
                 String.class,
                 publicIssueId))
-        .isEqualTo("ACTION_IN_PROGRESS");
+        .isEqualTo("COMPLETED");
     assertThat(
             jdbc.queryForObject(
                 "SELECT status FROM inspections WHERE inspection_id=?", String.class, inspectionId))
@@ -435,7 +437,7 @@ class PublicIssueActionTest {
   }
 
   @Test
-  void validatesActionImageUploadAndBlocksCompletedAction() throws Exception {
+  void validatesActionImageUploadRequestAndActionReference() throws Exception {
     long actionId = createAction();
     mvc.perform(
             multipart(
@@ -463,18 +465,6 @@ class PublicIssueActionTest {
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_404_3"));
-    jdbc.update(
-        "UPDATE facility_action SET action_status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE action_id=?",
-        actionId);
-    mvc.perform(
-            multipart(
-                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
-                    publicIssueId,
-                    actionId)
-                .file(new MockMultipartFile("files", "사진.png", "image/png", png))
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_4"));
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM facility_action_image", Integer.class))
         .isZero();
   }
@@ -496,11 +486,11 @@ class PublicIssueActionTest {
                 .exists())
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionRegistered.value.code")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionCompleted.value.code")
                 .value("PUBLIC_ISSUE_200_2"))
         .andExpect(
             jsonPath(
-                    "$.components.schemas.CreatePublicIssueActionRequest.properties.actionDescription.maxLength")
+                    "$.components.schemas.CompletePublicIssueActionRequest.properties.actionDescription.maxLength")
                 .value(4000))
         .andExpect(
             jsonPath(
@@ -522,10 +512,6 @@ class PublicIssueActionTest {
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['200'].content['application/json'].examples.facilityActionImagesUploaded.value.code")
                 .value("PUBLIC_ISSUE_200_4"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['409']")
-                .exists())
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['413']")
