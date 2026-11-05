@@ -31,7 +31,7 @@ result는 `applicationId`, `receiptNo`, `applicantName`, `totalCount`, `historie
 
 ## 단계
 
-- APPLICATION_RECEIVED → 접수: 현장점검 신청의 실제 submittedAt. 신청자 RESIDENT.
+- APPLICATION_RECEIVED → 접수: 현장점검 신청의 submittedAt. 이 값이 없는 과거 신청은 최초 RECEIVED 상태 기록 시각을 표시합니다. 신청자 RESIDENT.
 - INSPECTION_SCHEDULED → 점검 예정: 담당자·일정 배정의 실제 상태 변경 이력. ADMIN.
 - INSPECTION_IN_PROGRESS → 점검 진행: 방문 시각 도래에 따른 실제 전환 이력. 자동 전환은 SYSTEM.
 - INSPECTION_COMPLETED → 점검 완료: 실제 PUBLISHED 결과의 publishedAt. 단순 초안 저장·사진 업로드·공개되지 않은 과거 COMPLETED 상태만으로 완료 이력을 만들지 않습니다.
@@ -49,7 +49,7 @@ actorType은 RESIDENT·ADMIN·SYSTEM·UNKNOWN입니다. 시스템은 actorId=nul
 
 점검 공개 처리자를 새로 저장해 이미 COMPLETED였던 점검의 결과 공개도 실제 공개자로 표시합니다. 기존 결과는 공개 시각과 정확히 일치하는 완료 이력이 있을 때만 해당 처리자를 사용하고, 없으면 UNKNOWN입니다.
 
-V40 이전에 변환된 RECEIVED 이력만으로 실제 신청 접수 시각을 단정할 수 없어 submittedAt이 없는 접수는 생성하지 않습니다. 시공은 V45부터 배정·자동 진행·전체 완료 이력을 상태 변경과 같은 트랜잭션에 저장합니다. V45 이전에는 실제 completedAt이 있는 완료 건만 LEGACY 이력으로 보존하고, 예정 시각·mutable updatedAt으로 배정·진행 시각을 만들어내지 않습니다.
+과거 신청에 submittedAt이 없으면 최초 RECEIVED 이력의 시각을 사용하고, 설명에 기존 접수 상태 기록임을 표시합니다. 접수 시각과 상태 이력이 둘 다 없으면 해당 항목을 생략합니다. 시공은 V45부터 배정·자동 진행·전체 완료 이력을 상태 변경과 같은 트랜잭션에 저장합니다. V45 이전에는 실제 completedAt이 있는 완료 건만 LEGACY 이력으로 보존하고, 예정 시각·mutable updatedAt으로 배정·진행 시각을 만들어내지 않습니다.
 
 ## 오류
 

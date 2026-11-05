@@ -148,8 +148,7 @@ class ConstructionAutoStartTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"DRAFT", "SUBMITTED", "REVIEWING", "CONSENT_PENDING", "SCHEDULING", "REJECTED"})
+  @ValueSource(strings = {"DRAFT", "SUBMITTED", "REJECTED"})
   void rechecksSupportApprovalAfterLock(String state) {
     jdbc.update("UPDATE support_applications SET status=?", state);
     assertThat(service.startIfDue(constructionId)).isFalse();

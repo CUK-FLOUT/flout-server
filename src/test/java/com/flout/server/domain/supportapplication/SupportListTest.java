@@ -95,7 +95,7 @@ class SupportListTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','REVIEWING',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
         source,
         program,
         residentId);
@@ -165,7 +165,7 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.supportApplications[0].requestedFacility").value("출입구 물막이판"))
         .andExpect(
             jsonPath("$.result.supportApplications[0].landlordConsentStatus").value("NOT_REQUIRED"))
-        .andExpect(jsonPath("$.result.supportApplications[0].status").value("REVIEWING"));
+        .andExpect(jsonPath("$.result.supportApplications[0].status").value("SUBMITTED"));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }
 
@@ -191,7 +191,7 @@ class SupportListTest {
 
   @Test
   void literalWildcardsAndSqlInjectionCannotBroadenResults() throws Exception {
-    add("기호%_주민", "부천시 원미구", "REVIEWING", "PENDING");
+    add("기호%_주민", "부천시 원미구", "SUBMITTED", "PENDING");
     for (var keyword : List.of("%", "_", "%_"))
       list(token, keyword, 0, 10)
           .andExpect(status().isOk())
@@ -206,7 +206,7 @@ class SupportListTest {
   void paginatesInStableSupportIdDescendingOrderWithMatchingFilteredTotals() throws Exception {
     var expected = new ArrayList<Long>();
     for (int i = 0; i < 12; i++)
-      expected.add(add("검색대상" + i, "경기도 부천시 원미구", "REVIEWING", "NOT_REQUIRED"));
+      expected.add(add("검색대상" + i, "경기도 부천시 원미구", "SUBMITTED", "NOT_REQUIRED"));
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
@@ -242,14 +242,13 @@ class SupportListTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(1))
         .andExpect(jsonPath("$.result.supportApplications.length()").value(1));
-    add("유효주소", "  경기 부천시 오정구", "REVIEWING", "PENDING");
-    add("유효주소", "부천시 원미구", "REVIEWING", "PENDING");
+    add("유효주소", "  경기 부천시 오정구", "SUBMITTED", "PENDING");
+    add("유효주소", "부천시 원미구", "SUBMITTED", "PENDING");
     list(token, "", 0, 10).andExpect(jsonPath("$.result.totalElements").value(3));
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"REVIEWING", "CONSENT_PENDING", "SCHEDULING", "APPROVED", "REJECTED", "SUBMITTED"})
+  @ValueSource(strings = {"APPROVED", "REJECTED", "SUBMITTED"})
   void mapsStatusesWithoutChangingStoredEnums(String state) throws Exception {
     jdbc.update("UPDATE support_applications SET status=?", state);
     list(token, "", 0, 10)

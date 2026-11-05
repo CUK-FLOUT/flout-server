@@ -31,8 +31,8 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       value =
           """
       SELECT COUNT(*) AS totalCount,
-             COALESCE(SUM(CASE WHEN status IN ('SUBMITTED', 'REVIEWING') THEN 1 ELSE 0 END), 0) AS reviewingCount,
-             COALESCE(SUM(CASE WHEN status = 'CONSENT_PENDING' THEN 1 ELSE 0 END), 0) AS consentRequiredCount,
+             COALESCE(SUM(CASE WHEN status = 'SUBMITTED' THEN 1 ELSE 0 END), 0) AS reviewingCount,
+             0 AS consentRequiredCount,
              COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedCount
       FROM support_applications
       WHERE status <> 'DRAFT' AND REGEXP_LIKE(TRIM(address), :addressPattern)

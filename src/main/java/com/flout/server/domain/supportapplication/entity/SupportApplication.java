@@ -59,10 +59,7 @@ public class SupportApplication {
   private PreferredTimeSlot preferredVisitTime;
 
   @Enumerated(EnumType.STRING)
-  @Column(
-      nullable = false,
-      columnDefinition =
-          "enum('DRAFT','SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
+  @Column(nullable = false, columnDefinition = "enum('DRAFT','SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)

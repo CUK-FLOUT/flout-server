@@ -198,7 +198,7 @@ class ConstructionScheduleTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"SUBMITTED", "REVIEWING", "CONSENT_PENDING", "SCHEDULING", "REJECTED"})
+  @ValueSource(strings = {"SUBMITTED", "REJECTED"})
   void rejectsSupportThatIsNotApproved(String state) throws Exception {
     jdbc.update("UPDATE support_applications SET status=?", state);
     save()

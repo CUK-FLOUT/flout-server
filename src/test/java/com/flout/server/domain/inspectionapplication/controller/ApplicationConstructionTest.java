@@ -231,7 +231,7 @@ class ApplicationConstructionTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"SUBMITTED", "REVIEWING", "CONSENT_PENDING", "SCHEDULING", "REJECTED"})
+  @ValueSource(strings = {"SUBMITTED", "REJECTED"})
   void unapprovedSupportDoesNotExposeAStaleConstruction(String state) throws Exception {
     jdbc.update("UPDATE support_applications SET status=?", state);
     getInfo()

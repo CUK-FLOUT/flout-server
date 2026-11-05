@@ -37,7 +37,7 @@ GET `/api/admin/applications/{applicationId}/support`
 ```
 
 - 미신청: `support: null`로 200을 반환합니다. 지원 DRAFT만 있는 경우도 접수 전이므로 동일합니다. 기존 현장점검 신청은 있어야 합니다.
-- 검토 중: `support.status`에 실제 SUBMITTED·REVIEWING·CONSENT_PENDING·SCHEDULING 상태를 반환합니다. 승인 범위·미승인 사유·시공 연계는 null입니다.
+- 검토 중: `support.status`에 실제 SUBMITTED 상태를 반환합니다. 승인 범위·미승인 사유·시공 연계는 null입니다.
 - 승인: `status: APPROVED`, `supportScope`에 DB 저장된 승인 범위를 반환합니다. 시공 건이 있으면 실제 constructionId·constructionStatus를 반환하고 없으면 둘 다 null입니다. 승인만으로 진행 중 상태를 추정하지 않습니다.
 - 미승인: `status: REJECTED`, `rejectionReason`에 운영자가 저장한 사유를 반환합니다. 승인 범위·시공 연계는 null입니다. 고정 미승인 문구를 서버에서 임의 생성하지 않습니다.
 

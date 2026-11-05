@@ -154,7 +154,7 @@ class ApplicationSupportTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"SUBMITTED", "REVIEWING", "CONSENT_PENDING", "SCHEDULING"})
+  @ValueSource(strings = {"SUBMITTED"})
   void returnsReviewStateWithoutStaleApprovalOrConstruction(String state) throws Exception {
     jdbc.update("UPDATE support_applications SET status=?,rejection_reason='old rejection'", state);
     getSupport()

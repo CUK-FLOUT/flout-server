@@ -6,6 +6,9 @@ import com.flout.server.domain.inspection.entity.*;
 import com.flout.server.domain.inspection.repository.*;
 import com.flout.server.domain.inspectionapplication.dto.response.ApplicationHistoriesResponse;
 import com.flout.server.domain.inspectionapplication.dto.response.ApplicationHistoriesResponse.*;
+import com.flout.server.domain.inspectionapplication.entity.ApplicationStatusHistory;
+import com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus;
+import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
@@ -25,6 +28,7 @@ public class ApplicationHistoriesService {
   private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
   private final InspectionApplicationDetailService details;
   private final InspectionApplicationRepository applications;
+  private final ApplicationStatusHistoryRepository applicationHistories;
   private final InspectionRepository inspections;
   private final InspectionStatusHistoryRepository inspectionHistories;
   private final InspectionResultRepository results;
@@ -44,18 +48,32 @@ public class ApplicationHistoriesService {
     List<Event> events = new ArrayList<>();
     var inspection = inspections.findByApplicationId(applicationId).orElse(null);
     Long inspectionId = inspection == null ? null : inspection.getId();
-    if (source.getSubmittedAt() != null)
+    var receivedAt = source.getSubmittedAt();
+    boolean legacyReceipt = receivedAt == null;
+    if (legacyReceipt)
+      receivedAt =
+          applicationHistories
+              .findFirstByApplicationIdAndStatusOrderByCreatedAtAscIdAsc(
+                  applicationId, InspectionApplicationStatus.RECEIVED)
+              .map(ApplicationStatusHistory::getCreatedAt)
+              .orElse(null);
+    if (receivedAt != null) {
+      var type = EventType.APPLICATION_RECEIVED;
       events.add(
-          event(
+          new Event(
               "receipt:" + source.getId(),
-              EventType.APPLICATION_RECEIVED,
-              source.getSubmittedAt(),
+              type,
+              type.getStatusLabel(),
+              type.getTitle(),
+              legacyReceipt ? "기존 신청에 저장된 접수 상태 기록입니다." : type.getDescription(),
+              receivedAt.atOffset(ZoneOffset.ofHours(9)),
               ActorType.RESIDENT,
               source.getApplicant().getId(),
               source.getApplicantName(),
               inspectionId,
               null,
               null));
+    }
     if (inspection != null) {
       var histories = inspectionHistories.findByInspectionIdOrderByChangedAtAscIdAsc(inspectionId);
       for (var history : histories) {

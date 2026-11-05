@@ -228,11 +228,25 @@ class ApplicationHistoriesTest {
   }
 
   @Test
-  void noEventsIsSuccessfulAndLegacyReceivedHistoryDoesNotInventReceiptTime() throws Exception {
+  void legacyReceivedHistoryShowsRecordedReceiptBeforeAssignment() throws Exception {
     empty();
     jdbc.update(
-        "INSERT INTO application_status_histories(application_id,status,created_at) VALUES(?,'RECEIVED',CURRENT_TIMESTAMP)",
+        "INSERT INTO application_status_histories(application_id,status,created_at) VALUES(?,'RECEIVED','2030-01-01 10:00:00')",
         applicationId);
+    long inspection = inspection();
+    inspectionEvent(inspection, "RECEIVED", "SCHEDULED", "MANUAL", adminId, "2030-01-02 10:00:00");
+    history()
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(2))
+        .andExpect(jsonPath("$.result.histories[0].eventType").value("INSPECTION_SCHEDULED"))
+        .andExpect(jsonPath("$.result.histories[1].eventType").value("APPLICATION_RECEIVED"))
+        .andExpect(jsonPath("$.result.histories[1].occurredAt").value("2030-01-01T10:00:00+09:00"))
+        .andExpect(jsonPath("$.result.histories[1].description").value("기존 신청에 저장된 접수 상태 기록입니다."));
+  }
+
+  @Test
+  void noEventsIsSuccessful() throws Exception {
+    empty();
     history()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(0))
@@ -243,6 +257,9 @@ class ApplicationHistoriesTest {
   void receiptTimeIsPersistedSubmissionNotCreationOrScheduledTime() throws Exception {
     empty();
     jdbc.update("UPDATE inspection_applications SET submitted_at='2030-01-01 10:00:00'");
+    jdbc.update(
+        "INSERT INTO application_status_histories(application_id,status,created_at) VALUES(?,'RECEIVED','2030-01-01 09:00:00')",
+        applicationId);
     history()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(1))

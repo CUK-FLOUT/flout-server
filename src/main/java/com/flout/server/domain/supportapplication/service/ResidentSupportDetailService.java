@@ -26,10 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ResidentSupportDetailService {
-  private static final Set<SupportApplicationStatus> REVIEW_STATES =
-      Set.of(
-          SupportApplicationStatus.SUBMITTED, SupportApplicationStatus.REVIEWING,
-          SupportApplicationStatus.CONSENT_PENDING, SupportApplicationStatus.SCHEDULING);
   private final UserRepository users;
   private final SupportApplicationRepository applications;
   private final InspectionRepository inspections;
@@ -40,7 +36,7 @@ public class ResidentSupportDetailService {
 
   public ResidentSupportReviewResponse review(Long userId, Long id) {
     var a = owned(userId, id);
-    requireState(REVIEW_STATES.contains(a.getStatus()));
+    requireState(a.getStatus().isReviewable());
     var source = a.getApplication();
     return new ResidentSupportReviewResponse(
         a.getId(),
