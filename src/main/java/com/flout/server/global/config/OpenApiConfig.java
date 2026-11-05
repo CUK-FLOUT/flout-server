@@ -226,6 +226,11 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describeFacilityReview(operation);
                             }
+                            if (path.equals(
+                                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeFacilityActionImageUpload(operation);
+                            }
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
@@ -508,6 +513,52 @@ public class OpenApiConfig {
     addError(operation, "facilityNotFound", PublicIssueErrorCode.FACILITY_NOT_FOUND, null);
     addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
     addError(operation, "reviewNotAllowed", PublicIssueErrorCode.REVIEW_NOT_ALLOWED, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeFacilityActionImageUpload(Operation operation) {
+    var code = PublicIssueSuccessCode.ACTION_IMAGES_UPLOADED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "facilityActionImagesUploaded",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "publicIssueId",
+                1,
+                "actionId",
+                3,
+                "images",
+                List.of(
+                    Map.of(
+                        "imageId",
+                        11,
+                        "imageUrl",
+                        "https://flout-dev-files-kr.s3.ap-northeast-2.amazonaws.com/public-issues/1/actions/3/example?X-Amz-Signature=...",
+                        "uploadedAt",
+                        "2026-11-06T10:00:00+09:00")))));
+    addError(operation, "emptyImages", PublicIssueErrorCode.EMPTY_ACTION_IMAGES, null);
+    addError(operation, "invalidImages", PublicIssueErrorCode.INVALID_ACTION_IMAGES, null);
+    addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
+    addError(operation, "actionNotFound", PublicIssueErrorCode.ACTION_NOT_FOUND, null);
+    addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
+    addError(
+        operation,
+        "imageUploadNotAllowed",
+        PublicIssueErrorCode.ACTION_IMAGE_UPLOAD_NOT_ALLOWED,
+        null);
+    addError(
+        operation,
+        "imageTooLarge",
+        GeneralErrorCode.PAYLOAD_TOO_LARGE,
+        "사진은 파일당 최대 10MiB까지 업로드할 수 있습니다. 요청 전체는 80MiB 이하입니다.");
+    addError(operation, "imageUploadFailed", PublicIssueErrorCode.ACTION_IMAGE_UPLOAD_FAILED, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

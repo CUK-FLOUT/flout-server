@@ -25,4 +25,13 @@ public class FacilityActionImage {
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "action_id", nullable = false)
   private PublicIssueAction action;
+
+  public static FacilityActionImage create(
+      PublicIssueAction action, String imageUrl, LocalDateTime uploadedAt) {
+    var image = new FacilityActionImage();
+    image.action = action;
+    image.imageUrl = imageUrl;
+    image.uploadedAt = uploadedAt;
+    return image;
+  }
 }

@@ -6,13 +6,18 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.publicissue.entity.PublicIssueAction;
 import com.flout.server.domain.publicissue.repository.PublicIssueActionRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,6 +27,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
@@ -43,8 +50,11 @@ class PublicIssueActionTest {
   @Autowired JwtService jwt;
   @Autowired ObjectMapper mapper;
   @MockitoSpyBean PublicIssueActionRepository actions;
+  @MockitoBean AttachmentStorage storage;
   long publicIssueId, reviewId, facilityId, inspectionId, adminId;
   String token, residentToken;
+  Map<String, byte[]> storedObjects;
+  byte[] png;
 
   @BeforeEach
   void setup() {
@@ -123,6 +133,24 @@ class PublicIssueActionTest {
         publicIssueId,
         facilityId);
     reviewId = jdbc.queryForObject("SELECT review_id FROM facility_review", Long.class);
+    storedObjects = new ConcurrentHashMap<>();
+    png = pngBytes();
+    doAnswer(
+            invocation -> {
+              storedObjects.put(invocation.getArgument(0), invocation.getArgument(1));
+              return null;
+            })
+        .when(storage)
+        .upload(anyString(), any(byte[].class), anyString());
+    doAnswer(
+            invocation -> {
+              storedObjects.remove(invocation.getArgument(0));
+              return null;
+            })
+        .when(storage)
+        .delete(anyString());
+    when(storage.readUrl(anyString()))
+        .thenAnswer(invocation -> "https://example.invalid/private/" + invocation.getArgument(0));
   }
 
   org.springframework.test.web.servlet.ResultActions postAction(
@@ -151,6 +179,21 @@ class PublicIssueActionTest {
 
   int actionCount() {
     return jdbc.queryForObject("SELECT COUNT(*) FROM facility_action", Integer.class);
+  }
+
+  long createAction() throws Exception {
+    postAction(publicIssueId, token, body("빗물받이 퇴적물 제거")).andExpect(status().isOk());
+    return jdbc.queryForObject("SELECT action_id FROM facility_action", Long.class);
+  }
+
+  static byte[] pngBytes() {
+    try {
+      var output = new ByteArrayOutputStream();
+      ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", output);
+      return output.toByteArray();
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   Map<String, Object> reviewBody(Object status) {
@@ -360,6 +403,83 @@ class PublicIssueActionTest {
   }
 
   @Test
+  void uploadsActionImagesAndKeepsInternalObjectKeys() throws Exception {
+    long actionId = createAction();
+    mvc.perform(
+            multipart(
+                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
+                    publicIssueId,
+                    actionId)
+                .file(new MockMultipartFile("files", "출입구.png", "image/png", png))
+                .file(new MockMultipartFile("files", "배수구.png", "image/png", png))
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_4"))
+        .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
+        .andExpect(jsonPath("$.result.actionId").value(actionId))
+        .andExpect(jsonPath("$.result.images.length()").value(2))
+        .andExpect(
+            jsonPath("$.result.images[0].imageUrl")
+                .value(org.hamcrest.Matchers.startsWith("https://example.invalid/private/")))
+        .andExpect(
+            jsonPath("$.result.images[0].uploadedAt")
+                .value(org.hamcrest.Matchers.endsWith("+09:00")));
+    var keys =
+        jdbc.queryForList(
+            "SELECT image_url FROM facility_action_image ORDER BY image_id", String.class);
+    assertThat(keys).hasSize(2).allMatch(key -> key.startsWith("public-issues/"));
+    assertThat(storedObjects.keySet()).containsExactlyInAnyOrderElementsOf(keys);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Integer.class))
+        .isZero();
+  }
+
+  @Test
+  void validatesActionImageUploadAndBlocksCompletedAction() throws Exception {
+    long actionId = createAction();
+    mvc.perform(
+            multipart(
+                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
+                    publicIssueId,
+                    actionId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_4"));
+    mvc.perform(
+            multipart(
+                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
+                    publicIssueId,
+                    actionId)
+                .file(new MockMultipartFile("files", "가짜.png", "image/png", "not-image".getBytes()))
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_5"));
+    mvc.perform(
+            multipart(
+                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
+                    publicIssueId,
+                    Long.MAX_VALUE)
+                .file(new MockMultipartFile("files", "사진.png", "image/png", png))
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_404_3"));
+    jdbc.update(
+        "UPDATE facility_action SET action_status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE action_id=?",
+        actionId);
+    mvc.perform(
+            multipart(
+                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
+                    publicIssueId,
+                    actionId)
+                .file(new MockMultipartFile("files", "사진.png", "image/png", png))
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_4"));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM facility_action_image", Integer.class))
+        .isZero();
+  }
+
+  @Test
   void documentsRequestSuccessAndErrors() throws Exception {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
@@ -397,6 +517,18 @@ class PublicIssueActionTest {
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['403']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['200'].content['application/json'].examples.facilityActionImagesUploaded.value.code")
+                .value("PUBLIC_ISSUE_200_4"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['409']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['413']")
                 .exists());
   }
 }
