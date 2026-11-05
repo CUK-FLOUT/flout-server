@@ -44,6 +44,7 @@ class SupportStatusTest {
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
 
+  /** Resets support data so each status-count test controls the rows included in its totals. */
   @BeforeEach
   void setup() {
 
@@ -96,7 +97,7 @@ class SupportStatusTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','REVIEWING',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
         source,
         program,
         residentId);
@@ -145,17 +146,17 @@ class SupportStatusTest {
 
   @Test
   void aggregatesCurrentStatesOnceAndIncludesOtherStatesInTotal() throws Exception {
-    add("REVIEWING", "경기 부천시 소사구", "PENDING");
-    add("CONSENT_PENDING", "부천시 오정구", "NOT_REQUIRED");
+    add("SUBMITTED", "경기 부천시 소사구", "PENDING");
+    add("SUBMITTED", "부천시 오정구", "NOT_REQUIRED");
     add("APPROVED", "  경기도 부천시 원미구 ", "CONFIRMED");
-    add("SCHEDULING", "경기도 부천시 원미구", "CONFIRMED");
+    add("SUBMITTED", "경기도 부천시 원미구", "CONFIRMED");
     add("REJECTED", "경기도 부천시 원미구", "PENDING");
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     statusRequest(token)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(6))
-        .andExpect(jsonPath("$.result.reviewingCount").value(2))
-        .andExpect(jsonPath("$.result.consentRequiredCount").value(1))
+        .andExpect(jsonPath("$.result.reviewingCount").value(4))
+        .andExpect(jsonPath("$.result.consentRequiredCount").value(0))
         .andExpect(jsonPath("$.result.approvedCount").value(1));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
     mvc.perform(
@@ -206,32 +207,6 @@ class SupportStatusTest {
         .andExpect(jsonPath("$.code").value("COMMON_403_1"));
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"REVIEWING", "CONSENT_PENDING"})
-  void legacyReviewStatesCannotBeApprovedBeforeClassification(String previous) throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET status=? WHERE support_application_id=?",
-        previous,
-        supportId);
-    mvc.perform(
-            post("/api/admin/support-applications/" + supportId + "/approve")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"supportScope\":\"물막이판\",\"applicantHousingReviewed\":true,\"expertInspectionReviewed\":true,\"eligibilityDocumentsReviewed\":true}"))
-        .andExpect(status().isConflict());
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT status FROM support_applications WHERE support_application_id=?",
-                String.class,
-                supportId))
-        .isEqualTo(previous);
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM support_application_status_histories", Long.class))
-        .isZero();
-  }
-
   @Test
   void draftIsHiddenFromAdminAndCannotBeApprovedOrRejected() throws Exception {
     jdbc.update(
@@ -262,9 +237,9 @@ class SupportStatusTest {
   }
 
   @Test
-  void schedulingCannotBeApprovedAgain() throws Exception {
+  void approvedCannotBeApprovedAgain() throws Exception {
     jdbc.update(
-        "UPDATE support_applications SET status='SCHEDULING' WHERE support_application_id=?",
+        "UPDATE support_applications SET status='APPROVED' WHERE support_application_id=?",
         supportId);
     mvc.perform(
             post("/api/admin/support-applications/" + supportId + "/approve")

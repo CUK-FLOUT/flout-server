@@ -49,6 +49,7 @@ class ResidentSupportProgressTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
+  /** Seeds a submitted application whose owner can be used to test schedule and document access. */
   @BeforeEach
   void setup() {
 
@@ -103,7 +104,7 @@ class ResidentSupportProgressTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','REVIEWING',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
         source,
         program,
         residentId);
@@ -136,7 +137,7 @@ class ResidentSupportProgressTest {
 
   @Test
   void scheduleUsesActualScreenFieldsAndNeverUsesPreferredDateAsConfirmedDate() throws Exception {
-    state("SCHEDULING");
+    state("APPROVED");
     jdbc.update(
         "UPDATE support_applications SET applicant_name='일정테스트주민',landlord_consent_status='CONFIRMED',preferred_visit_date='2027-01-01',preferred_visit_time='AFTERNOON'");
     jdbc.update("UPDATE inspection_applications SET detail_address='101호',internal_memo='비공개메모'");
@@ -154,7 +155,7 @@ class ResidentSupportProgressTest {
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
         .andExpect(jsonPath("$.result.programName").value("검증용 지원사업"))
-        .andExpect(jsonPath("$.result.status").value("SCHEDULING"))
+        .andExpect(jsonPath("$.result.status").value("APPROVED"))
         .andExpect(jsonPath("$.result.requestedFacility").value("출입구 물막이판"))
         .andExpect(jsonPath("$.result.landlordConsentStatus").value("VERIFIED"))
         .andExpect(
@@ -175,6 +176,11 @@ class ResidentSupportProgressTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.scheduledConstructionDate").value("2027-01-15"))
         .andExpect(jsonPath("$.result.scheduledConstructionTime").value("10:30:00"));
+    request("schedule")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.status").value("APPROVED"))
+        .andExpect(jsonPath("$.result.scheduledConstructionDate").value("2027-01-15"))
+        .andExpect(jsonPath("$.result.scheduledConstructionTime").value("10:30:00"));
     request("attachments")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.attachments").isEmpty());
@@ -182,8 +188,8 @@ class ResidentSupportProgressTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"SUBMITTED", "REVIEWING", "CONSENT_PENDING", "APPROVED", "REJECTED"})
-  void onlySchedulingStateCanUseScheduleView(String value) throws Exception {
+  @ValueSource(strings = {"DRAFT", "SUBMITTED", "REJECTED"})
+  void onlyApprovedStateCanUseScheduleView(String value) throws Exception {
     state(value);
     request("schedule")
         .andExpect(status().isConflict())
@@ -191,8 +197,7 @@ class ResidentSupportProgressTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"SUBMITTED", "REVIEWING", "CONSENT_PENDING", "SCHEDULING", "APPROVED", "REJECTED"})
+  @ValueSource(strings = {"DRAFT", "SUBMITTED", "APPROVED", "REJECTED"})
   void emptyDocumentsWorkInEveryStateWithoutS3(String value) throws Exception {
     state(value);
     request("attachments")
@@ -300,11 +305,12 @@ class ResidentSupportProgressTest {
         .hasMessageContaining("AWS_REGION and AWS_S3_BUCKET");
   }
 
+  /** Checks the consent display for approved applications across stored consent states. */
   @ParameterizedTest
   @CsvSource({"PENDING,PENDING", "CONFIRMED,VERIFIED", "NOT_REQUIRED,NOT_REQUIRED"})
   void consentIsActualSavedStateRatherThanAssumedCompleted(String saved, String expected)
       throws Exception {
-    state("SCHEDULING");
+    state("APPROVED");
     jdbc.update("UPDATE support_applications SET landlord_consent_status=?", saved);
     for (String view : List.of("schedule", "attachments"))
       request(view)
@@ -312,10 +318,13 @@ class ResidentSupportProgressTest {
           .andExpect(jsonPath("$.result.landlordConsentStatus").value(expected));
   }
 
+  /**
+   * Checks that an unauthorized caller cannot infer the application's state or access its files.
+   */
   @ParameterizedTest
   @ValueSource(strings = {"schedule", "attachments"})
   void authorizationAlwaysPrecedesDocumentAccessAndStateValidation(String view) throws Exception {
-    state("SCHEDULING");
+    state("APPROVED");
     attach("application/pdf");
     var other =
         users.saveAndFlush(User.resident("progress-other@example.test", "test-hash", "다른주민"));
@@ -340,10 +349,11 @@ class ResidentSupportProgressTest {
     verifyNoInteractions(storage);
   }
 
+  /** Compares persisted rows before and after a read and checks that storage keys stay private. */
   @ParameterizedTest
   @ValueSource(strings = {"schedule", "attachments"})
   void queriesDoNotWriteOrExposeInternalKeys(String view) throws Exception {
-    state("SCHEDULING");
+    state("APPROVED");
     var tables =
         List.of(
             "support_applications",

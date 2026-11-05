@@ -29,15 +29,7 @@ public record SupportApplicationDetailResponse(
     boolean inspectionResultPublished,
     List<Attachment> attachments,
     @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"}) String landlordConsentStatus,
-    @Schema(
-            allowableValues = {
-              "SUBMITTED",
-              "REVIEWING",
-              "CONSENT_PENDING",
-              "SCHEDULING",
-              "APPROVED",
-              "REJECTED"
-            })
+    @Schema(allowableValues = {"SUBMITTED", "APPROVED", "REJECTED"})
         SupportApplicationStatus status) {
   public record Attachment(
       String originalName,

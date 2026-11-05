@@ -15,7 +15,10 @@ public enum InspectionApplicationSuccessCode implements BaseResponseCode {
   INTERNAL_MEMO_SAVED(200, "APPLICATION_200_1", "내부 메모가 저장되었습니다."),
   DETAIL_FOUND(200, "APPLICATION_200_2", "현장점검 신청 상세정보를 조회했습니다."),
   ATTACHMENTS_FOUND(200, "APPLICATION_200_3", "신청 첨부사진을 조회했습니다."),
-  DRAFT_UPDATED(200, "APPLICATION_200_4", "임시 신청 정보를 수정했습니다.");
+  DRAFT_UPDATED(200, "APPLICATION_200_4", "임시 신청 정보를 수정했습니다."),
+  SUPPORT_FOUND(200, "APPLICATION_200_5", "신청의 지원 정보를 조회했습니다."),
+  CONSTRUCTION_FOUND(200, "APPLICATION_200_6", "신청의 시공 정보를 조회했습니다."),
+  HISTORIES_FOUND(200, "APPLICATION_200_7", "신청의 처리 이력을 조회했습니다.");
 
   private final int status;
   private final String code;

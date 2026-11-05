@@ -42,7 +42,7 @@
       "fileUrl": "https://example.test/private-signed-url"
     }
   ],
-  "status": "CONSENT_PENDING"
+  "status": "SUBMITTED"
 }
 ```
 
@@ -51,7 +51,7 @@
 - `landlordConsentRequired`는 세입자이면 true입니다. 동의서 확인 완료 여부를 뜻하지 않습니다.
 - 희망 방문일·시간은 지원 신청에 입력한 설치 희망 일정이며 확정 일정이 아닙니다.
 - 첨부파일은 실제 저장된 서류만 조회합니다. 파일명과 15분 유효 비공개 서명 URL을 반환하며, 첨부가 없으면 빈 배열입니다. 신청서 PDF를 임의로 만들지 않습니다.
-- 승인된 지원 범위가 없으면 `supportScope`는 null입니다. 기존 SUBMITTED 상태는 상세 조회와 동일하게 REVIEWING으로 표시하며 조회로 저장 상태를 변경하지 않습니다.
+- 승인된 지원 범위가 없으면 `supportScope`는 null입니다. 접수된 신청은 SUBMITTED를 반환합니다.
 
 ## 오류
 

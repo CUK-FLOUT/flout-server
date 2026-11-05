@@ -26,10 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ResidentSupportDetailService {
-  private static final Set<SupportApplicationStatus> REVIEW_STATES =
-      Set.of(
-          SupportApplicationStatus.SUBMITTED, SupportApplicationStatus.REVIEWING,
-          SupportApplicationStatus.CONSENT_PENDING, SupportApplicationStatus.SCHEDULING);
   private final UserRepository users;
   private final SupportApplicationRepository applications;
   private final InspectionRepository inspections;
@@ -40,7 +36,7 @@ public class ResidentSupportDetailService {
 
   public ResidentSupportReviewResponse review(Long userId, Long id) {
     var a = owned(userId, id);
-    requireState(REVIEW_STATES.contains(a.getStatus()));
+    requireState(a.getStatus().isReviewable());
     var source = a.getApplication();
     return new ResidentSupportReviewResponse(
         a.getId(),
@@ -110,23 +106,25 @@ public class ResidentSupportDetailService {
         published);
   }
 
+  /**
+   * Uses the approval view's ownership check and confirmed schedule, including an unscheduled
+   * approval.
+   */
   public ResidentSupportScheduleResponse schedule(Long userId, Long id) {
-    var a = owned(userId, id);
-    requireState(a.getStatus() == SupportApplicationStatus.SCHEDULING);
-    var source = a.getApplication();
+    var approval = approval(userId, id);
     return new ResidentSupportScheduleResponse(
-        a.getId(),
-        source.getId(),
-        receipt(a),
-        a.getApplicantName(),
-        a.getAddress(),
-        source.getDetailAddress(),
-        a.getProgram().getName(),
-        a.getStatus(),
-        a.getRequestedFacility(),
-        consent(a),
-        null,
-        null);
+        approval.supportApplicationId(),
+        approval.applicationId(),
+        approval.receiptNo(),
+        approval.applicantName(),
+        approval.address(),
+        approval.detailAddress(),
+        approval.programName(),
+        approval.status(),
+        approval.requestedFacility(),
+        approval.landlordConsentStatus(),
+        approval.scheduledConstructionDate(),
+        approval.scheduledConstructionTime());
   }
 
   public ResidentSupportAttachmentsResponse attachments(Long userId, Long id) {

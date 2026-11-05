@@ -3,7 +3,9 @@ package com.flout.server.domain.construction.service;
 import com.flout.server.domain.construction.dto.request.SaveConstructionScheduleRequest;
 import com.flout.server.domain.construction.dto.response.ConstructionScheduleResponse;
 import com.flout.server.domain.construction.entity.ConstructionStatus;
+import com.flout.server.domain.construction.entity.ConstructionStatusHistory;
 import com.flout.server.domain.construction.repository.ConstructionRepository;
+import com.flout.server.domain.construction.repository.ConstructionStatusHistoryRepository;
 import com.flout.server.domain.construction.response.code.ConstructionErrorCode;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
@@ -25,6 +27,7 @@ public class ConstructionScheduleService {
   private final SupportDecisionAccess access;
   private final SupportApplicationRepository supports;
   private final ConstructionRepository constructions;
+  private final ConstructionStatusHistoryRepository histories;
   private final Clock inspectionClock;
 
   /** 승인 신청을 먼저 잠그고 시공 건을 잠근 뒤 상태와 확정 일정을 검증해 저장한다. */
@@ -58,6 +61,7 @@ public class ConstructionScheduleService {
     var scheduledAt = LocalDateTime.of(request.constructionDate(), request.constructionTime());
     if (scheduledAt.isBefore(now)) throw new BaseException(ConstructionErrorCode.PAST_SCHEDULE);
     construction.schedule(operator, scheduledAt, now);
+    histories.saveAndFlush(ConstructionStatusHistory.changed(construction, operator, now));
     constructions.flush();
     return ConstructionScheduleResponse.from(construction);
   }

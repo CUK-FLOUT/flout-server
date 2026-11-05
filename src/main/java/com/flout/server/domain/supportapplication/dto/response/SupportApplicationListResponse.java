@@ -20,14 +20,6 @@ public record SupportApplicationListResponse(
               description = "DB CONFIRMED는 VERIFIED로 반환",
               allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"})
           String landlordConsentStatus,
-      @Schema(
-              allowableValues = {
-                "SUBMITTED",
-                "REVIEWING",
-                "CONSENT_PENDING",
-                "SCHEDULING",
-                "APPROVED",
-                "REJECTED"
-              })
+      @Schema(allowableValues = {"SUBMITTED", "APPROVED", "REJECTED"})
           SupportApplicationStatus status) {}
 }

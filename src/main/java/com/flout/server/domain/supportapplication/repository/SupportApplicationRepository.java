@@ -4,6 +4,15 @@ import com.flout.server.domain.supportapplication.entity.SupportApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportApplicationRepository extends JpaRepository<SupportApplication, Long> {
+  java.util.List<SupportApplication> findByApplicationIdAndStatusNotOrderBySubmittedAtAscIdAsc(
+      Long applicationId,
+      com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
+  java.util.Optional<SupportApplication>
+      findFirstByApplicationIdAndStatusNotOrderBySubmittedAtDescIdDesc(
+          Long applicationId,
+          com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
   @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
   @org.springframework.data.jpa.repository.Query(
       "select a from SupportApplication a where a.id = :id")
@@ -22,8 +31,8 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       value =
           """
       SELECT COUNT(*) AS totalCount,
-             COALESCE(SUM(CASE WHEN status IN ('SUBMITTED', 'REVIEWING') THEN 1 ELSE 0 END), 0) AS reviewingCount,
-             COALESCE(SUM(CASE WHEN status = 'CONSENT_PENDING' THEN 1 ELSE 0 END), 0) AS consentRequiredCount,
+             COALESCE(SUM(CASE WHEN status = 'SUBMITTED' THEN 1 ELSE 0 END), 0) AS reviewingCount,
+             0 AS consentRequiredCount,
              COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedCount
       FROM support_applications
       WHERE status <> 'DRAFT' AND REGEXP_LIKE(TRIM(address), :addressPattern)
