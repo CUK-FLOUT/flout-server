@@ -64,7 +64,7 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       FROM support_applications s
       WHERE s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)
         AND REGEXP_LIKE(TRIM(s.address), :districtPattern)
-        AND (:status = '' OR s.status = :status OR (:status = 'REVIEWING' AND s.status = 'SUBMITTED'))
+        AND (:status = '' OR CONCAT('', s.status) = :status OR (:status = 'REVIEWING' AND s.status = 'SUBMITTED'))
         AND (:consent = '' OR s.landlord_consent_status = :consent)
         AND (:keyword = '' OR LOCATE(:keyword, s.applicant_name) > 0
           OR LOCATE(:keyword, LPAD(CONCAT('', s.application_id),

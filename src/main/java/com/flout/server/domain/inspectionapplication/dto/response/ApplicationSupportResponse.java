@@ -1,6 +1,7 @@
 package com.flout.server.domain.inspectionapplication.dto.response;
 
 import com.flout.server.domain.construction.entity.ConstructionStatus;
+import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -10,6 +11,11 @@ public record ApplicationSupportResponse(
     String applicantName,
     String address,
     @Schema(nullable = true, description = "원본 현장점검 신청의 상세주소. 미입력 시 null") String detailAddress,
+    @Schema(
+            nullable = true,
+            description = "연결된 침수 취약도 분석의 거주층. 미입력 시 null",
+            example = "SEMI_BASEMENT")
+        HousingType housingType,
     @Schema(nullable = true, description = "가장 최근 접수된 지원 신청. 미신청 또는 DRAFT만 있으면 null")
         SupportInfo support) {
   public record SupportInfo(

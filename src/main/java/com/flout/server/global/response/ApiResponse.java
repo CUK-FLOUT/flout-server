@@ -2,6 +2,7 @@ package com.flout.server.global.response;
 
 import com.flout.server.global.response.code.BaseResponseCode;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,12 +10,14 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public class ApiResponse {
+  private static final ZoneId RESPONSE_ZONE = ZoneId.of("Asia/Seoul");
+  private static final DateTimeFormatter TIME_STAMP_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   private final Boolean isSuccess;
   private final String code;
   private final String message;
-  private final String timeStamp =
-      LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+  private final String timeStamp = LocalDateTime.now(RESPONSE_ZONE).format(TIME_STAMP_FORMAT);
 
   public static ApiResponse of(Boolean isSuccess, BaseResponseCode baseResponseCode) {
     return new ApiResponse(isSuccess, baseResponseCode.getCode(), baseResponseCode.getMessage());

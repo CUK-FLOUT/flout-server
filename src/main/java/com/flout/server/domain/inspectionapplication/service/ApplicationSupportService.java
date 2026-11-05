@@ -61,6 +61,7 @@ public class ApplicationSupportService {
         detail.applicantName(),
         detail.address(),
         detail.detailAddress(),
+        detail.housingType(),
         info);
   }
 }

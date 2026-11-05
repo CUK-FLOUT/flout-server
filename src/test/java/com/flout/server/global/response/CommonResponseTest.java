@@ -9,10 +9,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.exception.GlobalExceptionHandler;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import com.jayway.jsonpath.JsonPath;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.TimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatusCode;
@@ -47,6 +56,26 @@ class CommonResponseTest {
         .andExpect(jsonPath("$.message").value("호출에 성공했습니다."))
         .andExpect(jsonPath("$.result").value("hello"))
         .andExpect(jsonPath("$.timeStamp").isString());
+  }
+
+  @Test
+  @ResourceLock(Resources.TIME_ZONE)
+  void successAndErrorTimestampsUseSeoulWhenServerRunsInUtc() throws Exception {
+    var originalTimeZone = TimeZone.getDefault();
+    var seoul = ZoneId.of("Asia/Seoul");
+    var format = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    try {
+      TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+      var before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+      for (String path : new String[] {"/success", "/business"}) {
+        var body = mvc.perform(get(path)).andReturn().getResponse().getContentAsString();
+        String timestamp = JsonPath.read(body, "$.timeStamp");
+        var actual = LocalDateTime.parse(timestamp, format).atZone(seoul).toInstant();
+        assertThat(actual).isBetween(before, Instant.now());
+      }
+    } finally {
+      TimeZone.setDefault(originalTimeZone);
+    }
   }
 
   @Test

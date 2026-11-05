@@ -1466,7 +1466,7 @@ public class OpenApiConfig {
           .getContent()
           .get(JSON)
           .addExamples(
-              "withHousingType",
+              "inspectionApplication",
               new Example()
                   .value(
                       Map.ofEntries(
@@ -1479,8 +1479,7 @@ public class OpenApiConfig {
                           Map.entry("occupancyType", "TENANT"),
                           Map.entry("floodExperience", "NO"),
                           Map.entry("existingFacility", false),
-                          Map.entry("applicantName", "김주민"),
-                          Map.entry("housingType", "SEMI_BASEMENT"))));
+                          Map.entry("applicantName", "김주민"))));
     }
 
     ApiResponse success = operation.getResponses().remove("200");

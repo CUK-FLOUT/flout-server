@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class InspectionApplicationHousingMigrationTest {
   @Test
-  void addsNullableHousingWithoutChangingLegacyApplications() throws Exception {
+  void movesHousingTypeFromExistingApplicationsToRiskAssessments() throws Exception {
     var url = "jdbc:h2:mem:housing-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
     Flyway.configure().dataSource(url, "sa", "").target("44").load().migrate();
     try (var connection = DriverManager.getConnection(url, "sa", "");
@@ -39,6 +39,22 @@ class InspectionApplicationHousingMigrationTest {
                   statement.executeUpdate(
                       "UPDATE inspection_applications SET housing_type='BASEMENT' WHERE application_id=1"))
           .isInstanceOf(java.sql.SQLException.class);
+
+      statement.executeUpdate(
+          "UPDATE inspection_applications SET housing_type='SEMI_BASEMENT' WHERE application_id=1");
+      statement.executeUpdate(
+          "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(1,'부천시 원미구','1층','HIGH','COMPLETED')");
+      Flyway.configure().dataSource(url, "sa", "").target("48").load().migrate();
+
+      try (var rows =
+          statement.executeQuery(
+              "SELECT housing_type FROM risk_assessments ORDER BY assessment_id")) {
+        assertThat(rows.next()).isTrue();
+        assertThat(rows.getString("housing_type")).isEqualTo("SEMI_BASEMENT");
+        assertThat(rows.next()).isTrue();
+        assertThat(rows.getString("housing_type")).isNull();
+        assertThat(rows.next()).isFalse();
+      }
     }
   }
 }

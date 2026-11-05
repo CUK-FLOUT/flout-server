@@ -495,7 +495,7 @@ class SupportDetailTest {
   @ParameterizedTest
   @ValueSource(strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
   void returnsSourceHousingInBothSupportDetailAndReview(String housing) throws Exception {
-    jdbc.update("UPDATE inspection_applications SET housing_type=?", housing);
+    jdbc.update("UPDATE risk_assessments SET housing_type=?", housing);
     detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.housingType").value(housing));
     review().andExpect(status().isOk()).andExpect(jsonPath("$.result.housingType").value(housing));
   }

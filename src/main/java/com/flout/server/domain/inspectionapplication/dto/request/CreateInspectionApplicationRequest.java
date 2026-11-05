@@ -1,7 +1,6 @@
 package com.flout.server.domain.inspectionapplication.dto.request;
 
 import com.flout.server.domain.inspectionapplication.entity.FloodExperience;
-import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.inspectionapplication.entity.InflowLocation;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.inspectionapplication.entity.PreferredTimeSlot;
@@ -80,44 +79,4 @@ public record CreateInspectionApplicationRequest(
             description = "신청 당시 입력한 신청자 이름",
             example = "김주민",
             requiredMode = Schema.RequiredMode.REQUIRED)
-        String applicantName,
-    @Schema(
-            description = "거주층. 기존 클라이언트는 생략 가능하며 미입력은 null로 저장합니다.",
-            example = "SEMI_BASEMENT",
-            nullable = true)
-        HousingType housingType) {
-  public CreateInspectionApplicationRequest(
-      Long assessmentId,
-      Long guideId,
-      String address,
-      String detailAddress,
-      BigDecimal latitude,
-      BigDecimal longitude,
-      String contact,
-      OccupancyType occupancyType,
-      FloodExperience floodExperience,
-      Boolean existingFacility,
-      String requestReason,
-      LocalDate preferredVisitDate,
-      PreferredTimeSlot preferredTimeSlot,
-      List<InflowLocation> inflowLocations,
-      String applicantName) {
-    this(
-        assessmentId,
-        guideId,
-        address,
-        detailAddress,
-        latitude,
-        longitude,
-        contact,
-        occupancyType,
-        floodExperience,
-        existingFacility,
-        requestReason,
-        preferredVisitDate,
-        preferredTimeSlot,
-        inflowLocations,
-        applicantName,
-        null);
-  }
-}
+        String applicantName) {}
