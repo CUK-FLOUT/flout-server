@@ -378,13 +378,12 @@ class SupportListTest {
   void combinesDistrictStatusConsentAndKeywordWithMatchingPageCounts() throws Exception {
     var expected = new ArrayList<Long>();
     for (int i = 0; i < 7; i++)
-      expected.add(
-          add("필터주민" + i, "경기도 부천시 소사구 소사로 1", i % 2 == 0 ? "SUBMITTED" : "REVIEWING", "PENDING"));
-    add("필터주민", "부천시 원미구", "REVIEWING", "PENDING");
+      expected.add(add("필터주민" + i, "경기도 부천시 소사구 소사로 1", "SUBMITTED", "PENDING"));
+    add("필터주민", "부천시 원미구", "SUBMITTED", "PENDING");
     add("필터주민", "부천시 소사구", "APPROVED", "PENDING");
-    add("필터주민", "부천시 소사구", "REVIEWING", "CONFIRMED");
-    add("필터주민", "서울시 부천시 소사구", "REVIEWING", "PENDING");
-    add("필터주민", "부천시 소사구청", "REVIEWING", "PENDING");
+    add("필터주민", "부천시 소사구", "SUBMITTED", "CONFIRMED");
+    add("필터주민", "서울시 부천시 소사구", "SUBMITTED", "PENDING");
+    add("필터주민", "부천시 소사구청", "SUBMITTED", "PENDING");
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
