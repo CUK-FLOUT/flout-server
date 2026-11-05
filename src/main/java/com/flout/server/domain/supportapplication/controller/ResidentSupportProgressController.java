@@ -37,11 +37,11 @@ public class ResidentSupportProgressController {
   @Operation(
       summary = "주민 지원 일정 조율중 상세 조회",
       description =
-          "RESIDENT 본인의 SCHEDULING 지원 신청만 조회합니다. 실제 신청 정보·사업명·신청 시설·동의 상태를 반환합니다. 확정 시공 일정 저장 구조가 없어 scheduledConstructionDate/Time은 null이며 희망 일정으로 대체하지 않습니다. 단계와 고정 안내 문구는 프론트에서 status로 구성합니다. 기존 시공 일정 조회 API와 별개이며 GET으로 데이터를 변경하지 않습니다.")
+          "RESIDENT 본인의 APPROVED 지원 신청을 조회합니다. 시공 일정이 확정되면 저장된 날짜와 시간을 반환하며, 미확정이면 둘 다 null입니다.")
   @ApiResponse(responseCode = "200", description = "일정 조율중 상세 조회 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "409",
-      description = "SUPPORT_DETAIL_409_1: SCHEDULING이 아닌 상태",
+      description = "SUPPORT_DETAIL_409_1: APPROVED이 아닌 상태",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<ResidentSupportScheduleResponse> schedule(
       @AuthenticationPrincipal Jwt jwt,

@@ -220,14 +220,17 @@ public class ApplicationHistoriesService {
         List.copyOf(events));
   }
 
+  /** Older history rows without an operator retain an unknown actor. */
   private static ActorType actorType(User actor) {
     return actor == null ? ActorType.UNKNOWN : ActorType.ADMIN;
   }
 
+  /** Returns the stored actor ID when the history still references a user. */
   private static Long userId(User actor) {
     return actor == null ? null : actor.getId();
   }
 
+  /** Keeps the actor name absent when no user can be attributed. */
   private static String userName(User actor) {
     return actor == null ? null : actor.getName();
   }

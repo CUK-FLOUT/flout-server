@@ -50,6 +50,7 @@ class ApplicationSupportTest {
   long constructionId = 900;
   String token, residentToken;
 
+  /** Seeds a local operator and an approved support application for the support tab. */
   @BeforeEach
   void setup() {
     reset(constructions);
@@ -99,6 +100,7 @@ class ApplicationSupportTest {
         supportId);
   }
 
+  /** Requests the support tab with the supplied application ID and optional token. */
   ResultActions getSupport(String id, String access) throws Exception {
     var request = get("/api/admin/applications/" + id + "/support");
     if (access != null) request.header("Authorization", "Bearer " + access);

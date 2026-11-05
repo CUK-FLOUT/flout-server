@@ -53,6 +53,7 @@ class InspectionPhotoDeleteTest {
   String token, residentToken;
   byte[] png, jpeg;
 
+  /** Seeds an inspection and operator with isolated photo metadata and cleanup intents. */
   @BeforeEach
   void setup() throws Exception {
     reset(photos);
@@ -137,6 +138,7 @@ class InspectionPhotoDeleteTest {
     return "/api/admin/inspections/" + inspectionId + "/attachments";
   }
 
+  /** Uploads the draft files through the API with optional authentication. */
   org.springframework.test.web.servlet.ResultActions upload(
       String access, MockMultipartFile... files) throws Exception {
     var req = multipart(path());
@@ -181,6 +183,7 @@ class InspectionPhotoDeleteTest {
         "SELECT object_key FROM inspection_result_photos WHERE photo_id=?", String.class, id);
   }
 
+  /** Exercises deletion with caller-supplied IDs and optional authentication. */
   org.springframework.test.web.servlet.ResultActions remove(
       String inspection, String photo, String access) throws Exception {
     var request = delete("/api/admin/inspections/" + inspection + "/attachments/" + photo);
@@ -397,6 +400,9 @@ class InspectionPhotoDeleteTest {
     }
   }
 
+  /**
+   * Races publication against deletion of the only draft photo to verify the publication invariant.
+   */
   @Test
   void concurrentPublicationCannotLoseItsRequiredPhoto() throws Exception {
     long id = addPhoto();

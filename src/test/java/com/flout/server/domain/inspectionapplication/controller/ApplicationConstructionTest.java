@@ -50,6 +50,7 @@ class ApplicationConstructionTest {
   long constructionId = 900;
   String token, residentToken;
 
+  /** Seeds an approved support application with a pending construction and a fixed Seoul clock. */
   @BeforeEach
   void setup() {
     reset(constructions);
@@ -99,6 +100,7 @@ class ApplicationConstructionTest {
         supportId);
   }
 
+  /** Requests the construction tab with the supplied application ID and optional token. */
   ResultActions getInfo(String id, String access) throws Exception {
     var request = get("/api/admin/applications/" + id + "/construction");
     if (access != null) request.header("Authorization", "Bearer " + access);

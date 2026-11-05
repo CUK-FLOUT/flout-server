@@ -36,6 +36,7 @@ class ResidentSupportDetailTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
+  /** Seeds a resident-owned application for the review, approval, and rejection detail views. */
   @BeforeEach
   void setup() {
 
@@ -224,6 +225,7 @@ class ResidentSupportDetailTest {
         .isEqualTo(saved);
   }
 
+  /** Checks access for the owner, another resident, an operator, and an anonymous caller. */
   @ParameterizedTest
   @ValueSource(strings = {"review", "approval", "rejection"})
   void onlyTheResidentOwnerCanAccessEachView(String view) throws Exception {
@@ -314,6 +316,10 @@ class ResidentSupportDetailTest {
         .isEqualTo(before);
   }
 
+  /**
+   * Checks that each detail example matches its current state and that operator routes remain
+   * documented.
+   */
   @Test
   void swaggerDocumentsAllThreeViewsAndKeepsExistingOperatorRoutes() throws Exception {
     var text =
@@ -354,7 +360,7 @@ class ResidentSupportDetailTest {
       assertThat(sample.get("status").asString())
           .isEqualTo(
               switch (view) {
-                case "review" -> "REVIEWING";
+                case "review" -> "SUBMITTED";
                 case "approval" -> "APPROVED";
                 default -> "REJECTED";
               });

@@ -53,6 +53,7 @@ class ApplicationHistoriesTest {
   long constructionId = 900;
   String token, residentToken;
 
+  /** Seeds an application and related records with a controllable clock for event timestamps. */
   @BeforeEach
   void setup() {
     reset(constructions);
@@ -110,6 +111,7 @@ class ApplicationHistoriesTest {
         supportId);
   }
 
+  /** Queries processing history with the supplied application ID and optional token. */
   ResultActions history(String id, String access) throws Exception {
     var request = get("/api/admin/applications/" + id + "/histories");
     if (access != null) request.header("Authorization", "Bearer " + access);
@@ -156,6 +158,10 @@ class ApplicationHistoriesTest {
         time);
   }
 
+  /**
+   * Checks that recorded inspection, support, and construction events form one timeline with no
+   * extra review event.
+   */
   @Test
   void fullTimelineUsesNineActualStagesInNewestFirstOrder() throws Exception {
     jdbc.update("UPDATE inspection_applications SET submitted_at='2030-01-01 10:00:00'");

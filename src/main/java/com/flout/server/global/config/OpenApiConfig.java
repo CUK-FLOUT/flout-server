@@ -1855,6 +1855,7 @@ public class OpenApiConfig {
     };
   }
 
+  /** Documents each resident detail view with its own status and approval schedule examples. */
   private void describeResidentSupportDetail(Operation operation, String view) {
     var result = new LinkedHashMap<String, Object>();
     long applicationId = view.equals("review") ? 2L : view.equals("approval") ? 3L : 4L;
@@ -1870,7 +1871,7 @@ public class OpenApiConfig {
     result.put("programName", "침수 예방시설 설치 지원");
     result.put(
         "status",
-        view.equals("review") ? "REVIEWING" : view.equals("approval") ? "APPROVED" : "REJECTED");
+        view.equals("review") ? "SUBMITTED" : view.equals("approval") ? "APPROVED" : "REJECTED");
     result.put("requestedFacility", "출입구 물막이판");
     if (view.equals("review")) {
       result.put("submittedAt", "2026-10-07T10:00:00");

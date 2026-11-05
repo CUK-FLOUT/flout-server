@@ -43,6 +43,7 @@ class SupportListTest {
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
 
+  /** Seeds support applications for list filtering, jurisdiction, and pagination checks. */
   @BeforeEach
   void setup() {
 
@@ -189,6 +190,7 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.totalPages").value(0));
   }
 
+  /** Treats wildcard characters and SQL-like input as literal search text. */
   @Test
   void literalWildcardsAndSqlInjectionCannotBroadenResults() throws Exception {
     add("기호%_주민", "부천시 원미구", "SUBMITTED", "PENDING");
@@ -202,6 +204,7 @@ class SupportListTest {
           .andExpect(jsonPath("$.result.totalElements").value(0));
   }
 
+  /** Checks page boundaries, descending IDs, and totals under the same filter. */
   @Test
   void paginatesInStableSupportIdDescendingOrderWithMatchingFilteredTotals() throws Exception {
     var expected = new ArrayList<Long>();
@@ -234,6 +237,7 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.supportApplications").isEmpty());
   }
 
+  /** Checks that out-of-jurisdiction and lookalike addresses are excluded from rows and totals. */
   @Test
   void jurisdictionAppliesToRowsAndCountAndRejectsLookalikeAddresses() throws Exception {
     for (var address : List.of("서울시 부천시", "경기도 수원시", "부천시청", "부천시민로", "경기도 부천시흥"))

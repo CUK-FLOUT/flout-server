@@ -44,6 +44,7 @@ class SupportStatusTest {
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
 
+  /** Resets support data so each status-count test controls the rows included in its totals. */
   @BeforeEach
   void setup() {
 
