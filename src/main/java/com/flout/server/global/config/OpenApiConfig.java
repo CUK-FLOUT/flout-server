@@ -218,6 +218,10 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describePublicIssueRegistration(operation);
                             }
+                            if (path.equals("/api/admin/public-issues/{publicIssueId}/actions")
+                                && method == PathItem.HttpMethod.POST) {
+                              describePublicIssueActionRegistration(operation);
+                            }
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
@@ -421,6 +425,55 @@ public class OpenApiConfig {
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
     operation.getResponses().get("404").description("원본 점검이 존재하지 않습니다.");
+  }
+
+  private void describePublicIssueActionRegistration(Operation operation) {
+    var code = PublicIssueSuccessCode.ACTION_REGISTERED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "publicIssueActionRegistered",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "actionId",
+                1,
+                "reviewId",
+                1,
+                "publicIssueId",
+                1,
+                "actionDescription",
+                "빗물받이 퇴적물 제거 및 주변 배수로 정비",
+                "actionStatus",
+                "IN_PROGRESS",
+                "publicIssueStatus",
+                "ACTION_IN_PROGRESS",
+                "createdAt",
+                "2026-11-05T10:00:00+09:00")));
+    if (operation.getRequestBody() != null
+        && operation.getRequestBody().getContent() != null
+        && operation.getRequestBody().getContent().get(JSON) != null) {
+      operation
+          .getRequestBody()
+          .getContent()
+          .get(JSON)
+          .addExamples(
+              "registerPublicIssueAction",
+              new Example()
+                  .summary("실제 점검·조치 결과 등록")
+                  .value(Map.of("actionDescription", "빗물받이 퇴적물 제거 및 주변 배수로 정비")));
+    }
+    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
+    addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
+    addError(operation, "actionNotAllowed", PublicIssueErrorCode.ACTION_NOT_ALLOWED, null);
+    addError(operation, "reviewRequired", PublicIssueErrorCode.REVIEW_REQUIRED, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   private void describeInspectionPhotoUpload(Operation operation) {
