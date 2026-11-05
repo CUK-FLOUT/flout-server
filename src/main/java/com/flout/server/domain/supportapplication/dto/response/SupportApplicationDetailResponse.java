@@ -1,6 +1,7 @@
 package com.flout.server.domain.supportapplication.dto.response;
 
 import com.flout.server.domain.inspection.entity.InspectionStatus;
+import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.inspectionapplication.entity.PreferredTimeSlot;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
@@ -15,8 +16,8 @@ public record SupportApplicationDetailResponse(
     @Schema(description = "지원 신청 당시 저장된 전체 연락처", example = "010-1234-0002") String contact,
     String address,
     String detailAddress,
-    @Schema(description = "현재 저장 구조가 없어 null 반환. 주소에서 추정하지 않습니다.", nullable = true)
-        String housingType,
+    @Schema(description = "연결된 침수 취약도 분석의 거주층. 미입력은 null이며 주소에서 추정하지 않습니다.", nullable = true)
+        HousingType housingType,
     OccupancyType occupancyType,
     @Schema(description = "공개된 점검 결과의 권장조치. 저장된 표시 순서 유지") List<String> recommendedActions,
     String requestedFacility,
@@ -29,14 +30,7 @@ public record SupportApplicationDetailResponse(
     boolean inspectionResultPublished,
     List<Attachment> attachments,
     @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"}) String landlordConsentStatus,
-    @Schema(
-            allowableValues = {
-              "REVIEWING",
-              "CONSENT_PENDING",
-              "SCHEDULING",
-              "APPROVED",
-              "REJECTED"
-            })
+    @Schema(allowableValues = {"SUBMITTED", "APPROVED", "REJECTED"})
         SupportApplicationStatus status) {
   public record Attachment(
       String originalName,

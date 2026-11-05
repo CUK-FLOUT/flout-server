@@ -41,6 +41,7 @@ class SupportDetailTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
+  /** Seeds the support and inspection data used to verify the operator detail views. */
   @BeforeEach
   void setup() {
 
@@ -95,7 +96,7 @@ class SupportDetailTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','REVIEWING',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
         source,
         program,
         residentId);
@@ -160,7 +161,7 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.result.inspectionStatus").value("IN_PROGRESS"))
         .andExpect(jsonPath("$.result.inspectionResultPublished").value(false))
         .andExpect(jsonPath("$.result.landlordConsentStatus").value("PENDING"))
-        .andExpect(jsonPath("$.result.status").value("REVIEWING"));
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
   }
 
   @Test
@@ -300,7 +301,7 @@ class SupportDetailTest {
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     detail()
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.status").value("REVIEWING"))
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
         .andExpect(jsonPath("$.result.landlordConsentStatus").value("VERIFIED"));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }
@@ -404,7 +405,7 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.result.contact").value("010-0000-0000"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
-        .andExpect(jsonPath("$.result.housingType").doesNotExist())
+        .andExpect(jsonPath("$.result.housingType").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
         .andExpect(
             jsonPath("$.result.vulnerabilityTypes")
@@ -489,5 +490,50 @@ class SupportDetailTest {
     review()
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.code").value("SUPPORT_DETAIL_500_1"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+  void returnsSourceHousingInBothSupportDetailAndReview(String housing) throws Exception {
+    jdbc.update("UPDATE risk_assessments SET housing_type=?", housing);
+    detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.housingType").value(housing));
+    review().andExpect(status().isOk()).andExpect(jsonPath("$.result.housingType").value(housing));
+  }
+
+  @Test
+  void swaggerDocumentsHousingInDetailAndReviewSuccessExamples() throws Exception {
+    var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andReturn();
+    var api = mapper.readTree(response.getResponse().getContentAsString());
+    for (var path :
+        List.of(
+            "/api/admin/support-applications/{supportApplicationId}",
+            "/api/admin/support-applications/{supportApplicationId}/histories")) {
+      var result =
+          api.path("paths")
+              .path(path)
+              .path("get")
+              .path("responses")
+              .path("200")
+              .path("content")
+              .path("application/json")
+              .path("examples")
+              .path("screenData")
+              .path("value")
+              .path("result");
+      assertThat(result.path("housingType").asString()).isEqualTo("SEMI_BASEMENT");
+    }
+    for (var schema :
+        List.of(
+            "SupportApplicationDetailResponse",
+            "SupportApplicationReviewResponse",
+            "InspectionApplicationDetailResponse")) {
+      assertThat(
+              api.path("components")
+                  .path("schemas")
+                  .path(schema)
+                  .path("properties")
+                  .has("housingType"))
+          .isTrue();
+    }
   }
 }

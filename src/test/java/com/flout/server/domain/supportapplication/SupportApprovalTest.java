@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationStatusHistoryRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
@@ -44,13 +45,14 @@ class SupportApprovalTest {
   @Autowired ObjectMapper mapper;
   @Autowired JwtEncoder encoder;
   @MockitoSpyBean SupportApplicationStatusHistoryRepository histories;
+  @MockitoSpyBean ConstructionRepository constructions;
   long supportId, adminId, residentId;
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
 
   @BeforeEach
   void setup() {
-    reset(histories);
+    reset(histories, constructions);
     for (var table :
         List.of(
             "support_attachments",
@@ -136,6 +138,7 @@ class SupportApprovalTest {
   }
 
   void unchanged() {
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class)).isZero();
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo("SUBMITTED");
     assertThat(
@@ -144,6 +147,22 @@ class SupportApprovalTest {
         .isZero();
     assertThat(jdbc.queryForObject("SELECT support_scope FROM support_applications", String.class))
         .isNull();
+  }
+
+  @Test
+  void removedLandlordConfirmationIsNotDocumentedOrCallable() throws Exception {
+    mvc.perform(
+            patch("/api/admin/support-applications/{id}/landlord-consent", supportId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CONFIRMED\"}"))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/support-applications/{supportApplicationId}/landlord-consent']")
+                .doesNotExist());
   }
 
   @Test
@@ -157,6 +176,7 @@ class SupportApprovalTest {
         .andExpect(jsonPath("$.result.status").value("APPROVED"))
         .andExpect(jsonPath("$.result.supportScope").value(SCOPE))
         .andExpect(jsonPath("$.result.approvedByUserId").value(adminId))
+        .andExpect(jsonPath("$.result.constructionId").isNumber())
         .andExpect(jsonPath("$.result.approvedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
     var row = jdbc.queryForMap("SELECT * FROM support_applications");
     var history = jdbc.queryForMap("SELECT * FROM support_application_status_histories");
@@ -169,42 +189,37 @@ class SupportApprovalTest {
     assertThat(history.get("CHANGED_AT")).isEqualTo(row.get("APPROVED_AT"));
     assertThat(history.get("SUPPORT_SCOPE")).isEqualTo(SCOPE);
     assertThat(snapshot()).isEqualTo(before);
+    assertThat(jdbc.queryForObject("SELECT support_application_id FROM constructions", Long.class))
+        .isEqualTo(supportId);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"CONFIRMED", "PENDING", "NOT_REQUIRED"})
-  void tenantRequiresConfirmedConsent(String consent) throws Exception {
+  void tenantRequiresDocumentRegardlessOfConfirmation(String consent) throws Exception {
     jdbc.update(
         "UPDATE support_applications SET occupancy_type='TENANT',landlord_consent_status=?",
         consent);
-    if (consent.equals("CONFIRMED")) send(supportId, body(), token).andExpect(status().isOk());
-    else {
-      send(supportId, body(), token)
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
-      unchanged();
-    }
-  }
-
-  @Test
-  void rejectsEtcEvenIfConsentConfirmed() throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET occupancy_type='ETC',landlord_consent_status='CONFIRMED'");
-    send(supportId, body(), token).andExpect(status().isBadRequest());
+    send(supportId, body(), token)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
     unchanged();
   }
 
   @Test
-  void documentUploadDoesNotReplaceConsentConfirmation() throws Exception {
+  void approvesEtcWithoutDocument() throws Exception {
+    jdbc.update(
+        "UPDATE support_applications SET occupancy_type='ETC',landlord_consent_status='CONFIRMED'");
+    send(supportId, body(), token).andExpect(status().isOk());
+  }
+
+  @Test
+  void documentAllowsApprovalWithoutConsentConfirmation() throws Exception {
     jdbc.update(
         "UPDATE support_applications SET occupancy_type='TENANT',landlord_consent_status='PENDING'");
     jdbc.update(
         "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'LANDLORD_CONSENT','isolated-fixture/no-s3-object','fixture.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
         supportId);
-    send(supportId, body(), token)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
-    unchanged();
+    send(supportId, body(), token).andExpect(status().isOk());
   }
 
   @Test
@@ -294,6 +309,8 @@ class SupportApprovalTest {
   void repeatedApprovalIs409() throws Exception {
     send(supportId, body(), token).andExpect(status().isOk());
     send(supportId, body(), token).andExpect(status().isConflict());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class))
+        .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM support_application_status_histories", Integer.class))
@@ -333,6 +350,15 @@ class SupportApprovalTest {
     unchanged();
     assertThat(jdbc.queryForObject("SELECT approved_at FROM support_applications", Object.class))
         .isNull();
+  }
+
+  @Test
+  void constructionCreationFailureRollsBackApprovalAndHistory() throws Exception {
+    doThrow(new IllegalStateException("simulated construction failure"))
+        .when(constructions)
+        .saveAndFlush(any());
+    send(supportId, body(), token).andExpect(status().isInternalServerError());
+    unchanged();
   }
 
   @Test

@@ -1,6 +1,7 @@
 package com.flout.server.domain.supportapplication.dto.response;
 
 import com.flout.server.domain.inspection.entity.InspectionStatus;
+import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.inspectionapplication.entity.PreferredTimeSlot;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
@@ -17,6 +18,11 @@ public record SupportApplicationReviewResponse(
     @Schema(description = "지원 신청 당시 저장된 전체 연락처", example = "010-1234-0002") String contact,
     String address,
     String detailAddress,
+    @Schema(
+            description = "연결된 침수 취약도 분석의 거주층. 미입력은 null",
+            example = "SEMI_BASEMENT",
+            nullable = true)
+        HousingType housingType,
     OccupancyType occupancyType,
     @Schema(description = "공개된 점검 결과의 취약지점. 저장 순서 유지, 중복 유형 제외") List<String> vulnerabilityTypes,
     Long inspectionId,

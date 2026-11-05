@@ -1,12 +1,15 @@
 package com.flout.server.domain.supportapplication.service;
 
+import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.inspection.entity.Inspection;
 import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspection.repository.InspectionResultRepository;
+import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.supportapplication.dto.response.*;
 import com.flout.server.domain.supportapplication.entity.*;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
+import com.flout.server.domain.supportapplication.repository.SupportAttachmentRepository;
 import com.flout.server.domain.supportapplication.response.code.SupportDetailErrorCode;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
@@ -14,25 +17,26 @@ import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ResidentSupportDetailService {
-  private static final Set<SupportApplicationStatus> REVIEW_STATES =
-      Set.of(
-          SupportApplicationStatus.SUBMITTED, SupportApplicationStatus.REVIEWING,
-          SupportApplicationStatus.CONSENT_PENDING, SupportApplicationStatus.SCHEDULING);
   private final UserRepository users;
   private final SupportApplicationRepository applications;
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
+  private final SupportAttachmentRepository attachments;
+  private final AttachmentStorage storage;
+  private final ConstructionRepository constructions;
 
   public ResidentSupportReviewResponse review(Long userId, Long id) {
     var a = owned(userId, id);
-    requireState(REVIEW_STATES.contains(a.getStatus()));
+    requireState(a.getStatus().isReviewable());
     var source = a.getApplication();
     return new ResidentSupportReviewResponse(
         a.getId(),
@@ -55,6 +59,10 @@ public class ResidentSupportDetailService {
     var a = owned(userId, id);
     requireState(a.getStatus() == SupportApplicationStatus.APPROVED);
     var source = a.getApplication();
+    var scheduledAt =
+        constructions
+            .findBySupportApplicationId(id)
+            .map(com.flout.server.domain.construction.entity.Construction::getScheduledAt);
     return new ResidentSupportApprovalResponse(
         a.getId(),
         source.getId(),
@@ -68,8 +76,8 @@ public class ResidentSupportDetailService {
         a.getRequestedFacility(),
         a.getSupportScope(),
         consent(a),
-        null,
-        null);
+        scheduledAt.map(java.time.LocalDateTime::toLocalDate).orElse(null),
+        scheduledAt.map(java.time.LocalDateTime::toLocalTime).orElse(null));
   }
 
   public ResidentSupportRejectionResponse rejection(Long userId, Long id) {
@@ -96,6 +104,56 @@ public class ResidentSupportDetailService {
         a.getApprovedAt(),
         inspection.map(Inspection::getId).orElse(null),
         published);
+  }
+
+  /**
+   * Uses the approval view's ownership check and confirmed schedule, including an unscheduled
+   * approval.
+   */
+  public ResidentSupportScheduleResponse schedule(Long userId, Long id) {
+    var approval = approval(userId, id);
+    return new ResidentSupportScheduleResponse(
+        approval.supportApplicationId(),
+        approval.applicationId(),
+        approval.receiptNo(),
+        approval.applicantName(),
+        approval.address(),
+        approval.detailAddress(),
+        approval.programName(),
+        approval.status(),
+        approval.requestedFacility(),
+        approval.landlordConsentStatus(),
+        approval.scheduledConstructionDate(),
+        approval.scheduledConstructionTime());
+  }
+
+  public ResidentSupportAttachmentsResponse attachments(Long userId, Long id) {
+    var a = owned(userId, id);
+    var documents = attachments.findByApplicationIdOrderByIdAsc(a.getId());
+    List<ResidentSupportAttachmentsResponse.Attachment> files;
+    try {
+      files =
+          documents.stream()
+              .map(
+                  document ->
+                      new ResidentSupportAttachmentsResponse.Attachment(
+                          document.getId(),
+                          document.getAttachmentType(),
+                          document.getOriginalFilename(),
+                          document.getFileSize(),
+                          document.getContentType(),
+                          SupportAttachmentResponse.from(document).submittedAt(),
+                          storage.readUrl(document.getObjectKey())))
+              .toList();
+    } catch (RuntimeException e) {
+      log.error(
+          "증빙서류 조회 실패. supportApplicationId={}, failureType={}, stackTrace={}",
+          a.getId(),
+          e.getClass().getName(),
+          Arrays.toString(e.getStackTrace()));
+      throw new BaseException(SupportDetailErrorCode.ATTACHMENT_READ_FAILED);
+    }
+    return new ResidentSupportAttachmentsResponse(a.getId(), consent(a), files);
   }
 
   private SupportApplication owned(Long userId, Long id) {
@@ -125,9 +183,7 @@ public class ResidentSupportDetailService {
   }
 
   private SupportApplicationStatus displayStatus(SupportApplication a) {
-    return a.getStatus() == SupportApplicationStatus.SUBMITTED
-        ? SupportApplicationStatus.REVIEWING
-        : a.getStatus();
+    return a.getStatus();
   }
 
   private String consent(SupportApplication a) {

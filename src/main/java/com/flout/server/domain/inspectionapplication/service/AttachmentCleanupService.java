@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
@@ -35,6 +37,17 @@ public class AttachmentCleanupService {
                 LocalDateTime.now());
           }
         });
+  }
+
+  /** 첨부 메타데이터 삭제와 같은 트랜잭션에 객체 정리 요청을 저장해 롤백 시 파일을 보존한다. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void enqueueDeletion(String key) {
+    var now = LocalDateTime.now();
+    if (jdbc.update(
+            "UPDATE attachment_upload_intents SET created_at = ? WHERE object_key = ?", now, key)
+        == 0)
+      jdbc.update(
+          "INSERT INTO attachment_upload_intents (object_key, created_at) VALUES (?, ?)", key, now);
   }
 
   // Called inside the upload transaction. A reconciler must wait for its outcome.
@@ -68,8 +81,10 @@ public class AttachmentCleanupService {
                   jdbc.queryForObject(
                       "SELECT (SELECT COUNT(*) FROM application_attachments WHERE object_key = ?)"
                           + " + (SELECT COUNT(*) FROM inspection_result_photos WHERE object_key = ?)"
-                          + " + (SELECT COUNT(*) FROM support_attachments WHERE object_key = ?)",
+                          + " + (SELECT COUNT(*) FROM support_attachments WHERE object_key = ?)"
+                          + " + (SELECT COUNT(*) FROM construction_photos WHERE object_key = ?)",
                       Long.class,
+                      key,
                       key,
                       key,
                       key);

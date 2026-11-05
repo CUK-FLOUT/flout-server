@@ -55,7 +55,7 @@ public class SupportApplicationDetailService {
         application.getContact(),
         application.getAddress(),
         source.getDetailAddress(),
-        null,
+        source.getAssessment().getHousingType(),
         application.getOccupancyType(),
         actions,
         application.getRequestedFacility(),
@@ -67,9 +67,7 @@ public class SupportApplicationDetailService {
         published.isPresent(),
         readAttachments(application.getId()),
         consent == LandlordConsentStatus.CONFIRMED ? "VERIFIED" : consent.name(),
-        application.getStatus() == SupportApplicationStatus.SUBMITTED
-            ? SupportApplicationStatus.REVIEWING
-            : application.getStatus());
+        application.getStatus());
   }
 
   private List<SupportApplicationDetailResponse.Attachment> readAttachments(Long id) {

@@ -229,7 +229,7 @@ class SupportAttachmentTest {
         .andExpect(jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
         .andExpect(jsonPath("$.result.contentType").value(mime))
         .andExpect(jsonPath("$.result.url").doesNotExist())
-        .andExpect(jsonPath("$.result.status").doesNotExist());
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
     assertThat(count()).isEqualTo(1);
     assertThat(objects).hasSize(1);
     assertThat(objects.values().iterator().next()).isEqualTo(bytes);
@@ -241,7 +241,19 @@ class SupportAttachmentTest {
         .doesNotContain("evidence");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Integer.class))
         .isZero();
-    assertThat(snapshot()).isEqualTo(before);
+    var after = snapshot();
+    assertThat(after.subList(1, after.size())).isEqualTo(before.subList(1, before.size()));
+    var previousApplication =
+        new java.util.LinkedHashMap<>(
+            ((java.util.List<java.util.Map<String, Object>>) before.get(0)).get(0));
+    var updatedApplication =
+        new java.util.LinkedHashMap<>(
+            ((java.util.List<java.util.Map<String, Object>>) after.get(0)).get(0));
+    assertThat(previousApplication.remove("STATUS")).isEqualTo("DRAFT");
+    assertThat(previousApplication.remove("SUBMITTED_AT")).isNull();
+    assertThat(updatedApplication.remove("STATUS")).isEqualTo("SUBMITTED");
+    assertThat(updatedApplication.remove("SUBMITTED_AT")).isNotNull();
+    assertThat(updatedApplication).isEqualTo(previousApplication);
     assertThat(
             jdbc.queryForObject(
                 "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=?",
@@ -497,6 +509,68 @@ class SupportAttachmentTest {
   }
 
   @Test
+  void submissionReplacesExistingDraftSubmissionTime() throws Exception {
+    var oldSubmittedAt = LocalDateTime.of(2020, 1, 2, 3, 4, 5);
+    jdbc.update(
+        "UPDATE support_applications SET submitted_at=? WHERE support_application_id=?",
+        java.sql.Timestamp.valueOf(oldSubmittedAt),
+        support);
+    var before = LocalDateTime.now().minusSeconds(1);
+    upload(file("consent.pdf", pdf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
+    var after = LocalDateTime.now().plusSeconds(1);
+    var row =
+        jdbc.queryForMap(
+            "SELECT status, submitted_at FROM support_applications WHERE support_application_id=?",
+            support);
+    assertThat(row.get("STATUS")).isEqualTo("SUBMITTED");
+    assertThat(((java.sql.Timestamp) row.get("SUBMITTED_AT")).toLocalDateTime())
+        .isAfter(oldSubmittedAt)
+        .isBetween(before, after);
+  }
+
+  @Test
+  void failedUploadKeepsDraftAndRetryReceivesSameApplication() throws Exception {
+    var initial =
+        jdbc.queryForMap(
+            "SELECT status, submitted_at, created_at FROM support_applications WHERE support_application_id=?",
+            support);
+    assertThat(initial.get("STATUS")).isEqualTo("DRAFT");
+    assertThat(initial.get("SUBMITTED_AT")).isNull();
+    doThrow(new IllegalStateException("upload failed"))
+        .doNothing()
+        .when(storage)
+        .upload(anyString(), any(byte[].class), anyString());
+    var document = file("consent.pdf", pdf());
+    upload(document).andExpect(status().isInternalServerError());
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, submitted_at, created_at FROM support_applications WHERE support_application_id=?",
+                support))
+        .isEqualTo(initial);
+    assertThat(count()).isZero();
+    upload(document)
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.supportApplicationId").value(support))
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
+    var received =
+        jdbc.queryForMap(
+            "SELECT status, submitted_at, created_at FROM support_applications WHERE support_application_id=?",
+            support);
+    assertThat(received.get("STATUS")).isEqualTo("SUBMITTED");
+    assertThat(received.get("SUBMITTED_AT")).isNotNull();
+    assertThat(received.get("CREATED_AT")).isEqualTo(initial.get("CREATED_AT"));
+    upload(document).andExpect(status().isConflict());
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT status, submitted_at, created_at FROM support_applications WHERE support_application_id=?",
+                support))
+        .isEqualTo(received);
+    assertThat(count()).isEqualTo(1);
+  }
+
+  @Test
   void rejectsRepeatedSubmissionIncludingDifferentContent() throws Exception {
     var f = file("first.pdf", pdf());
     upload(f).andExpect(status().isCreated());
@@ -647,7 +721,7 @@ class SupportAttachmentTest {
   }
 
   @Test
-  void documentsMultipartSuccessErrorsAndNoNewGet() throws Exception {
+  void documentsMultipartSuccessErrorsAlongsideResidentGet() throws Exception {
     var documentation =
         mvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk())
@@ -669,8 +743,8 @@ class SupportAttachmentTest {
                     .exists())
             .andExpect(
                 jsonPath(
-                        "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].get")
-                    .doesNotExist());
+                        "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].get.responses['200']")
+                    .exists());
     String operation =
         "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].post";
     String properties = operation + ".requestBody.content['multipart/form-data'].schema.properties";
@@ -681,16 +755,16 @@ class SupportAttachmentTest {
                 .value(org.hamcrest.Matchers.contains("LANDLORD_CONSENT")))
         .andExpect(
             jsonPath(operation + ".description")
-                .value(org.hamcrest.Matchers.containsString("TENANT인 경우에만")))
+                .value(org.hamcrest.Matchers.containsString("TENANT의 DRAFT")))
         .andExpect(
             jsonPath(operation + ".description")
-                .value(org.hamcrest.Matchers.containsString("OWNER는 별도 증빙서류가 불필요합니다.")))
+                .value(org.hamcrest.Matchers.containsString("SUBMITTED로 접수")))
         .andExpect(
             jsonPath(operation + ".description")
-                .value(org.hamcrest.Matchers.containsString("OWNER·ETC의 업로드 요청은 400")))
+                .value(org.hamcrest.Matchers.containsString("OWNER·ETC는 업로드할 수 없습니다")))
         .andExpect(
             jsonPath(operation + ".description")
-                .value(org.hamcrest.Matchers.containsString("CONFIRMED로 변경하지 않")))
+                .value(org.hamcrest.Matchers.containsString("중복 제출은 409")))
         .andExpect(
             jsonPath(
                     operation

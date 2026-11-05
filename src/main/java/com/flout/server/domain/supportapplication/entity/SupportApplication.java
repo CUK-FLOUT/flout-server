@@ -59,10 +59,7 @@ public class SupportApplication {
   private PreferredTimeSlot preferredVisitTime;
 
   @Enumerated(EnumType.STRING)
-  @Column(
-      nullable = false,
-      columnDefinition =
-          "enum('SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
+  @Column(nullable = false, columnDefinition = "enum('DRAFT','SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)
@@ -86,12 +83,16 @@ public class SupportApplication {
       columnDefinition = "enum('NOT_REQUIRED','PENDING','CONFIRMED')")
   private LandlordConsentStatus landlordConsentStatus;
 
-  @Column(name = "submitted_at", nullable = false, updatable = false)
+  @Column(name = "submitted_at")
   private LocalDateTime submittedAt;
+
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 
   @PrePersist
   void onCreate() {
-    submittedAt = LocalDateTime.now();
+    createdAt = LocalDateTime.now();
+    if (status == SupportApplicationStatus.SUBMITTED) submittedAt = createdAt;
   }
 
   public static SupportApplication submitted(
@@ -118,15 +119,16 @@ public class SupportApplication {
     support.preferredVisitTime = preferredVisitTime;
     support.status =
         source.getOccupancyType() == OccupancyType.TENANT
-            ? SupportApplicationStatus.CONSENT_PENDING
-            : SupportApplicationStatus.REVIEWING;
+            ? SupportApplicationStatus.DRAFT
+            : SupportApplicationStatus.SUBMITTED;
     return support;
   }
 
-  public void confirmLandlordConsent() {
-    this.landlordConsentStatus = LandlordConsentStatus.CONFIRMED;
-    if (this.status == SupportApplicationStatus.CONSENT_PENDING)
-      this.status = SupportApplicationStatus.REVIEWING;
+  public void submitDraft() {
+    if (status != SupportApplicationStatus.DRAFT)
+      throw new IllegalStateException("임시 신청만 접수할 수 있습니다.");
+    status = SupportApplicationStatus.SUBMITTED;
+    submittedAt = LocalDateTime.now();
   }
 
   public void approve(String scope, User operator, LocalDateTime approvedAt) {

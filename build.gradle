@@ -52,6 +52,8 @@ tasks.named('test') {
     dependsOn 'spotlessCheck'
     useJUnitPlatform()
     systemProperty 'spring.profiles.active', 'test'
+    // Keep retained application contexts from exhausting the test JVM heap.
+    systemProperty 'spring.test.context.cache.maxSize', '4'
 }
 
 tasks.named('bootRun') {

@@ -43,6 +43,7 @@ class SupportListTest {
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
 
+  /** Seeds support applications for list filtering, jurisdiction, and pagination checks. */
   @BeforeEach
   void setup() {
 
@@ -95,7 +96,7 @@ class SupportListTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','REVIEWING',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
         source,
         program,
         residentId);
@@ -165,7 +166,7 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.supportApplications[0].requestedFacility").value("출입구 물막이판"))
         .andExpect(
             jsonPath("$.result.supportApplications[0].landlordConsentStatus").value("NOT_REQUIRED"))
-        .andExpect(jsonPath("$.result.supportApplications[0].status").value("REVIEWING"));
+        .andExpect(jsonPath("$.result.supportApplications[0].status").value("SUBMITTED"));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }
 
@@ -189,9 +190,10 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.totalPages").value(0));
   }
 
+  /** Treats wildcard characters and SQL-like input as literal search text. */
   @Test
   void literalWildcardsAndSqlInjectionCannotBroadenResults() throws Exception {
-    add("기호%_주민", "부천시 원미구", "REVIEWING", "PENDING");
+    add("기호%_주민", "부천시 원미구", "SUBMITTED", "PENDING");
     for (var keyword : List.of("%", "_", "%_"))
       list(token, keyword, 0, 10)
           .andExpect(status().isOk())
@@ -202,11 +204,12 @@ class SupportListTest {
           .andExpect(jsonPath("$.result.totalElements").value(0));
   }
 
+  /** Checks page boundaries, descending IDs, and totals under the same filter. */
   @Test
   void paginatesInStableSupportIdDescendingOrderWithMatchingFilteredTotals() throws Exception {
     var expected = new ArrayList<Long>();
     for (int i = 0; i < 12; i++)
-      expected.add(add("검색대상" + i, "경기도 부천시 원미구", "REVIEWING", "NOT_REQUIRED"));
+      expected.add(add("검색대상" + i, "경기도 부천시 원미구", "SUBMITTED", "NOT_REQUIRED"));
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
@@ -234,6 +237,7 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.supportApplications").isEmpty());
   }
 
+  /** Checks that out-of-jurisdiction and lookalike addresses are excluded from rows and totals. */
   @Test
   void jurisdictionAppliesToRowsAndCountAndRejectsLookalikeAddresses() throws Exception {
     for (var address : List.of("서울시 부천시", "경기도 수원시", "부천시청", "부천시민로", "경기도 부천시흥"))
@@ -242,21 +246,18 @@ class SupportListTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(1))
         .andExpect(jsonPath("$.result.supportApplications.length()").value(1));
-    add("유효주소", "  경기 부천시 오정구", "REVIEWING", "PENDING");
-    add("유효주소", "부천시 원미구", "REVIEWING", "PENDING");
+    add("유효주소", "  경기 부천시 오정구", "SUBMITTED", "PENDING");
+    add("유효주소", "부천시 원미구", "SUBMITTED", "PENDING");
     list(token, "", 0, 10).andExpect(jsonPath("$.result.totalElements").value(3));
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"REVIEWING", "CONSENT_PENDING", "SCHEDULING", "APPROVED", "REJECTED", "SUBMITTED"})
+  @ValueSource(strings = {"APPROVED", "REJECTED", "SUBMITTED"})
   void mapsStatusesWithoutChangingStoredEnums(String state) throws Exception {
     jdbc.update("UPDATE support_applications SET status=?", state);
     list(token, "", 0, 10)
         .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.result.supportApplications[0].status")
-                .value("SUBMITTED".equals(state) ? "REVIEWING" : state));
+        .andExpect(jsonPath("$.result.supportApplications[0].status").value(state));
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo(state);
   }
@@ -354,8 +355,118 @@ class SupportListTest {
     var parameters = new ArrayList<String>();
     for (var parameter : operation.path("parameters"))
       parameters.add(parameter.path("name").asString());
-    assertThat(parameters).containsExactlyInAnyOrder("keyword", "page", "size");
+    assertThat(parameters)
+        .containsExactlyInAnyOrder(
+            "keyword", "page", "size", "district", "status", "landlordConsentStatus");
     assertThat(operation.path("responses").has("400")).isTrue();
+    assertThat(
+            operation
+                .path("responses")
+                .path("200")
+                .path("content")
+                .path("application/json")
+                .path("examples")
+                .path("screenData")
+                .path("value")
+                .path("result")
+                .has("supportApplications"))
+        .isTrue();
     assertThat(paths.path("/api/admin/support-applications/status").has("get")).isTrue();
+  }
+
+  @Test
+  void combinesDistrictStatusConsentAndKeywordWithMatchingPageCounts() throws Exception {
+    var expected = new ArrayList<Long>();
+    for (int i = 0; i < 7; i++)
+      expected.add(add("필터주민" + i, "경기도 부천시 소사구 소사로 1", "SUBMITTED", "PENDING"));
+    add("필터주민", "부천시 원미구", "SUBMITTED", "PENDING");
+    add("필터주민", "부천시 소사구", "APPROVED", "PENDING");
+    add("필터주민", "부천시 소사구", "SUBMITTED", "CONFIRMED");
+    add("필터주민", "서울시 부천시 소사구", "SUBMITTED", "PENDING");
+    add("필터주민", "부천시 소사구청", "SUBMITTED", "PENDING");
+    Collections.reverse(expected);
+    var actual = new ArrayList<Long>();
+    for (int page = 0; page < 3; page++) {
+      var response =
+          mvc.perform(
+                  get("/api/admin/support-applications")
+                      .header("Authorization", "Bearer " + token)
+                      .param("keyword", "필터주민")
+                      .param("district", "소사구")
+                      .param("status", "REVIEWING")
+                      .param("landlordConsentStatus", "PENDING")
+                      .param("page", String.valueOf(page))
+                      .param("size", "3"))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.result.totalElements").value(7))
+              .andExpect(jsonPath("$.result.totalPages").value(3))
+              .andReturn();
+      for (var row :
+          mapper
+              .readTree(response.getResponse().getContentAsString())
+              .path("result")
+              .path("supportApplications")) actual.add(row.path("supportApplicationId").asLong());
+    }
+    assertThat(actual).containsExactlyElementsOf(expected).doesNotHaveDuplicates();
+  }
+
+  @Test
+  void individualFiltersAndConsentAliasesRespectPersistedValues() throws Exception {
+    long approved = add("소사주민", " 경기 부천시 소사구", "APPROVED", "CONFIRMED");
+    add("오정주민", "부천시 오정구", "REJECTED", "PENDING");
+    for (var consent : List.of("VERIFIED", "CONFIRMED")) {
+      mvc.perform(
+              get("/api/admin/support-applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param("landlordConsentStatus", consent))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.totalElements").value(1))
+          .andExpect(
+              jsonPath("$.result.supportApplications[0].supportApplicationId").value(approved));
+    }
+    for (var filter :
+        List.of(
+            new String[] {"district", "원미구"},
+            new String[] {"district", "오정구"},
+            new String[] {"status", "APPROVED"},
+            new String[] {"landlordConsentStatus", "NOT_REQUIRED"}))
+      mvc.perform(
+              get("/api/admin/support-applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param(filter[0], filter[1]))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.totalElements").value(1));
+    mvc.perform(
+            get("/api/admin/support-applications")
+                .header("Authorization", "Bearer " + token)
+                .param("district", " ")
+                .param("status", "")
+                .param("landlordConsentStatus", " "))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(3));
+  }
+
+  @Test
+  void rejectsInvalidFilterValuesWithoutBroadeningSearch() throws Exception {
+    for (var filter :
+        List.of(
+            new String[] {"district", "서울"},
+            new String[] {"district", "소사구|.*"},
+            new String[] {"status", "DRAFT"},
+            new String[] {"status", "unknown"},
+            new String[] {"landlordConsentStatus", "UNKNOWN"}))
+      mvc.perform(
+              get("/api/admin/support-applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param(filter[0], filter[1]))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+    mvc.perform(
+            get("/api/admin/support-applications")
+                .header("Authorization", "Bearer " + token)
+                .param("status", "REJECTED"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0))
+        .andExpect(jsonPath("$.result.totalPages").value(0));
   }
 }

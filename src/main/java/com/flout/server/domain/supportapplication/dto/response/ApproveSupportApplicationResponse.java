@@ -8,8 +8,10 @@ public record ApproveSupportApplicationResponse(
     SupportApplicationStatus status,
     String supportScope,
     Long approvedByUserId,
-    OffsetDateTime approvedAt) {
-  public static ApproveSupportApplicationResponse from(SupportApplication application) {
+    OffsetDateTime approvedAt,
+    Long constructionId) {
+  public static ApproveSupportApplicationResponse from(
+      SupportApplication application, Long constructionId) {
     return new ApproveSupportApplicationResponse(
         application.getId(),
         application.getStatus(),
@@ -19,6 +21,7 @@ public record ApproveSupportApplicationResponse(
             .getApprovedAt()
             .atZone(ZoneId.systemDefault())
             .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime());
+            .toOffsetDateTime(),
+        constructionId);
   }
 }

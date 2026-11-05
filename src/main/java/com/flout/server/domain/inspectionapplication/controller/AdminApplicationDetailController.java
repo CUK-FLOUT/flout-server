@@ -25,7 +25,7 @@ public class AdminApplicationDetailController {
   @Operation(
       summary = "신청 상세정보 조회",
       description =
-          "운영자 본인 관할 신청의 접수번호, 신청자 이름·연락처, 전체 주소·상세주소, 거주 형태, AI 취약도, 침수 경험, 유입 위치, 기존 시설 여부, 주민 방문 희망일·시간대 및 요청 사유를 반환합니다. 반지하 표시는 화면 기본값으로 처리하며 응답에 별도 층수 필드는 없습니다. 희망일·시간대·요청 사유·상세주소가 없으면 null, 유입 위치가 없으면 빈 배열을 반환합니다. 확정 방문 일정과 구분하며 데이터를 변경하지 않습니다.")
+          "운영자 본인 관할 신청의 접수번호, 신청자 이름·연락처, 전체 주소·상세주소, 거주 형태, AI 취약도, 침수 경험, 유입 위치, 기존 시설 여부, 주민 방문 희망일·시간대 및 요청 사유를 반환합니다. housingType은 연결된 침수 취약도 분석에 저장된 거주층이며 미입력은 null입니다. 주소로 추정하지 않습니다. 희망일·시간대·요청 사유·상세주소가 없으면 null, 유입 위치가 없으면 빈 배열을 반환합니다. 확정 방문 일정과 구분하며 데이터를 변경하지 않습니다.")
   public SuccessResponse<InspectionApplicationDetailResponse> get(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "신청 ID. 양의 정수이며 점검 ID와 구분", example = "1") @PathVariable

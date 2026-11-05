@@ -869,4 +869,73 @@ class InspectionApplicationFlowTest {
         bytes);
     return new MockMultipartFile("files", "photo.png", "image/png", bytes.toByteArray());
   }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+  void linksApplicationToAssessmentWithStoredHousingType(String housing) throws Exception {
+    var result =
+        analyze(Map.of("housingType", housing)).andExpect(status().isCreated()).andReturn();
+    assessmentId =
+        mapper
+            .readTree(result.getResponse().getContentAsString())
+            .path("result")
+            .path("assessmentId")
+            .asLong();
+    long applicationId = createDraft();
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT r.housing_type FROM inspection_applications a JOIN risk_assessments r ON r.assessment_id=a.assessment_id WHERE a.application_id=?",
+                String.class,
+                applicationId))
+        .isEqualTo(housing);
+    submit()
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.applicationId").value(applicationId));
+  }
+
+  @Test
+  void omittedOrNullHousingDoesNotDefaultToBasement() throws Exception {
+    analyze(Map.of()).andExpect(status().isCreated());
+    var options = new java.util.HashMap<String, Object>();
+    options.put("housingType", null);
+    analyze(options).andExpect(status().isCreated());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM risk_assessments", Long.class))
+        .isEqualTo(3);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM risk_assessments WHERE housing_type IS NOT NULL", Long.class))
+        .isZero();
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"", "BASEMENT", "반지하", "UNKNOWN", "1"})
+  void rejectsUnsupportedHousingTypes(String housing) throws Exception {
+    analyze(Map.of("housingType", housing)).andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM risk_assessments", Long.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void rejectsNumericAndBooleanHousingWithoutOrdinalCoercion() throws Exception {
+    for (var housing : List.of(0, 1, true)) {
+      analyze(Map.of("housingType", housing)).andExpect(status().isBadRequest());
+    }
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM risk_assessments", Long.class))
+        .isEqualTo(1);
+  }
+
+  private org.springframework.test.web.servlet.ResultActions analyze(Map<String, Object> options)
+      throws Exception {
+    var application = request();
+    var body = new java.util.HashMap<>(options);
+    body.put("address", application.get("address"));
+    body.put("detailAddress", application.get("detailAddress"));
+    return mvc.perform(
+        post("/api/resident/risk-assessments")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(body)));
+  }
 }

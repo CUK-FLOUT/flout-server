@@ -28,7 +28,7 @@ public class AdminSupportRejectionController {
   @Operation(
       summary = "지원 신청 미승인",
       description =
-          "ADMIN JWT 및 부천시 관할이 필요합니다. 검토 중(REVIEWING·CONSENT_PENDING, 기존 SUBMITTED 호환)만 REJECTED로 변경하며 이미 처리된 신청은 409입니다. 검토 체크박스·지원 범위·동의 확인·서류 제출은 요구하지 않습니다.")
+          "ADMIN JWT 및 부천시 관할이 필요합니다. SUBMITTED 신청만 미승인하며 검토 체크박스·지원 범위·동의 확인·서류 제출은 요구하지 않습니다.")
   public SuccessResponse<RejectSupportApplicationResponse> reject(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long supportApplicationId,

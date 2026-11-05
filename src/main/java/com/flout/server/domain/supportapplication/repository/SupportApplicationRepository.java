@@ -4,6 +4,15 @@ import com.flout.server.domain.supportapplication.entity.SupportApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportApplicationRepository extends JpaRepository<SupportApplication, Long> {
+  java.util.List<SupportApplication> findByApplicationIdAndStatusNotOrderBySubmittedAtAscIdAsc(
+      Long applicationId,
+      com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
+  java.util.Optional<SupportApplication>
+      findFirstByApplicationIdAndStatusNotOrderBySubmittedAtDescIdDesc(
+          Long applicationId,
+          com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
   @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
   @org.springframework.data.jpa.repository.Query(
       "select a from SupportApplication a where a.id = :id")
@@ -22,11 +31,11 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       value =
           """
       SELECT COUNT(*) AS totalCount,
-             COALESCE(SUM(CASE WHEN status = 'REVIEWING' THEN 1 ELSE 0 END), 0) AS reviewingCount,
-             COALESCE(SUM(CASE WHEN status = 'CONSENT_PENDING' THEN 1 ELSE 0 END), 0) AS consentRequiredCount,
+             COALESCE(SUM(CASE WHEN status = 'SUBMITTED' THEN 1 ELSE 0 END), 0) AS reviewingCount,
+             0 AS consentRequiredCount,
              COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedCount
       FROM support_applications
-      WHERE REGEXP_LIKE(TRIM(address), :addressPattern)
+      WHERE status <> 'DRAFT' AND REGEXP_LIKE(TRIM(address), :addressPattern)
       """,
       nativeQuery = true)
   StatusCounts countStatusByJurisdiction(
@@ -44,7 +53,7 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
 
   @org.springframework.data.jpa.repository.Query(
       value =
-          "SELECT s.* FROM support_applications s WHERE s.support_application_id = :id AND REGEXP_LIKE(TRIM(s.address), :addressPattern)",
+          "SELECT s.* FROM support_applications s WHERE s.support_application_id = :id AND s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)",
       nativeQuery = true)
   java.util.Optional<SupportApplication> findAdminDetail(
       @org.springframework.data.repository.query.Param("id") Long id,
@@ -53,7 +62,10 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
   String ADMIN_SEARCH_FILTER =
       """
       FROM support_applications s
-      WHERE REGEXP_LIKE(TRIM(s.address), :addressPattern)
+      WHERE s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)
+        AND REGEXP_LIKE(TRIM(s.address), :districtPattern)
+        AND (:status = '' OR CONCAT('', s.status) = :status OR (:status = 'REVIEWING' AND s.status = 'SUBMITTED'))
+        AND (:consent = '' OR s.landlord_consent_status = :consent)
         AND (:keyword = '' OR LOCATE(:keyword, s.applicant_name) > 0
           OR LOCATE(:keyword, LPAD(CONCAT('', s.application_id),
             GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0')) > 0)
@@ -73,6 +85,9 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
   java.util.List<AdminListItem> searchAdminApplications(
       @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
       @org.springframework.data.repository.query.Param("keyword") String keyword,
+      @org.springframework.data.repository.query.Param("districtPattern") String districtPattern,
+      @org.springframework.data.repository.query.Param("status") String status,
+      @org.springframework.data.repository.query.Param("consent") String consent,
       @org.springframework.data.repository.query.Param("limit") int limit,
       @org.springframework.data.repository.query.Param("offset") long offset);
 
@@ -81,7 +96,10 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       nativeQuery = true)
   long countAdminApplications(
       @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
-      @org.springframework.data.repository.query.Param("keyword") String keyword);
+      @org.springframework.data.repository.query.Param("keyword") String keyword,
+      @org.springframework.data.repository.query.Param("districtPattern") String districtPattern,
+      @org.springframework.data.repository.query.Param("status") String status,
+      @org.springframework.data.repository.query.Param("consent") String consent);
 
   interface AdminListItem {
     Long getSupportApplicationId();

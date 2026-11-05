@@ -28,7 +28,7 @@ public class AdminSupportApprovalController {
   @Operation(
       summary = "지원 신청 승인",
       description =
-          "검토 중(REVIEWING·CONSENT_PENDING, 기존 SUBMITTED 호환)만 APPROVED로 변경하며 재처리는 409이고, 검토 3항목은 모두 true여야 합니다. OWNER는 동의·증빙서류가 필요 없고 TENANT는 운영자 동의 확인 상태 CONFIRMED가 필요합니다.")
+          "접수된 신청만 승인하며 검토 3항목은 모두 true여야 합니다. TENANT는 임대인 동의서 제출이 필요하고 OWNER·ETC는 동의서가 필요하지 않습니다. 승인과 함께 미배정 시공 건을 생성하고 constructionId를 반환합니다. 이 ID로 시공 일정 저장 API를 호출합니다.")
   public SuccessResponse<ApproveSupportApplicationResponse> approve(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long supportApplicationId,

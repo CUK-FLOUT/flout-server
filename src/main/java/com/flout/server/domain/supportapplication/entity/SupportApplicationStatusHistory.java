@@ -23,15 +23,11 @@ public class SupportApplicationStatusHistory {
   @Column(
       name = "previous_status",
       nullable = false,
-      columnDefinition =
-          "enum('SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
+      columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus previousStatus;
 
   @Enumerated(EnumType.STRING)
-  @Column(
-      nullable = false,
-      columnDefinition =
-          "enum('SUBMITTED','REVIEWING','CONSENT_PENDING','SCHEDULING','APPROVED','REJECTED')")
+  @Column(nullable = false, columnDefinition = "enum('SUBMITTED','APPROVED','REJECTED')")
   private SupportApplicationStatus status;
 
   @Column(name = "support_scope", length = 500)

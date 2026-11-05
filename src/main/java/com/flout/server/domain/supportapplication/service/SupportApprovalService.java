@@ -1,5 +1,7 @@
 package com.flout.server.domain.supportapplication.service;
 
+import com.flout.server.domain.construction.entity.Construction;
+import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.supportapplication.dto.request.ApproveSupportApplicationRequest;
 import com.flout.server.domain.supportapplication.dto.response.ApproveSupportApplicationResponse;
@@ -18,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupportApprovalService {
   private final SupportDecisionAccess access;
   private final SupportApplicationStatusHistoryRepository histories;
+  private final SupportAttachmentRepository attachments;
+  private final ConstructionRepository constructions;
 
   @Transactional
   public ApproveSupportApplicationResponse approve(
@@ -25,16 +29,18 @@ public class SupportApprovalService {
     var decision = access.lockSubmitted(operatorId, id);
     var operator = decision.operator();
     var application = decision.application();
-    if (application.getOccupancyType() == OccupancyType.ETC
-        || application.getOccupancyType() == null)
+    if (application.getOccupancyType() == null)
       throw new BaseException(SupportApprovalErrorCode.INVALID_OCCUPANCY);
     if (application.getOccupancyType() == OccupancyType.TENANT
-        && application.getLandlordConsentStatus() != LandlordConsentStatus.CONFIRMED)
+        && !attachments.existsByApplicationIdAndAttachmentType(
+            id, SupportAttachmentType.LANDLORD_CONSENT))
       throw new BaseException(SupportApprovalErrorCode.CONSENT_NOT_CONFIRMED);
     var previousStatus = application.getStatus();
     application.approve(
         request.supportScope(), operator, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
     histories.saveAndFlush(SupportApplicationStatusHistory.approved(application, previousStatus));
-    return ApproveSupportApplicationResponse.from(application);
+    var construction =
+        constructions.saveAndFlush(Construction.pending(application, application.getApprovedAt()));
+    return ApproveSupportApplicationResponse.from(application, construction.getId());
   }
 }

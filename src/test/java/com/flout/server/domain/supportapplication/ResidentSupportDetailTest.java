@@ -36,6 +36,7 @@ class ResidentSupportDetailTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
+  /** Seeds a resident-owned application for the review, approval, and rejection detail views. */
   @BeforeEach
   void setup() {
 
@@ -90,7 +91,7 @@ class ResidentSupportDetailTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','REVIEWING',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
         source,
         program,
         residentId);
@@ -134,7 +135,7 @@ class ResidentSupportDetailTest {
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
         .andExpect(jsonPath("$.result.programName").value("검증용 지원사업"))
-        .andExpect(jsonPath("$.result.status").value("REVIEWING"))
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
         .andExpect(jsonPath("$.result.submittedAt").value("2026-11-05T12:34:56"))
         .andExpect(jsonPath("$.result.requestedFacility").value("출입구 물막이판"))
         .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
@@ -186,21 +187,12 @@ class ResidentSupportDetailTest {
   @ParameterizedTest
   @CsvSource({
     "review,SUBMITTED,200",
-    "review,REVIEWING,200",
-    "review,CONSENT_PENDING,200",
-    "review,SCHEDULING,200",
     "review,APPROVED,409",
     "review,REJECTED,409",
     "approval,SUBMITTED,409",
-    "approval,REVIEWING,409",
-    "approval,CONSENT_PENDING,409",
-    "approval,SCHEDULING,409",
     "approval,APPROVED,200",
     "approval,REJECTED,409",
     "rejection,SUBMITTED,409",
-    "rejection,REVIEWING,409",
-    "rejection,CONSENT_PENDING,409",
-    "rejection,SCHEDULING,409",
     "rejection,APPROVED,409",
     "rejection,REJECTED,200"
   })
@@ -211,11 +203,11 @@ class ResidentSupportDetailTest {
   }
 
   @Test
-  void legacySubmittedMappingIsResponseOnly() throws Exception {
+  void submittedStatusIsReturnedWithoutChangingIt() throws Exception {
     state("SUBMITTED");
     request("review")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.status").value("REVIEWING"));
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo("SUBMITTED");
   }
@@ -233,11 +225,12 @@ class ResidentSupportDetailTest {
         .isEqualTo(saved);
   }
 
+  /** Checks access for the owner, another resident, an operator, and an anonymous caller. */
   @ParameterizedTest
   @ValueSource(strings = {"review", "approval", "rejection"})
   void onlyTheResidentOwnerCanAccessEachView(String view) throws Exception {
     state(
-        view.equals("approval") ? "APPROVED" : view.equals("rejection") ? "REJECTED" : "REVIEWING");
+        view.equals("approval") ? "APPROVED" : view.equals("rejection") ? "REJECTED" : "SUBMITTED");
     var other = users.saveAndFlush(User.resident("other@example.test", "test-hash", "다른주민"));
     var otherToken = jwt.issue(other).accessToken();
     request(view, Long.toString(supportId), null)
@@ -292,7 +285,7 @@ class ResidentSupportDetailTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"review,REVIEWING", "approval,APPROVED", "rejection,REJECTED"})
+  @CsvSource({"review,SUBMITTED", "approval,APPROVED", "rejection,REJECTED"})
   void getDoesNotWriteAndReturnsOnlyScreenData(String view, String value) throws Exception {
     state(value);
     var tables =
@@ -323,6 +316,10 @@ class ResidentSupportDetailTest {
         .isEqualTo(before);
   }
 
+  /**
+   * Checks that each detail example matches its current state and that operator routes remain
+   * documented.
+   */
   @Test
   void swaggerDocumentsAllThreeViewsAndKeepsExistingOperatorRoutes() throws Exception {
     var text =
@@ -338,6 +335,41 @@ class ResidentSupportDetailTest {
       assertThat(
               op.get("responses").get("200").get("content").get("application/json").has("schema"))
           .isTrue();
+      var media = op.get("responses").get("200").get("content").get("application/json");
+      var example = media.get("examples").get(view).get("value");
+      assertThat(example.get("code").asString()).isEqualTo("COMMON_200");
+      assertThat(example.get("status").asInt()).isEqualTo(200);
+      var sample = example.get("result");
+      Class<?> dto =
+          switch (view) {
+            case "review" ->
+                com.flout.server.domain.supportapplication.dto.response
+                    .ResidentSupportReviewResponse.class;
+            case "approval" ->
+                com.flout.server.domain.supportapplication.dto.response
+                    .ResidentSupportApprovalResponse.class;
+            default ->
+                com.flout.server.domain.supportapplication.dto.response
+                    .ResidentSupportRejectionResponse.class;
+          };
+      assertThat(sample.size()).isEqualTo(dto.getRecordComponents().length);
+      for (var field : dto.getRecordComponents())
+        assertThat(sample.has(field.getName())).as(field.getName()).isTrue();
+      assertThat(sample.get("programName").asString()).isEqualTo("침수 예방시설 설치 지원");
+      assertThat(sample.get("requestedFacility").asString()).isEqualTo("출입구 물막이판");
+      assertThat(sample.get("status").asString())
+          .isEqualTo(
+              switch (view) {
+                case "review" -> "SUBMITTED";
+                case "approval" -> "APPROVED";
+                default -> "REJECTED";
+              });
+      if (view.equals("approval")) {
+        assertThat(sample.get("scheduledConstructionDate").isNull()).isTrue();
+        var scheduled = media.get("examples").get("approvalScheduled").get("value").get("result");
+        assertThat(scheduled.get("scheduledConstructionDate").asString()).isEqualTo("2026-10-21");
+        assertThat(scheduled.get("scheduledConstructionTime").asString()).isEqualTo("10:00:00");
+      }
       for (String code : List.of("200", "400", "401", "403", "404", "409"))
         assertThat(op.get("responses").has(code)).as(view + code).isTrue();
     }

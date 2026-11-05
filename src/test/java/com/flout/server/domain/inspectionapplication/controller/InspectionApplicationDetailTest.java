@@ -133,7 +133,7 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.result.preferredVisitDate").value("2026-11-03"))
         .andExpect(jsonPath("$.result.requestReason").value("최근 배수구 역류가 있어 점검을 희망합니다."))
         .andExpect(jsonPath("$.result.preferredTimeSlot").value("MORNING"))
-        .andExpect(jsonPath("$.result.floor").doesNotExist());
+        .andExpect(jsonPath("$.result.housingType").value(nullValue()));
     for (String table : tables)
       assertThat(jdbc.queryForList("SELECT * FROM " + table)).isEqualTo(before.get(table));
   }
@@ -231,5 +231,17 @@ class InspectionApplicationDetailTest {
             jsonPath(
                     "$.components.schemas.InspectionApplicationDetailResponse.properties.preferredTimeSlot.type")
                 .value(hasItems("string", "null")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+  void returnsSavedHousingTypeWithoutGuessingFromAddress(String housing) throws Exception {
+    jdbc.update(
+        "UPDATE risk_assessments SET housing_type=? WHERE assessment_id=(SELECT assessment_id FROM inspection_applications WHERE application_id=?)",
+        housing,
+        applicationId);
+    mvc.perform(detail())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.housingType").value(housing));
   }
 }
