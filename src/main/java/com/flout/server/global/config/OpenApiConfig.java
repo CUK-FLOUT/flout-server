@@ -222,6 +222,10 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describePublicIssueActionRegistration(operation);
                             }
+                            if (path.equals("/api/admin/public-issues/{publicIssueId}/review")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeFacilityReview(operation);
+                            }
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
@@ -471,6 +475,39 @@ public class OpenApiConfig {
     addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
     addError(operation, "actionNotAllowed", PublicIssueErrorCode.ACTION_NOT_ALLOWED, null);
     addError(operation, "reviewRequired", PublicIssueErrorCode.REVIEW_REQUIRED, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeFacilityReview(Operation operation) {
+    var code = PublicIssueSuccessCode.REVIEW_SAVED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "facilityReviewSaved",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.ofEntries(
+                Map.entry("reviewId", 1),
+                Map.entry("publicIssueId", 1),
+                Map.entry("facilityId", 17),
+                Map.entry("facilityName", "원미구 빗물받이"),
+                Map.entry("reviewStatus", "UNDER_REVIEW"),
+                Map.entry("publicIssueStatus", "UNDER_REVIEW"),
+                Map.entry("inspectionNotes", "빗물받이 막힘 여부와 주변 도로 배수 상태 현장 확인"),
+                Map.entry("reviewReason", "인근 신청 3건과 침수 이력 2건 확인"),
+                Map.entry("reviewerUserId", 2),
+                Map.entry("reviewedAt", "2026-11-06T10:00:00+09:00"))));
+    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "invalidReviewStatus", PublicIssueErrorCode.INVALID_REVIEW_STATUS, null);
+    addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
+    addError(operation, "facilityNotFound", PublicIssueErrorCode.FACILITY_NOT_FOUND, null);
+    addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
+    addError(operation, "reviewNotAllowed", PublicIssueErrorCode.REVIEW_NOT_ALLOWED, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

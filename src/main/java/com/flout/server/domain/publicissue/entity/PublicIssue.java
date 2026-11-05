@@ -83,4 +83,15 @@ public class PublicIssue {
   public void startAction() {
     status = PublicIssueStatus.ACTION_IN_PROGRESS;
   }
+
+  public void saveReview(FacilityReviewStatus reviewStatus) {
+    status =
+        switch (reviewStatus) {
+          case PENDING -> PublicIssueStatus.RECEIVED;
+          case UNDER_REVIEW -> PublicIssueStatus.UNDER_REVIEW;
+          case INSPECTION_REQUIRED -> PublicIssueStatus.INSPECTION_REQUIRED;
+          case ACTION_IN_PROGRESS -> PublicIssueStatus.ACTION_IN_PROGRESS;
+          case COMPLETED -> PublicIssueStatus.COMPLETED;
+        };
+  }
 }

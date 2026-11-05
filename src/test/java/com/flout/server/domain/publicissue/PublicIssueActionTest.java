@@ -43,7 +43,7 @@ class PublicIssueActionTest {
   @Autowired JwtService jwt;
   @Autowired ObjectMapper mapper;
   @MockitoSpyBean PublicIssueActionRepository actions;
-  long publicIssueId, reviewId, inspectionId, adminId;
+  long publicIssueId, reviewId, facilityId, inspectionId, adminId;
   String token, residentToken;
 
   @BeforeEach
@@ -116,7 +116,7 @@ class PublicIssueActionTest {
     jdbc.update(
         "INSERT INTO public_facility(facility_name,facility_type,address,latitude,longitude) VALUES('원미구 빗물받이','STORM_DRAIN',?,37.5000000,126.7600000)",
         ADDRESS);
-    long facilityId = jdbc.queryForObject("SELECT facility_id FROM public_facility", Long.class);
+    facilityId = jdbc.queryForObject("SELECT facility_id FROM public_facility", Long.class);
     jdbc.update(
         "INSERT INTO facility_review(user_id,local_problem_id,facility_id,inspection_note,review_status,review_reason,reviewed_at) VALUES(?,?,?,'현장 확인 필요','UNDER_REVIEW','반복 침수 이력 확인',CURRENT_TIMESTAMP)",
         adminId,
@@ -135,6 +135,14 @@ class PublicIssueActionTest {
     return mvc.perform(request);
   }
 
+  org.springframework.test.web.servlet.ResultActions postReview(Object body) throws Exception {
+    return mvc.perform(
+        post("/api/admin/public-issues/{publicIssueId}/review", publicIssueId)
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(body)));
+  }
+
   Map<String, Object> body(Object description) {
     var body = new LinkedHashMap<String, Object>();
     body.put("actionDescription", description);
@@ -143,6 +151,70 @@ class PublicIssueActionTest {
 
   int actionCount() {
     return jdbc.queryForObject("SELECT COUNT(*) FROM facility_action", Integer.class);
+  }
+
+  Map<String, Object> reviewBody(Object status) {
+    var body = new LinkedHashMap<String, Object>();
+    body.put("facilityId", facilityId);
+    body.put("reviewStatus", status);
+    body.put("inspectionNotes", " 빗물받이 막힘 여부와 주변 도로 배수 상태 현장 확인 ");
+    body.put("reviewReason", " 인근 신청 3건과 침수 이력 2건 확인 ");
+    return body;
+  }
+
+  @Test
+  void createsAndUpdatesFacilityReviewWithSameId() throws Exception {
+    jdbc.update("DELETE FROM facility_review WHERE review_id=?", reviewId);
+    postReview(reviewBody("UNDER_REVIEW"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_3"))
+        .andExpect(jsonPath("$.result.reviewId").isNumber())
+        .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
+        .andExpect(jsonPath("$.result.facilityId").value(facilityId))
+        .andExpect(jsonPath("$.result.facilityName").value("원미구 빗물받이"))
+        .andExpect(jsonPath("$.result.reviewStatus").value("UNDER_REVIEW"))
+        .andExpect(jsonPath("$.result.publicIssueStatus").value("UNDER_REVIEW"))
+        .andExpect(jsonPath("$.result.inspectionNotes").value("빗물받이 막힘 여부와 주변 도로 배수 상태 현장 확인"))
+        .andExpect(jsonPath("$.result.reviewReason").value("인근 신청 3건과 침수 이력 2건 확인"))
+        .andExpect(jsonPath("$.result.reviewerUserId").value(adminId))
+        .andExpect(jsonPath("$.result.reviewedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
+    long savedReviewId = jdbc.queryForObject("SELECT review_id FROM facility_review", Long.class);
+    var update = reviewBody("INSPECTION_REQUIRED");
+    update.put("inspectionNotes", " 현장 재확인 필요 ");
+    update.put("reviewReason", null);
+    postReview(update)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.reviewId").value(savedReviewId))
+        .andExpect(jsonPath("$.result.reviewStatus").value("INSPECTION_REQUIRED"))
+        .andExpect(jsonPath("$.result.publicIssueStatus").value("INSPECTION_REQUIRED"))
+        .andExpect(jsonPath("$.result.inspectionNotes").value("현장 재확인 필요"))
+        .andExpect(jsonPath("$.result.reviewReason").doesNotExist());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM facility_review", Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void validatesFacilityReviewRequestAndReferences() throws Exception {
+    var request = reviewBody("COMPLETED");
+    postReview(request)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_3"));
+    request = reviewBody("UNDER_REVIEW");
+    request.put("facilityId", Long.MAX_VALUE);
+    postReview(request)
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_404_2"));
+    request = reviewBody("UNDER_REVIEW");
+    request.put("inspectionNotes", "   ");
+    postReview(request).andExpect(status().isBadRequest());
+    request = reviewBody("UNDER_REVIEW");
+    request.put("facilityId", "1");
+    postReview(request).andExpect(status().isBadRequest());
+    jdbc.update(
+        "UPDATE public_issues SET status='COMPLETED' WHERE public_issue_id=?", publicIssueId);
+    postReview(reviewBody("UNDER_REVIEW"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_3"));
   }
 
   @Test
@@ -291,6 +363,17 @@ class PublicIssueActionTest {
   void documentsRequestSuccessAndErrors() throws Exception {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['200'].content['application/json'].examples.facilityReviewSaved.value.code")
+                .value("PUBLIC_ISSUE_200_3"))
+        .andExpect(
+            jsonPath("$.components.schemas.SaveFacilityReviewRequest.properties.facilityId.type")
+                .value("integer"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['404']")
+                .exists())
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionRegistered.value.code")

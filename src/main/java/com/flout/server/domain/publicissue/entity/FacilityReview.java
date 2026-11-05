@@ -48,7 +48,43 @@ public class FacilityReview {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
+  public static FacilityReview create(
+      User reviewer,
+      PublicIssue localProblem,
+      PublicFacility facility,
+      String inspectionNote,
+      FacilityReviewStatus reviewStatus,
+      String reviewReason,
+      LocalDateTime reviewedAt) {
+    var review = new FacilityReview();
+    review.reviewer = reviewer;
+    review.localProblem = localProblem;
+    review.facility = facility;
+    review.update(reviewer, facility, inspectionNote, reviewStatus, reviewReason, reviewedAt);
+    return review;
+  }
+
+  public void update(
+      User reviewer,
+      PublicFacility facility,
+      String inspectionNote,
+      FacilityReviewStatus reviewStatus,
+      String reviewReason,
+      LocalDateTime reviewedAt) {
+    this.reviewer = reviewer;
+    this.facility = facility;
+    this.inspectionNote = inspectionNote;
+    this.reviewStatus = reviewStatus;
+    this.reviewReason = reviewReason;
+    this.reviewedAt = reviewedAt;
+  }
+
   public void startAction() {
     reviewStatus = FacilityReviewStatus.ACTION_IN_PROGRESS;
+  }
+
+  @PrePersist
+  void onCreate() {
+    createdAt = LocalDateTime.now();
   }
 }
