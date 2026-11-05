@@ -28,7 +28,7 @@ public class ResidentRiskAssessmentController {
   @Operation(
       summary = "침수 취약도 분석",
       description =
-          "주소와 상세 주소로 분석 결과를 생성합니다. 임시 분석 결과는 높음(HIGH)으로 저장되며, 응답의 assessmentId를 현장점검 신청에 사용합니다.")
+          "주소, 상세 주소와 선택 입력한 거주층(housingType)을 분석 결과에 저장합니다. 임시 분석 결과는 높음(HIGH)으로 저장되며, 응답의 assessmentId를 현장점검 신청에 사용합니다.")
   @ApiResponse(responseCode = "201", description = "분석 결과 저장 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",

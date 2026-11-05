@@ -19,7 +19,7 @@ public record SupportApplicationReviewResponse(
     String address,
     String detailAddress,
     @Schema(
-            description = "원본 현장점검 신청의 거주층. 기존 신청·미입력은 null",
+            description = "연결된 침수 취약도 분석의 거주층. 미입력은 null",
             example = "SEMI_BASEMENT",
             nullable = true)
         HousingType housingType,

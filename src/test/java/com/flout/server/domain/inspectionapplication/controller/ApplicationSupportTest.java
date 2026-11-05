@@ -114,6 +114,7 @@ class ApplicationSupportTest {
   @Test
   void returnsApprovedSupportAndActualConstructionWithoutMutations() throws Exception {
     jdbc.update("UPDATE inspection_applications SET detail_address='Unit 101'");
+    jdbc.update("UPDATE risk_assessments SET housing_type='FIRST_FLOOR'");
     jdbc.update("UPDATE support_applications SET support_scope='Approved installation scope'");
     var supportsBefore = jdbc.queryForList("SELECT * FROM support_applications");
     var constructionsBefore = jdbc.queryForList("SELECT * FROM constructions");
@@ -126,6 +127,7 @@ class ApplicationSupportTest {
         .andExpect(jsonPath("$.result.applicantName").isNotEmpty())
         .andExpect(jsonPath("$.result.address").isNotEmpty())
         .andExpect(jsonPath("$.result.detailAddress").value("Unit 101"))
+        .andExpect(jsonPath("$.result.housingType").value("FIRST_FLOOR"))
         .andExpect(jsonPath("$.result.support.supportApplicationId").value(supportId))
         .andExpect(jsonPath("$.result.support.programId").isNumber())
         .andExpect(jsonPath("$.result.support.programName").isNotEmpty())
@@ -146,12 +148,15 @@ class ApplicationSupportTest {
     jdbc.update("UPDATE support_applications SET status='DRAFT',submitted_at=NULL");
     getSupport()
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.housingType").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.result.support").value(org.hamcrest.Matchers.nullValue()));
+    jdbc.update("UPDATE risk_assessments SET housing_type='SEMI_BASEMENT'");
     jdbc.update("DELETE FROM constructions");
     jdbc.update("DELETE FROM support_applications");
     getSupport()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.housingType").value("SEMI_BASEMENT"))
         .andExpect(jsonPath("$.result.support").value(org.hamcrest.Matchers.nullValue()));
   }
 

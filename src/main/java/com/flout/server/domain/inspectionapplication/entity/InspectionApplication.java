@@ -45,12 +45,6 @@ public class InspectionApplication {
   @Column(name = "detail_address", length = 255)
   private String detailAddress;
 
-  @Enumerated(EnumType.STRING)
-  @Column(
-      name = "housing_type",
-      columnDefinition = "enum('SEMI_BASEMENT','FIRST_FLOOR','SECOND_FLOOR_OR_ABOVE')")
-  private HousingType housingType;
-
   @Column(nullable = false, precision = 10, scale = 7)
   private BigDecimal latitude;
 
@@ -108,7 +102,6 @@ public class InspectionApplication {
     application.receiptNo = receiptNo;
     application.address = request.address();
     application.detailAddress = request.detailAddress();
-    application.housingType = request.housingType();
     application.latitude = request.latitude();
     application.longitude = request.longitude();
     application.contact = request.contact().strip();

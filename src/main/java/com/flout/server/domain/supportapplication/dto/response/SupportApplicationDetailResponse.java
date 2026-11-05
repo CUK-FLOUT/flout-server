@@ -16,7 +16,7 @@ public record SupportApplicationDetailResponse(
     @Schema(description = "지원 신청 당시 저장된 전체 연락처", example = "010-1234-0002") String contact,
     String address,
     String detailAddress,
-    @Schema(description = "원본 현장점검 신청의 거주층. 기존 신청·미입력은 null이며 주소에서 추정하지 않습니다.", nullable = true)
+    @Schema(description = "연결된 침수 취약도 분석의 거주층. 미입력은 null이며 주소에서 추정하지 않습니다.", nullable = true)
         HousingType housingType,
     OccupancyType occupancyType,
     @Schema(description = "공개된 점검 결과의 권장조치. 저장된 표시 순서 유지") List<String> recommendedActions,

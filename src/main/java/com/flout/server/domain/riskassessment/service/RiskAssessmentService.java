@@ -33,7 +33,11 @@ public class RiskAssessmentService {
     var assessment =
         assessments.save(
             RiskAssessment.completedDemo(
-                resident, request.address().strip(), request.detailAddress(), RiskLevel.HIGH));
+                resident,
+                request.address().strip(),
+                request.detailAddress(),
+                RiskLevel.HIGH,
+                request.housingType()));
     return new CreateRiskAssessmentResponse(
         assessment.getId(), assessment.getRiskLevel(), assessment.getStatus());
   }

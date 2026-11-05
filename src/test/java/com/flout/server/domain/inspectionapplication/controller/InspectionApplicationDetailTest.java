@@ -237,7 +237,7 @@ class InspectionApplicationDetailTest {
   @ValueSource(strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
   void returnsSavedHousingTypeWithoutGuessingFromAddress(String housing) throws Exception {
     jdbc.update(
-        "UPDATE inspection_applications SET housing_type=? WHERE application_id=?",
+        "UPDATE risk_assessments SET housing_type=? WHERE assessment_id=(SELECT assessment_id FROM inspection_applications WHERE application_id=?)",
         housing,
         applicationId);
     mvc.perform(detail())
