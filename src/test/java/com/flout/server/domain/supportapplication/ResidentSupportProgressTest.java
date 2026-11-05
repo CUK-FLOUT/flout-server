@@ -44,6 +44,7 @@ class ResidentSupportProgressTest {
   @Autowired JwtService jwt;
   @Autowired ObjectMapper mapper;
   @Autowired SupportAttachmentRepository attachments;
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
   @MockitoBean AttachmentStorage storage;
   long supportId, adminId, residentId;
   String token, residentToken;
@@ -164,6 +165,22 @@ class ResidentSupportProgressTest {
     verifyNoInteractions(storage);
   }
 
+  @Test
+  void mergedApprovalKeepsActualConstructionScheduleAndAttachmentDependencies() throws Exception {
+    state("APPROVED");
+    jdbc.update(
+        "INSERT INTO constructions(support_application_id,status,scheduled_at,created_at,updated_at) VALUES(?,'SCHEDULED','2027-01-15 10:30:00',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+        supportId);
+    request("approval")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.scheduledConstructionDate").value("2027-01-15"))
+        .andExpect(jsonPath("$.result.scheduledConstructionTime").value("10:30:00"));
+    request("attachments")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.attachments").isEmpty());
+    verifyNoInteractions(storage);
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"SUBMITTED", "REVIEWING", "CONSENT_PENDING", "APPROVED", "REJECTED"})
   void onlySchedulingStateCanUseScheduleView(String value) throws Exception {
@@ -216,8 +233,11 @@ class ResidentSupportProgressTest {
                       .get("submittedAt")
                       .asString();
               var uploadTime =
-                  SupportAttachmentResponse.from(attachments.findById(id).orElseThrow())
-                      .submittedAt();
+                  new org.springframework.transaction.support.TransactionTemplate(transactions)
+                      .execute(
+                          status ->
+                              SupportAttachmentResponse.from(attachments.findById(id).orElseThrow())
+                                  .submittedAt());
               assertThat(java.time.OffsetDateTime.parse(timestamp)).isEqualTo(uploadTime);
               assertThat(timestamp).endsWith("+09:00");
             })

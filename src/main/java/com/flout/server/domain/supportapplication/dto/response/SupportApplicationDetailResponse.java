@@ -31,6 +31,7 @@ public record SupportApplicationDetailResponse(
     @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"}) String landlordConsentStatus,
     @Schema(
             allowableValues = {
+              "SUBMITTED",
               "REVIEWING",
               "CONSENT_PENDING",
               "SCHEDULING",

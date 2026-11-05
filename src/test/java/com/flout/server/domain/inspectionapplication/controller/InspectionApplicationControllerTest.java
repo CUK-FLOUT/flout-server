@@ -22,7 +22,12 @@ class InspectionApplicationControllerTest {
   @Test
   void submitReturnsInspectionApplicationSpecificCreatedResponse() {
     InspectionApplicationService service = mock(InspectionApplicationService.class);
-    InspectionApplicationController controller = new InspectionApplicationController(service);
+    InspectionApplicationController controller =
+        new InspectionApplicationController(
+            service,
+            mock(
+                com.flout.server.domain.inspectionapplication.service
+                    .ResidentApplicationUpdateService.class));
     CreateInspectionApplicationResponse expected =
         new CreateInspectionApplicationResponse(
             1L,

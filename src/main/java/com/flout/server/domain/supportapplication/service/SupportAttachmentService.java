@@ -62,6 +62,7 @@ public class SupportAttachmentService {
               var application = authorize(userId, applicationId, false);
               var determined = resolveType(application);
               rejectDuplicate(applicationId, determined);
+              requireDraft(application);
               return determined;
             });
     var document = validator.validate(file);
@@ -80,6 +81,7 @@ public class SupportAttachmentService {
                 if (currentType != type)
                   throw new BaseException(SupportAttachmentErrorCode.INVALID_OCCUPANCY);
                 rejectDuplicate(applicationId, currentType);
+                requireDraft(application);
                 var saved =
                     attachments.saveAndFlush(
                         SupportAttachment.submitted(
@@ -89,6 +91,7 @@ public class SupportAttachmentService {
                             document.filename(),
                             document.bytes().length,
                             document.contentType()));
+                application.submitDraft();
                 cleanup.completed(key);
                 return SupportAttachmentResponse.from(saved);
               });
@@ -128,6 +131,11 @@ public class SupportAttachmentService {
   private void rejectDuplicate(Long id, SupportAttachmentType type) {
     if (attachments.existsByApplicationIdAndAttachmentType(id, type))
       throw new BaseException(SupportAttachmentErrorCode.ALREADY_SUBMITTED);
+  }
+
+  private void requireDraft(SupportApplication application) {
+    if (application.getStatus() != SupportApplicationStatus.DRAFT)
+      throw new BaseException(SupportAttachmentErrorCode.APPLICATION_NOT_DRAFT);
   }
 
   private boolean duplicate(Throwable e) {

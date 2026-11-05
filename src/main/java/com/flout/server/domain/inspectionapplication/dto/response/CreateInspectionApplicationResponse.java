@@ -27,8 +27,6 @@ public record CreateInspectionApplicationResponse(
         inspectionId,
         String.format(Locale.ROOT, "%06d", application.getId()),
         application.getStatus(),
-        application.getStatus() == InspectionApplicationStatus.DRAFT
-            ? null
-            : application.getCreatedAt());
+        application.getSubmittedAt());
   }
 }

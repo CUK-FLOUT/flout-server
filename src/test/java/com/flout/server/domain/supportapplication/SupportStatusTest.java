@@ -208,7 +208,7 @@ class SupportStatusTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"REVIEWING", "CONSENT_PENDING"})
-  void approvalKeepsTheActualPreviousState(String previous) throws Exception {
+  void legacyReviewStatesCannotBeApprovedBeforeClassification(String previous) throws Exception {
     jdbc.update(
         "UPDATE support_applications SET status=? WHERE support_application_id=?",
         previous,
@@ -219,12 +219,46 @@ class SupportStatusTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"supportScope\":\"물막이판\",\"applicantHousingReviewed\":true,\"expertInspectionReviewed\":true,\"eligibilityDocumentsReviewed\":true}"))
-        .andExpect(status().isOk());
+        .andExpect(status().isConflict());
     assertThat(
             jdbc.queryForObject(
-                "SELECT previous_status FROM support_application_status_histories", String.class))
+                "SELECT status FROM support_applications WHERE support_application_id=?",
+                String.class,
+                supportId))
         .isEqualTo(previous);
-    statusRequest(token).andExpect(jsonPath("$.result.approvedCount").value(1));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM support_application_status_histories", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void draftIsHiddenFromAdminAndCannotBeApprovedOrRejected() throws Exception {
+    jdbc.update(
+        "UPDATE support_applications SET status='DRAFT' WHERE support_application_id=?", supportId);
+    statusRequest(token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(0));
+    mvc.perform(get("/api/admin/support-applications").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+    mvc.perform(
+            get("/api/admin/support-applications/{id}", supportId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            post("/api/admin/support-applications/{id}/approve", supportId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"supportScope\":\"물막이판\",\"applicantHousingReviewed\":true,\"expertInspectionReviewed\":true,\"eligibilityDocumentsReviewed\":true}"))
+        .andExpect(status().isConflict());
+    mvc.perform(
+            post("/api/admin/support-applications/{id}/reject", supportId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"사유\"}"))
+        .andExpect(status().isConflict());
   }
 
   @Test
@@ -243,8 +277,7 @@ class SupportStatusTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"OWNER", "TENANT", "ETC"})
-  void submissionSetsActualConsentStateAndConfirmationUpdatesCounts(String occupancy)
-      throws Exception {
+  void submissionExcludesDraftsFromCounts(String occupancy) throws Exception {
     var source =
         jdbc.queryForObject(
             "SELECT application_id FROM support_applications WHERE support_application_id=?",
@@ -281,42 +314,11 @@ class SupportStatusTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(body)))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.result.status").value(tenant ? "CONSENT_PENDING" : "REVIEWING"));
+        .andExpect(jsonPath("$.result.status").value(tenant ? "DRAFT" : "SUBMITTED"));
     statusRequest(token)
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.totalCount").value(1))
-        .andExpect(jsonPath("$.result.consentRequiredCount").value(tenant ? 1 : 0))
-        .andExpect(jsonPath("$.result.reviewingCount").value(tenant ? 0 : 1));
-    if (!tenant) return;
-    var id =
-        jdbc.queryForObject("SELECT support_application_id FROM support_applications", Long.class);
-    mvc.perform(
-            patch("/api/admin/support-applications/" + id + "/landlord-consent")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"CONFIRMED\"}"))
-        .andExpect(status().isBadRequest());
-    statusRequest(token).andExpect(jsonPath("$.result.consentRequiredCount").value(1));
-    jdbc.update(
-        "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'LANDLORD_CONSENT','isolated-fixture/no-s3-upload','consent.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
-        id);
-    mvc.perform(
-            patch("/api/admin/support-applications/" + id + "/landlord-consent")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"CONFIRMED\"}"))
-        .andExpect(status().isOk());
-    statusRequest(token)
-        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.totalCount").value(tenant ? 0 : 1))
         .andExpect(jsonPath("$.result.consentRequiredCount").value(0))
-        .andExpect(jsonPath("$.result.reviewingCount").value(1));
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT landlord_consent_status FROM support_applications", String.class))
-        .isEqualTo("CONFIRMED");
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM support_application_status_histories", Long.class))
-        .isZero();
+        .andExpect(jsonPath("$.result.reviewingCount").value(tenant ? 0 : 1));
   }
 }

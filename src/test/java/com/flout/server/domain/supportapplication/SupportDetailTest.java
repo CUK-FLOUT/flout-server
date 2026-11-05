@@ -300,7 +300,7 @@ class SupportDetailTest {
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     detail()
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.status").value("REVIEWING"))
+        .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
         .andExpect(jsonPath("$.result.landlordConsentStatus").value("VERIFIED"));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }

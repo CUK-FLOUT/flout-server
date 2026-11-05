@@ -1,5 +1,6 @@
 package com.flout.server.domain.supportapplication.service;
 
+import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.inspection.entity.Inspection;
 import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
@@ -35,6 +36,7 @@ public class ResidentSupportDetailService {
   private final InspectionResultRepository results;
   private final SupportAttachmentRepository attachments;
   private final AttachmentStorage storage;
+  private final ConstructionRepository constructions;
 
   public ResidentSupportReviewResponse review(Long userId, Long id) {
     var a = owned(userId, id);
@@ -61,6 +63,10 @@ public class ResidentSupportDetailService {
     var a = owned(userId, id);
     requireState(a.getStatus() == SupportApplicationStatus.APPROVED);
     var source = a.getApplication();
+    var scheduledAt =
+        constructions
+            .findBySupportApplicationId(id)
+            .map(com.flout.server.domain.construction.entity.Construction::getScheduledAt);
     return new ResidentSupportApprovalResponse(
         a.getId(),
         source.getId(),
@@ -74,8 +80,8 @@ public class ResidentSupportDetailService {
         a.getRequestedFacility(),
         a.getSupportScope(),
         consent(a),
-        null,
-        null);
+        scheduledAt.map(java.time.LocalDateTime::toLocalDate).orElse(null),
+        scheduledAt.map(java.time.LocalDateTime::toLocalTime).orElse(null));
   }
 
   public ResidentSupportRejectionResponse rejection(Long userId, Long id) {
@@ -179,9 +185,7 @@ public class ResidentSupportDetailService {
   }
 
   private SupportApplicationStatus displayStatus(SupportApplication a) {
-    return a.getStatus() == SupportApplicationStatus.SUBMITTED
-        ? SupportApplicationStatus.REVIEWING
-        : a.getStatus();
+    return a.getStatus();
   }
 
   private String consent(SupportApplication a) {
