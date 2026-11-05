@@ -219,6 +219,15 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describePublicIssueRegistration(operation);
                             }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
+                                        "/api/resident/support-applications/{supportApplicationId}/review",
+                                        "/api/resident/support-applications/{supportApplicationId}/approval",
+                                        "/api/resident/support-applications/{supportApplicationId}/rejection")
+                                    .contains(path)) {
+                              describeResidentSupportDetail(
+                                  operation, path.substring(path.lastIndexOf('/') + 1));
+                            }
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
@@ -1844,6 +1853,66 @@ public class OpenApiConfig {
       case 415 -> "지원하지 않는 요청 Content-Type";
       default -> "서버 오류";
     };
+  }
+
+  private void describeResidentSupportDetail(Operation operation, String view) {
+    var result = new LinkedHashMap<String, Object>();
+    long applicationId = view.equals("review") ? 2L : view.equals("approval") ? 3L : 4L;
+    result.put(
+        "supportApplicationId",
+        view.equals("review") ? 201L : view.equals("approval") ? 202L : 203L);
+    result.put("applicationId", applicationId);
+    result.put("receiptNo", String.format(java.util.Locale.ROOT, "%06d", applicationId));
+    result.put(
+        "applicantName", view.equals("review") ? "이주민" : view.equals("approval") ? "박주민" : "최주민");
+    result.put("address", "경기도 부천시 원미구 중동로 12");
+    result.put("detailAddress", "지하 101호");
+    result.put("programName", "침수 예방시설 설치 지원");
+    result.put(
+        "status",
+        view.equals("review") ? "REVIEWING" : view.equals("approval") ? "APPROVED" : "REJECTED");
+    result.put("requestedFacility", "출입구 물막이판");
+    if (view.equals("review")) {
+      result.put("submittedAt", "2026-10-07T10:00:00");
+      result.put("occupancyType", "TENANT");
+      result.put("preferredConstructionDate", "2026-10-21");
+      result.put("preferredTimeSlot", "MORNING");
+      result.put("landlordConsentStatus", "PENDING");
+    } else if (view.equals("approval")) {
+      result.put("approvedAt", "2026-10-13T14:00:00");
+      result.put("supportScope", "출입구 물막이판 1개 설치 지원");
+      result.put("landlordConsentStatus", "VERIFIED");
+      result.put("scheduledConstructionDate", null);
+      result.put("scheduledConstructionTime", null);
+    } else {
+      result.put("rejectionReason", "지원 대상 조건에 해당하지 않아 이번 신청은 미승인되었습니다.");
+      result.put("rejectedAt", "2026-10-13T14:00:00");
+      result.put("inspectionId", 12L);
+      result.put("inspectionResultPublished", true);
+    }
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("Figma 화면 기준 예시 데이터이며 실제 응답은 DB 저장값을 반환합니다.");
+    addExample(
+        success,
+        view,
+        envelope(
+            true,
+            GeneralSuccessCode.SUCCESS_OK,
+            GeneralSuccessCode.SUCCESS_OK.getMessage(),
+            result));
+    if (view.equals("approval")) {
+      var scheduled = new LinkedHashMap<>(result);
+      scheduled.put("scheduledConstructionDate", "2026-10-21");
+      scheduled.put("scheduledConstructionTime", "10:00:00");
+      addExample(
+          success,
+          "approvalScheduled",
+          envelope(
+              true,
+              GeneralSuccessCode.SUCCESS_OK,
+              GeneralSuccessCode.SUCCESS_OK.getMessage(),
+              scheduled));
+    }
   }
 
   private void addExample(ApiResponse response, String name, Map<String, Object> body) {

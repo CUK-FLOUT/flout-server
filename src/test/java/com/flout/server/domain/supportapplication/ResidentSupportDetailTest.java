@@ -338,6 +338,41 @@ class ResidentSupportDetailTest {
       assertThat(
               op.get("responses").get("200").get("content").get("application/json").has("schema"))
           .isTrue();
+      var media = op.get("responses").get("200").get("content").get("application/json");
+      var example = media.get("examples").get(view).get("value");
+      assertThat(example.get("code").asString()).isEqualTo("COMMON_200");
+      assertThat(example.get("status").asInt()).isEqualTo(200);
+      var sample = example.get("result");
+      Class<?> dto =
+          switch (view) {
+            case "review" ->
+                com.flout.server.domain.supportapplication.dto.response
+                    .ResidentSupportReviewResponse.class;
+            case "approval" ->
+                com.flout.server.domain.supportapplication.dto.response
+                    .ResidentSupportApprovalResponse.class;
+            default ->
+                com.flout.server.domain.supportapplication.dto.response
+                    .ResidentSupportRejectionResponse.class;
+          };
+      assertThat(sample.size()).isEqualTo(dto.getRecordComponents().length);
+      for (var field : dto.getRecordComponents())
+        assertThat(sample.has(field.getName())).as(field.getName()).isTrue();
+      assertThat(sample.get("programName").asString()).isEqualTo("침수 예방시설 설치 지원");
+      assertThat(sample.get("requestedFacility").asString()).isEqualTo("출입구 물막이판");
+      assertThat(sample.get("status").asString())
+          .isEqualTo(
+              switch (view) {
+                case "review" -> "REVIEWING";
+                case "approval" -> "APPROVED";
+                default -> "REJECTED";
+              });
+      if (view.equals("approval")) {
+        assertThat(sample.get("scheduledConstructionDate").isNull()).isTrue();
+        var scheduled = media.get("examples").get("approvalScheduled").get("value").get("result");
+        assertThat(scheduled.get("scheduledConstructionDate").asString()).isEqualTo("2026-10-21");
+        assertThat(scheduled.get("scheduledConstructionTime").asString()).isEqualTo("10:00:00");
+      }
       for (String code : List.of("200", "400", "401", "403", "404", "409"))
         assertThat(op.get("responses").has(code)).as(view + code).isTrue();
     }
