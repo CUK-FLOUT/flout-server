@@ -721,7 +721,7 @@ class SupportAttachmentTest {
   }
 
   @Test
-  void documentsMultipartSuccessErrorsAndNoNewGet() throws Exception {
+  void documentsMultipartSuccessErrorsAlongsideResidentGet() throws Exception {
     var documentation =
         mvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk())
@@ -743,8 +743,8 @@ class SupportAttachmentTest {
                     .exists())
             .andExpect(
                 jsonPath(
-                        "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].get")
-                    .doesNotExist());
+                        "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].get.responses['200']")
+                    .exists());
     String operation =
         "$.paths['/api/resident/support-applications/{supportApplicationId}/attachments'].post";
     String properties = operation + ".requestBody.content['multipart/form-data'].schema.properties";
