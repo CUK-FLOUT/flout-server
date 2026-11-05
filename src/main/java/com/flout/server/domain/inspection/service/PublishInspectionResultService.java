@@ -123,7 +123,7 @@ public class PublishInspectionResultService {
     }
 
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
-    result.publish(now);
+    result.publish(now, operator);
 
     var previous = inspection.getStatus();
     if (previous != InspectionStatus.COMPLETED) {

@@ -3,6 +3,7 @@ package com.flout.server.domain.construction.service;
 import com.flout.server.domain.construction.dto.request.CompleteConstructionRequest;
 import com.flout.server.domain.construction.dto.response.ConstructionCompletionResponse;
 import com.flout.server.domain.construction.entity.ConstructionStatus;
+import com.flout.server.domain.construction.entity.ConstructionStatusHistory;
 import com.flout.server.domain.construction.repository.*;
 import com.flout.server.domain.construction.response.code.ConstructionErrorCode;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
@@ -24,13 +25,14 @@ public class ConstructionCompletionService {
   private final SupportApplicationRepository supports;
   private final ConstructionRepository constructions;
   private final ConstructionPhotoRepository photos;
+  private final ConstructionStatusHistoryRepository histories;
   private final Clock inspectionClock;
 
   /** 지원 신청 → 시공 순서로 잠가 사진 업로드·일정 변경과 직렬화하고 공개 결과와 완료 상태를 원자적으로 저장한다. */
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public ConstructionCompletionResponse complete(
       Long operatorId, CompleteConstructionRequest request) {
-    access.requireOperator(operatorId);
+    var operator = access.requireOperator(operatorId);
     var id = request.constructionId();
     var supportId =
         constructions
@@ -58,6 +60,8 @@ public class ConstructionCompletionService {
     construction.complete(
         request.finalInstallationResult().strip(),
         LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS));
+    histories.saveAndFlush(
+        ConstructionStatusHistory.changed(construction, operator, construction.getCompletedAt()));
     constructions.flush();
     return ConstructionCompletionResponse.from(construction);
   }

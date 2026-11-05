@@ -4,6 +4,15 @@ import com.flout.server.domain.supportapplication.entity.SupportApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportApplicationRepository extends JpaRepository<SupportApplication, Long> {
+  java.util.List<SupportApplication> findByApplicationIdAndStatusNotOrderBySubmittedAtAscIdAsc(
+      Long applicationId,
+      com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
+  java.util.Optional<SupportApplication>
+      findFirstByApplicationIdAndStatusNotOrderBySubmittedAtDescIdDesc(
+          Long applicationId,
+          com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
   @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
   @org.springframework.data.jpa.repository.Query(
       "select a from SupportApplication a where a.id = :id")

@@ -1,5 +1,6 @@
 package com.flout.server.domain.inspection.entity;
 
+import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -40,6 +41,10 @@ public class InspectionResult {
 
   @Column(name = "published_at")
   private LocalDateTime publishedAt;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "published_by_user_id")
+  private User publishedBy;
 
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
@@ -87,5 +92,11 @@ public class InspectionResult {
 
     this.resultStatus = ResultStatus.PUBLISHED;
     this.publishedAt = publishedAt;
+  }
+
+  /** 이미 완료된 점검의 결과를 공개하는 경우에도 실제 공개 처리자를 남긴다. */
+  public void publish(LocalDateTime publishedAt, User operator) {
+    publish(publishedAt);
+    this.publishedBy = operator;
   }
 }

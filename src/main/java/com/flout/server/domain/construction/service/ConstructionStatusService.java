@@ -1,6 +1,8 @@
 package com.flout.server.domain.construction.service;
 
+import com.flout.server.domain.construction.entity.ConstructionStatusHistory;
 import com.flout.server.domain.construction.repository.ConstructionRepository;
+import com.flout.server.domain.construction.repository.ConstructionStatusHistoryRepository;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
 import java.time.*;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.*;
 @RequiredArgsConstructor
 public class ConstructionStatusService {
   private final ConstructionRepository constructions;
+  private final ConstructionStatusHistoryRepository histories;
   private final SupportApplicationRepository supports;
   private final Clock inspectionClock;
 
@@ -25,7 +28,9 @@ public class ConstructionStatusService {
     if (support == null || support.getStatus() != SupportApplicationStatus.APPROVED) return false;
     var construction = constructions.findForScheduleUpdate(id).orElse(null);
     if (construction == null) return false;
-    return construction.startIfDue(
-        LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS));
+    var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
+    if (!construction.startIfDue(now)) return false;
+    histories.saveAndFlush(ConstructionStatusHistory.changed(construction, null, now));
+    return true;
   }
 }
