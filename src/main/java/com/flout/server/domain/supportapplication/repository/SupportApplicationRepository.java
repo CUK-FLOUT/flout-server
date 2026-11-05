@@ -63,6 +63,9 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       """
       FROM support_applications s
       WHERE s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)
+        AND REGEXP_LIKE(TRIM(s.address), :districtPattern)
+        AND (:status = '' OR s.status = :status OR (:status = 'REVIEWING' AND s.status = 'SUBMITTED'))
+        AND (:consent = '' OR s.landlord_consent_status = :consent)
         AND (:keyword = '' OR LOCATE(:keyword, s.applicant_name) > 0
           OR LOCATE(:keyword, LPAD(CONCAT('', s.application_id),
             GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0')) > 0)
@@ -82,6 +85,9 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
   java.util.List<AdminListItem> searchAdminApplications(
       @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
       @org.springframework.data.repository.query.Param("keyword") String keyword,
+      @org.springframework.data.repository.query.Param("districtPattern") String districtPattern,
+      @org.springframework.data.repository.query.Param("status") String status,
+      @org.springframework.data.repository.query.Param("consent") String consent,
       @org.springframework.data.repository.query.Param("limit") int limit,
       @org.springframework.data.repository.query.Param("offset") long offset);
 
@@ -90,7 +96,10 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       nativeQuery = true)
   long countAdminApplications(
       @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
-      @org.springframework.data.repository.query.Param("keyword") String keyword);
+      @org.springframework.data.repository.query.Param("keyword") String keyword,
+      @org.springframework.data.repository.query.Param("districtPattern") String districtPattern,
+      @org.springframework.data.repository.query.Param("status") String status,
+      @org.springframework.data.repository.query.Param("consent") String consent);
 
   interface AdminListItem {
     Long getSupportApplicationId();

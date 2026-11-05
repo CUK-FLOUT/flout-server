@@ -1,0 +1,2 @@
+ALTER TABLE inspection_applications
+    ADD COLUMN housing_type ENUM('SEMI_BASEMENT', 'FIRST_FLOOR', 'SECOND_FLOOR_OR_ABOVE') NULL;

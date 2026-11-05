@@ -55,7 +55,7 @@ public class SupportApplicationDetailService {
         application.getContact(),
         application.getAddress(),
         source.getDetailAddress(),
-        null,
+        source.getHousingType(),
         application.getOccupancyType(),
         actions,
         application.getRequestedFacility(),

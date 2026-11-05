@@ -53,6 +53,7 @@ public class SupportApplicationReviewService {
         detail.contact(),
         detail.address(),
         detail.detailAddress(),
+        detail.housingType(),
         detail.occupancyType(),
         types,
         detail.inspectionId(),

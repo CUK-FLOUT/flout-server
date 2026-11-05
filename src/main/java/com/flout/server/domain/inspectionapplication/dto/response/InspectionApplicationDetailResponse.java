@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 
-// GIS 신청 기본 정보와 주민 입력값 반환, 층수 제외
+// GIS 신청 기본 정보와 주민 입력값 반환
 public record InspectionApplicationDetailResponse(
     @Schema(description = "현장점검 신청 ID", example = "1") Long applicationId,
     @Schema(description = "신청 ID를 최소 6자리로 표시한 접수번호", example = "000001") String receiptNo,
@@ -20,6 +20,11 @@ public record InspectionApplicationDetailResponse(
             nullable = true,
             types = {"string", "null"})
         String detailAddress,
+    @Schema(
+            description = "신청 시 선택한 거주층. 기존 신청·미입력은 null",
+            example = "SEMI_BASEMENT",
+            nullable = true)
+        HousingType housingType,
     @Schema(description = "거주 형태: OWNER=자가, TENANT=세입자, ETC=기타", example = "TENANT")
         OccupancyType occupancyType,
     @Schema(description = "연결된 AI 분석 취약도: HIGH=높음, CAUTION=주의, LOW=낮음", example = "HIGH")
@@ -59,6 +64,7 @@ public record InspectionApplicationDetailResponse(
         application.getContact(),
         application.getAddress(),
         application.getDetailAddress(),
+        application.getHousingType(),
         application.getOccupancyType(),
         application.getAssessment().getRiskLevel(),
         application.getFloodExperience(),

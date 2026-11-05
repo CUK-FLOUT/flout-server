@@ -355,8 +355,119 @@ class SupportListTest {
     var parameters = new ArrayList<String>();
     for (var parameter : operation.path("parameters"))
       parameters.add(parameter.path("name").asString());
-    assertThat(parameters).containsExactlyInAnyOrder("keyword", "page", "size");
+    assertThat(parameters)
+        .containsExactlyInAnyOrder(
+            "keyword", "page", "size", "district", "status", "landlordConsentStatus");
     assertThat(operation.path("responses").has("400")).isTrue();
+    assertThat(
+            operation
+                .path("responses")
+                .path("200")
+                .path("content")
+                .path("application/json")
+                .path("examples")
+                .path("screenData")
+                .path("value")
+                .path("result")
+                .has("supportApplications"))
+        .isTrue();
     assertThat(paths.path("/api/admin/support-applications/status").has("get")).isTrue();
+  }
+
+  @Test
+  void combinesDistrictStatusConsentAndKeywordWithMatchingPageCounts() throws Exception {
+    var expected = new ArrayList<Long>();
+    for (int i = 0; i < 7; i++)
+      expected.add(
+          add("필터주민" + i, "경기도 부천시 소사구 소사로 1", i % 2 == 0 ? "SUBMITTED" : "REVIEWING", "PENDING"));
+    add("필터주민", "부천시 원미구", "REVIEWING", "PENDING");
+    add("필터주민", "부천시 소사구", "APPROVED", "PENDING");
+    add("필터주민", "부천시 소사구", "REVIEWING", "CONFIRMED");
+    add("필터주민", "서울시 부천시 소사구", "REVIEWING", "PENDING");
+    add("필터주민", "부천시 소사구청", "REVIEWING", "PENDING");
+    Collections.reverse(expected);
+    var actual = new ArrayList<Long>();
+    for (int page = 0; page < 3; page++) {
+      var response =
+          mvc.perform(
+                  get("/api/admin/support-applications")
+                      .header("Authorization", "Bearer " + token)
+                      .param("keyword", "필터주민")
+                      .param("district", "소사구")
+                      .param("status", "REVIEWING")
+                      .param("landlordConsentStatus", "PENDING")
+                      .param("page", String.valueOf(page))
+                      .param("size", "3"))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.result.totalElements").value(7))
+              .andExpect(jsonPath("$.result.totalPages").value(3))
+              .andReturn();
+      for (var row :
+          mapper
+              .readTree(response.getResponse().getContentAsString())
+              .path("result")
+              .path("supportApplications")) actual.add(row.path("supportApplicationId").asLong());
+    }
+    assertThat(actual).containsExactlyElementsOf(expected).doesNotHaveDuplicates();
+  }
+
+  @Test
+  void individualFiltersAndConsentAliasesRespectPersistedValues() throws Exception {
+    long approved = add("소사주민", " 경기 부천시 소사구", "APPROVED", "CONFIRMED");
+    add("오정주민", "부천시 오정구", "REJECTED", "PENDING");
+    for (var consent : List.of("VERIFIED", "CONFIRMED")) {
+      mvc.perform(
+              get("/api/admin/support-applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param("landlordConsentStatus", consent))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.totalElements").value(1))
+          .andExpect(
+              jsonPath("$.result.supportApplications[0].supportApplicationId").value(approved));
+    }
+    for (var filter :
+        List.of(
+            new String[] {"district", "원미구"},
+            new String[] {"district", "오정구"},
+            new String[] {"status", "APPROVED"},
+            new String[] {"landlordConsentStatus", "NOT_REQUIRED"}))
+      mvc.perform(
+              get("/api/admin/support-applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param(filter[0], filter[1]))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.totalElements").value(1));
+    mvc.perform(
+            get("/api/admin/support-applications")
+                .header("Authorization", "Bearer " + token)
+                .param("district", " ")
+                .param("status", "")
+                .param("landlordConsentStatus", " "))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(3));
+  }
+
+  @Test
+  void rejectsInvalidFilterValuesWithoutBroadeningSearch() throws Exception {
+    for (var filter :
+        List.of(
+            new String[] {"district", "서울"},
+            new String[] {"district", "소사구|.*"},
+            new String[] {"status", "DRAFT"},
+            new String[] {"status", "unknown"},
+            new String[] {"landlordConsentStatus", "UNKNOWN"}))
+      mvc.perform(
+              get("/api/admin/support-applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param(filter[0], filter[1]))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+    mvc.perform(
+            get("/api/admin/support-applications")
+                .header("Authorization", "Bearer " + token)
+                .param("status", "REJECTED"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0))
+        .andExpect(jsonPath("$.result.totalPages").value(0));
   }
 }

@@ -201,6 +201,14 @@ public class OpenApiConfig {
                                     null);
                               }
                             }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
+                                        "/api/admin/support-applications",
+                                        "/api/admin/support-applications/{supportApplicationId}",
+                                        "/api/admin/support-applications/{supportApplicationId}/histories")
+                                    .contains(path)) {
+                              describeAdminSupportRead(operation, path);
+                            }
                             if (path.equals(
                                     "/api/admin/support-applications/{supportApplicationId}/approve")
                                 && method == PathItem.HttpMethod.POST) {
@@ -1326,6 +1334,7 @@ public class OpenApiConfig {
     result.put("contact", "010-1234-1234");
     result.put("address", "경기도 부천시 원미구 길주로 53");
     result.put("detailAddress", "101호");
+    result.put("housingType", "SEMI_BASEMENT");
     result.put("occupancyType", "TENANT");
     result.put("riskLevel", "HIGH");
     result.put("floodExperience", "YES");
@@ -1449,6 +1458,31 @@ public class OpenApiConfig {
 
   // 신청 생성 201 응답과 점검 ID 예시
   private void describeInspectionApplication(Operation operation) {
+    if (operation.getRequestBody() != null
+        && operation.getRequestBody().getContent() != null
+        && operation.getRequestBody().getContent().get(JSON) != null) {
+      operation
+          .getRequestBody()
+          .getContent()
+          .get(JSON)
+          .addExamples(
+              "withHousingType",
+              new Example()
+                  .value(
+                      Map.ofEntries(
+                          Map.entry("assessmentId", 5),
+                          Map.entry("address", "경기도 부천시 원미구 길주로 53"),
+                          Map.entry("detailAddress", "101호"),
+                          Map.entry("latitude", 37.5),
+                          Map.entry("longitude", 126.7),
+                          Map.entry("contact", "010-1234-5678"),
+                          Map.entry("occupancyType", "TENANT"),
+                          Map.entry("floodExperience", "NO"),
+                          Map.entry("existingFacility", false),
+                          Map.entry("applicantName", "김주민"),
+                          Map.entry("housingType", "SEMI_BASEMENT"))));
+    }
+
     ApiResponse success = operation.getResponses().remove("200");
     if (success == null) {
       success = new ApiResponse();
@@ -1952,5 +1986,74 @@ public class OpenApiConfig {
         .addProperty("result", new Schema<>().description("오류 응답에서는 null입니다.").nullable(true))
         .addProperty("timeStamp", new StringSchema().example(EXAMPLE_TIME))
         .required(List.of("isSuccess", "status", "code", "message", "result", "timeStamp"));
+  }
+
+  private void describeAdminSupportRead(Operation operation, String path) {
+    var code = GeneralSuccessCode.SUCCESS_OK;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    if (path.equals("/api/admin/support-applications")) {
+      result.put(
+          "supportApplications",
+          List.of(
+              Map.of(
+                  "supportApplicationId",
+                  201,
+                  "receiptNo",
+                  "000002",
+                  "applicantName",
+                  "김주민",
+                  "requestedFacility",
+                  "출입구 물막이판",
+                  "landlordConsentStatus",
+                  "VERIFIED",
+                  "status",
+                  "SUBMITTED")));
+      result.put("page", 0);
+      result.put("size", 10);
+      result.put("totalElements", 1);
+      result.put("totalPages", 1);
+    } else {
+      boolean review = path.endsWith("/histories");
+      result.put("supportApplicationId", 201);
+      result.put("receiptNo", "000002");
+      result.put("applicantName", "김주민");
+      result.put("contact", "010-1234-0002");
+      result.put("address", "경기도 부천시 원미구 길주로 53");
+      result.put("detailAddress", "101호");
+      result.put("housingType", "SEMI_BASEMENT");
+      result.put("occupancyType", "TENANT");
+      result.put("recommendedActions", List.of("출입구 물막이판 설치", "배수구 정비"));
+      result.put("requestedFacility", "출입구 물막이판");
+      result.put("residentRequest", "출입구 통행을 확보해주세요.");
+      result.put("preferredConstructionDate", "2026-11-20");
+      result.put("preferredTimeSlot", "MORNING");
+      result.put("inspectionId", 101);
+      result.put("inspectionStatus", "COMPLETED");
+      result.put("inspectionResultPublished", true);
+      result.put("attachments", List.of());
+      result.put("status", "SUBMITTED");
+      if (review) {
+        result.put("applicationId", 2);
+        result.put("vulnerabilityTypes", List.of("ENTRANCE", "DRAIN"));
+        result.put("landlordConsentRequired", true);
+        result.put("supportScope", null);
+        result.put(
+            "program",
+            Map.of(
+                "programId",
+                1,
+                "name",
+                "침수 예방시설 지원",
+                "description",
+                "침수 예방시설 설치 지원",
+                "targetDescription",
+                "부천시 지원 대상 주택",
+                "operatingStatus",
+                "OPEN"));
+      } else result.put("landlordConsentStatus", "VERIFIED");
+    }
+    addExample(success, "screenData", envelope(true, code, code.getMessage(), result));
   }
 }
