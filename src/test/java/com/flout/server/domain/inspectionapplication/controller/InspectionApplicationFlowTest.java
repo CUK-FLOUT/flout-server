@@ -869,4 +869,99 @@ class InspectionApplicationFlowTest {
         bytes);
     return new MockMultipartFile("files", "photo.png", "image/png", bytes.toByteArray());
   }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+  void storesOptionalHousingTypeAndChecksItOnDuplicateSubmission(String housing) throws Exception {
+    var body = request();
+    body.put("housingType", housing);
+    var result =
+        mvc.perform(
+                post("/api/resident/applications")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(body)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long id =
+        mapper
+            .readTree(result.getResponse().getContentAsString())
+            .path("result")
+            .path("applicationId")
+            .asLong();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT housing_type FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo(housing);
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.result.applicationId").value(id));
+    body.put("housingType", housing.equals("FIRST_FLOOR") ? "SEMI_BASEMENT" : "FIRST_FLOOR");
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isConflict());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT housing_type FROM inspection_applications WHERE application_id=?",
+                String.class,
+                id))
+        .isEqualTo(housing);
+  }
+
+  @Test
+  void omittedOrNullHousingDoesNotDefaultToBasement() throws Exception {
+    var body = request();
+    body.put("housingType", null);
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isCreated());
+    assertThat(
+            jdbc.queryForObject("SELECT housing_type FROM inspection_applications", String.class))
+        .isNull();
+    submit().andExpect(status().isCreated());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"", "BASEMENT", "반지하", "UNKNOWN", "1"})
+  void rejectsUnsupportedHousingTypes(String housing) throws Exception {
+    var body = request();
+    body.put("housingType", housing);
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void rejectsNumericAndBooleanHousingWithoutOrdinalCoercion() throws Exception {
+    for (var housing : List.of(0, 1, true)) {
+      var body = request();
+      body.put("housingType", housing);
+      mvc.perform(
+              post("/api/resident/applications")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(body)))
+          .andExpect(status().isBadRequest());
+    }
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspection_applications", Long.class))
+        .isZero();
+  }
 }

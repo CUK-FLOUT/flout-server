@@ -68,6 +68,7 @@ public class InspectionApplicationSubmissionTransaction {
             && Objects.equals(application.getGuideId(), request.guideId())
             && Objects.equals(application.getAddress(), request.address())
             && Objects.equals(application.getDetailAddress(), request.detailAddress())
+            && application.getHousingType() == request.housingType()
             && application
                     .getLatitude()
                     .compareTo(request.latitude().setScale(7, RoundingMode.HALF_UP))

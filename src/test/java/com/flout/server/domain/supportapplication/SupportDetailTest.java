@@ -405,7 +405,7 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.result.contact").value("010-0000-0000"))
         .andExpect(jsonPath("$.result.address").value("경기도 부천시 원미구 길주로 210"))
         .andExpect(jsonPath("$.result.detailAddress").value("101호"))
-        .andExpect(jsonPath("$.result.housingType").doesNotExist())
+        .andExpect(jsonPath("$.result.housingType").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.result.occupancyType").value("TENANT"))
         .andExpect(
             jsonPath("$.result.vulnerabilityTypes")
@@ -490,5 +490,50 @@ class SupportDetailTest {
     review()
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.code").value("SUPPORT_DETAIL_500_1"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+  void returnsSourceHousingInBothSupportDetailAndReview(String housing) throws Exception {
+    jdbc.update("UPDATE inspection_applications SET housing_type=?", housing);
+    detail().andExpect(status().isOk()).andExpect(jsonPath("$.result.housingType").value(housing));
+    review().andExpect(status().isOk()).andExpect(jsonPath("$.result.housingType").value(housing));
+  }
+
+  @Test
+  void swaggerDocumentsHousingInDetailAndReviewSuccessExamples() throws Exception {
+    var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andReturn();
+    var api = mapper.readTree(response.getResponse().getContentAsString());
+    for (var path :
+        List.of(
+            "/api/admin/support-applications/{supportApplicationId}",
+            "/api/admin/support-applications/{supportApplicationId}/histories")) {
+      var result =
+          api.path("paths")
+              .path(path)
+              .path("get")
+              .path("responses")
+              .path("200")
+              .path("content")
+              .path("application/json")
+              .path("examples")
+              .path("screenData")
+              .path("value")
+              .path("result");
+      assertThat(result.path("housingType").asString()).isEqualTo("SEMI_BASEMENT");
+    }
+    for (var schema :
+        List.of(
+            "SupportApplicationDetailResponse",
+            "SupportApplicationReviewResponse",
+            "InspectionApplicationDetailResponse")) {
+      assertThat(
+              api.path("components")
+                  .path("schemas")
+                  .path(schema)
+                  .path("properties")
+                  .has("housingType"))
+          .isTrue();
+    }
   }
 }
