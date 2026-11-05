@@ -22,6 +22,8 @@ public enum InspectionApplicationErrorCode implements BaseResponseCode {
 
   INVALID_APPLICATION_ADDRESS(400, "APPLICATION_400_2", "부천시 관할 주소만 현장점검을 신청할 수 있습니다."),
 
+  RESULT_NOT_PUBLISHED(400, "APPLICATION_400_5", "주민에게 공개된 현장점검 결과가 없습니다."),
+
   ASSESSMENT_ADDRESS_MISMATCH(400, "APPLICATION_400_3", "현장점검 신청 주소가 취약도 분석 주소와 일치하지 않습니다."),
 
   RECEIPT_NUMBER_GENERATION_FAILED(500, "APPLICATION_500_1", "접수번호 생성에 실패했습니다."),
