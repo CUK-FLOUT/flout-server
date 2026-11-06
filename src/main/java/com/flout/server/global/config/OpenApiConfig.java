@@ -119,7 +119,9 @@ public class OpenApiConfig {
                 "운영자-시공관리",
                 "주민-AI취약도 분석",
                 "주민-현장점검 신청",
-                "주민-지원신청");
+                "주민-지원신청",
+                "주민-시공 신청",
+                "주민-내신청");
         var tags = new ArrayList<>(api.getTags());
         tags.sort(
             Comparator.comparingInt(

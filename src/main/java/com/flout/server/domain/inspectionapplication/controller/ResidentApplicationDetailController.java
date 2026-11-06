@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/applications")
-@Tag(name = "주민-현장점검 신청", description = "현장점검 신청부터 진행 상황 및 결과 조회까지 관리")
+@Tag(name = "주민-내신청", description = "주민 본인의 신청 내역과 상세정보 조회")
 public class ResidentApplicationDetailController {
   private final ResidentApplicationDetailService service;
 
