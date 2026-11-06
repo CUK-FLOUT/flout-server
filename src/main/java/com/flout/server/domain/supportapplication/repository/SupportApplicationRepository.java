@@ -4,6 +4,10 @@ import com.flout.server.domain.supportapplication.entity.SupportApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SupportApplicationRepository extends JpaRepository<SupportApplication, Long> {
+  java.util.List<SupportApplication> findByApplicationIdInAndStatusNotOrderBySubmittedAtDescIdDesc(
+      java.util.Collection<Long> applicationIds,
+      com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);
+
   java.util.List<SupportApplication> findByApplicationIdAndStatusNotOrderBySubmittedAtAscIdAsc(
       Long applicationId,
       com.flout.server.domain.supportapplication.entity.SupportApplicationStatus status);

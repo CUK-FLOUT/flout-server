@@ -1381,6 +1381,24 @@ public class OpenApiConfig {
     result.put("resultPublished", false);
     result.put("createdAt", "2026-10-21T22:30:00");
     result.put("submittedAt", "2026-10-21T22:35:00");
+    var progress = new LinkedHashMap<String, Object>();
+    progress.put("title", "현장점검 · 침수 위험 점검 신청");
+    progress.put("stage", "INSPECTION_RECEIVED");
+    progress.put("closed", false);
+    progress.put("updatedAt", "2026-10-21T22:35:00+09:00");
+    progress.put("inspectionId", 1);
+    progress.put("supportApplicationId", null);
+    progress.put("constructionId", null);
+    progress.put("resultPublished", false);
+    progress.put("inspectionResultSummary", null);
+    var visit = new LinkedHashMap<String, Object>();
+    visit.put("scheduledAt", null);
+    visit.put("inspectorName", null);
+    visit.put("preVisitNotice", null);
+    progress.put("visit", visit);
+    progress.put("support", null);
+    progress.put("construction", null);
+    result.put("progress", progress);
     addExample(
         success, "residentApplicationDetail", envelope(true, code, code.getMessage(), result));
     addError(
