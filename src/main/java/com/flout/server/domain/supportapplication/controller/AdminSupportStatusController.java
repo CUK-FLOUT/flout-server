@@ -22,7 +22,7 @@ public class AdminSupportStatusController {
   @Operation(
       summary = "지원 신청 현황 건수 조회",
       description =
-          "관할 지원 신청 중 DRAFT를 제외하여 집계합니다. reviewingCount는 SUBMITTED 건수입니다. consentRequiredCount는 0을 반환합니다. 관할 정보가 없거나 지원하지 않는 관할이면 403입니다.")
+          "부천시 관할 지원 신청 중 DRAFT를 제외하여 집계합니다. totalCount는 전체, reviewingCount는 SUBMITTED, rejectedCount는 REJECTED, approvedCount는 APPROVED 건수입니다. 관할 정보가 없거나 지원하지 않는 관할이면 403입니다.")
   public SuccessResponse<SupportApplicationStatusResponse> getStatus(
       @AuthenticationPrincipal Jwt jwt) {
     return SuccessResponse.ok(service.getStatus(Long.valueOf(jwt.getSubject())));
