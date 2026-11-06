@@ -2,6 +2,7 @@ package com.flout.server.domain.riskassessment.controller;
 
 import com.flout.server.domain.riskassessment.dto.request.CreateRiskAssessmentRequest;
 import com.flout.server.domain.riskassessment.dto.response.CreateRiskAssessmentResponse;
+import com.flout.server.domain.riskassessment.response.code.RiskAssessmentSuccessCode;
 import com.flout.server.domain.riskassessment.service.RiskAssessmentService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +29,7 @@ public class ResidentRiskAssessmentController {
   @Operation(
       summary = "침수 취약도 분석",
       description =
-          "주소, 상세 주소와 선택 입력한 거주층(housingType)을 분석 결과에 저장합니다. 임시 분석 결과는 높음(HIGH)으로 저장되며, 응답의 assessmentId를 현장점검 신청에 사용합니다.")
+          "주소를 좌표로 변환해 Python AI 서비스에서 지역 상대 취약도 등급·점수·주요 근거를 조회하고 결과를 저장합니다. 점수는 실제 침수 확률이 아닙니다. 응답의 assessmentId를 현장점검 신청에 사용합니다.")
   @ApiResponse(responseCode = "201", description = "분석 결과 저장 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",
@@ -38,8 +39,22 @@ public class ResidentRiskAssessmentController {
       responseCode = "403",
       description = "주민 계정만 분석을 요청할 수 있음",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+  @ApiResponse(
+      responseCode = "422",
+      description = "주소가 사전 계산된 분석 대상 격자에 포함되지 않음",
+      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+  @ApiResponse(
+      responseCode = "502",
+      description = "AI 서비스 호출 실패 또는 잘못된 응답",
+      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
+  @ApiResponse(
+      responseCode = "503",
+      description = "AI 서비스 응답 시간 초과",
+      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<CreateRiskAssessmentResponse> create(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateRiskAssessmentRequest request) {
-    return SuccessResponse.created(service.create(Long.valueOf(jwt.getSubject()), request));
+    return SuccessResponse.of(
+        service.create(Long.valueOf(jwt.getSubject()), request),
+        RiskAssessmentSuccessCode.ASSESSMENT_CREATED);
   }
 }

@@ -63,6 +63,16 @@ public class RiskAssessment {
       String detailAddress,
       RiskLevel riskLevel,
       HousingType housingType) {
+    return completed(user, address, detailAddress, riskLevel, housingType, "{\"source\":\"DEMO\"}");
+  }
+
+  public static RiskAssessment completed(
+      User user,
+      String address,
+      String detailAddress,
+      RiskLevel riskLevel,
+      HousingType housingType,
+      String resultJson) {
     RiskAssessment assessment = new RiskAssessment();
     assessment.user = Objects.requireNonNull(user);
     assessment.address = Objects.requireNonNull(address);
@@ -73,7 +83,7 @@ public class RiskAssessment {
     assessment.housingType = housingType;
     assessment.riskLevel = Objects.requireNonNull(riskLevel);
     assessment.status = RiskAssessmentStatus.COMPLETED;
-    assessment.resultJson = "{\"source\":\"DEMO\"}";
+    assessment.resultJson = Objects.requireNonNull(resultJson);
     return assessment;
   }
 
