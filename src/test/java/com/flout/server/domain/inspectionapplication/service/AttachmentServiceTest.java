@@ -50,6 +50,10 @@ class AttachmentServiceTest {
                 com.flout.server.domain.inspectionapplication.repository
                     .ApplicationStatusHistoryRepository.class),
             mock(NotificationService.class),
+            mock(
+                com.flout.server.domain.inspectionapplication.repository
+                    .ApplicationInflowLocationRepository.class),
+            mock(jakarta.validation.Validator.class),
             manager);
     var data = new ByteArrayOutputStream();
     ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", data);
@@ -130,6 +134,10 @@ class AttachmentServiceTest {
                 com.flout.server.domain.inspectionapplication.repository
                     .ApplicationStatusHistoryRepository.class),
             mock(NotificationService.class),
+            mock(
+                com.flout.server.domain.inspectionapplication.repository
+                    .ApplicationInflowLocationRepository.class),
+            mock(jakarta.validation.Validator.class),
             manager);
     assertThatThrownBy(() -> service.upload(1L, 10L, List.of(file)))
         .isInstanceOf(BaseException.class);

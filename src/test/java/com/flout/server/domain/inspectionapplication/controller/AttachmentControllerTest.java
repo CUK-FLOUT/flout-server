@@ -80,6 +80,7 @@ class AttachmentControllerTest {
             "inspection_status_histories",
             "inspections",
             "application_status_histories",
+            "application_inflow_locations",
             "inspection_applications",
             "risk_assessments",
             "users")) jdbc.update("DELETE FROM " + table);
@@ -160,7 +161,10 @@ class AttachmentControllerTest {
   void uploadsOneThenFourAndEnforcesTotalLimit() throws Exception {
     jdbc.update("DELETE FROM inspections WHERE application_id = ?", applicationId);
     jdbc.update(
-        "UPDATE inspection_applications SET status = 'DRAFT', submitted_at = NULL WHERE application_id = ?",
+        "UPDATE inspection_applications SET status = 'DRAFT', submitted_at = NULL, preferred_visit_date = CURRENT_DATE, preferred_time_slot = 'MORNING' WHERE application_id = ?",
+        applicationId);
+    jdbc.update(
+        "INSERT INTO application_inflow_locations(application_id, inflow_location) VALUES (?, 'DRAIN')",
         applicationId);
     verifyNoInteractions(deliveries);
     submit(token, applicationId, file("one.png", png))
