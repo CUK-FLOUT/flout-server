@@ -10,6 +10,8 @@ import com.flout.server.domain.inspectionapplication.repository.ApplicationAttac
 import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.global.exception.BaseException;
 import java.io.ByteArrayInputStream;
@@ -48,6 +50,7 @@ public class AttachmentService {
   private final AttachmentCleanupService cleanup;
   private final InspectionRepository inspections;
   private final ApplicationStatusHistoryRepository histories;
+  private final NotificationService notifications;
   private final TransactionTemplate transactions;
 
   public AttachmentService(
@@ -57,6 +60,7 @@ public class AttachmentService {
       AttachmentCleanupService cleanup,
       InspectionRepository inspections,
       ApplicationStatusHistoryRepository histories,
+      NotificationService notifications,
       PlatformTransactionManager transactionManager) {
     this.applications = applications;
     this.attachments = attachments;
@@ -64,6 +68,7 @@ public class AttachmentService {
     this.cleanup = cleanup;
     this.inspections = inspections;
     this.histories = histories;
+    this.notifications = notifications;
     this.transactions = new TransactionTemplate(transactionManager);
     this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -154,6 +159,11 @@ public class AttachmentService {
                   application.receive();
                   histories.save(ApplicationStatusHistory.received(application));
                   inspections.saveAndFlush(Inspection.received(application));
+                  notifications.send(
+                      userId,
+                      NotificationType.INSPECTION_RECEIVED,
+                      applicationId,
+                      "inspection-received:" + applicationId);
                 }
                 return uploadResponse(applicationId, saved);
               });

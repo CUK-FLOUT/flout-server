@@ -3,6 +3,8 @@ package com.flout.server.domain.construction.service;
 import com.flout.server.domain.construction.entity.ConstructionStatusHistory;
 import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.construction.repository.ConstructionStatusHistoryRepository;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
 import java.time.*;
@@ -18,6 +20,7 @@ public class ConstructionStatusService {
   private final ConstructionStatusHistoryRepository histories;
   private final SupportApplicationRepository supports;
   private final Clock inspectionClock;
+  private final NotificationService notifications;
 
   /** 일정·사진·전체 완료와 동일한 지원 신청 → 시공 잠금 순서로 전환 직전 상태와 확정 시각을 재검증한다. */
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -31,6 +34,11 @@ public class ConstructionStatusService {
     var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     if (!construction.startIfDue(now)) return false;
     histories.saveAndFlush(ConstructionStatusHistory.changed(construction, null, now));
+    notifications.send(
+        support.getApplicant().getId(),
+        NotificationType.CONSTRUCTION_STARTED,
+        support.getApplication().getId(),
+        "construction-started:" + id);
     return true;
   }
 }
