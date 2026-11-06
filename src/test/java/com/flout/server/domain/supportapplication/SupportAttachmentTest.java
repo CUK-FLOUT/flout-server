@@ -7,6 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.inspectionapplication.service.*;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.supportapplication.entity.SupportAttachment;
 import com.flout.server.domain.supportapplication.repository.SupportAttachmentRepository;
 import com.flout.server.domain.user.entity.User;
@@ -55,6 +58,7 @@ class SupportAttachmentTest {
   @Autowired ObjectMapper mapper;
   @Autowired AttachmentCleanupService cleanup;
   @MockitoBean AttachmentStorage storage;
+  @MockitoBean FcmDeliveryStore deliveries;
   @MockitoSpyBean SupportAttachmentRepository attachments;
   Map<String, byte[]> objects;
   long uid, app, support;
@@ -401,6 +405,10 @@ class SupportAttachmentTest {
             .path("result")
             .path("supportApplicationId")
             .asLong();
+    verify(deliveries)
+        .enqueue(
+            new PushNotificationRequested(
+                uid, NotificationType.SUPPORT_RECEIVED, app, "support-received:" + ownerSupport));
     assertThat(
             jdbc.queryForObject(
                 "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=?",
@@ -430,6 +438,10 @@ class SupportAttachmentTest {
                             true))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.status").value("APPROVED"));
+    verify(deliveries)
+        .enqueue(
+            new PushNotificationRequested(
+                uid, NotificationType.SUPPORT_APPROVED, app, "support-approved:" + ownerSupport));
     assertThat(count()).isZero();
     verifyNoInteractions(storage);
   }
@@ -544,6 +556,7 @@ class SupportAttachmentTest {
         .upload(anyString(), any(byte[].class), anyString());
     var document = file("consent.pdf", pdf());
     upload(document).andExpect(status().isInternalServerError());
+    verifyNoInteractions(deliveries);
     assertThat(
             jdbc.queryForMap(
                 "SELECT status, submitted_at, created_at FROM support_applications WHERE support_application_id=?",
@@ -562,6 +575,10 @@ class SupportAttachmentTest {
     assertThat(received.get("SUBMITTED_AT")).isNotNull();
     assertThat(received.get("CREATED_AT")).isEqualTo(initial.get("CREATED_AT"));
     upload(document).andExpect(status().isConflict());
+    verify(deliveries)
+        .enqueue(
+            new PushNotificationRequested(
+                uid, NotificationType.SUPPORT_RECEIVED, app, "support-received:" + support));
     assertThat(
             jdbc.queryForMap(
                 "SELECT status, submitted_at, created_at FROM support_applications WHERE support_application_id=?",

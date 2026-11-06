@@ -64,8 +64,9 @@ class FirebasePushGatewayTest {
                 "eventId",
                 "result:42"));
     var notification = ReflectionTestUtils.getField(message.getValue(), "notification");
-    assertThat(ReflectionTestUtils.getField(notification, "title")).isEqualTo("현장점검 완료");
-    assertThat(ReflectionTestUtils.getField(notification, "body")).isEqualTo("현장점검 결과가 등록됐어요.");
+    assertThat(ReflectionTestUtils.getField(notification, "title")).isEqualTo("현장 점검 결과가 등록되었어요.");
+    assertThat(ReflectionTestUtils.getField(notification, "body"))
+        .isEqualTo("우리 집의 취약지점과 권장 예방조치를 확인할 수 있어요.");
     gateway.close();
   }
 

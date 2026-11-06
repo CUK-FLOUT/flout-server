@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
@@ -20,6 +22,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -33,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
     })
 @AutoConfigureMockMvc
 @Transactional
+@RecordApplicationEvents
 class InspectionResultDraftTest {
   @Autowired MockMvc mvc;
   @Autowired jakarta.persistence.EntityManager entityManager;
@@ -40,6 +45,7 @@ class InspectionResultDraftTest {
   @Autowired ObjectMapper mapper;
   @Autowired UserRepository users;
   @Autowired JwtService jwt;
+  @Autowired ApplicationEvents events;
   Long inspectionId;
   Long applicationId;
   Long operatorId;
@@ -188,6 +194,13 @@ class InspectionResultDraftTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.inspectionStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.applicationStatus").value("INSPECTION_COMPLETED"));
+    assertThat(events.stream(PushNotificationRequested.class))
+        .containsExactly(
+            new PushNotificationRequested(
+                resident.getId(),
+                NotificationType.INSPECTION_RESULT_PUBLISHED,
+                applicationId,
+                "inspection-result-published:" + inspectionId));
     assertThat(
             jdbc.queryForObject(
                 "SELECT previous_status FROM inspection_status_histories WHERE inspection_id=?",

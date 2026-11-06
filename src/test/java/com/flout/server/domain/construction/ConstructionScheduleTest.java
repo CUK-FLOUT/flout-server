@@ -7,6 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.construction.repository.ConstructionRepository;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
@@ -31,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
       "spring.jpa.hibernate.ddl-auto=validate",
       "spring.datasource.url=jdbc:h2:mem:construction-schedule;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "app.inspection.auto-start.enabled=false",
+      "app.fcm.enabled=false",
       "app.s3.cleanup-interval-millis=3600000"
     })
 @AutoConfigureMockMvc
@@ -47,6 +51,7 @@ class ConstructionScheduleTest {
   Clock clock;
 
   @MockitoSpyBean ConstructionRepository constructions;
+  @MockitoBean FcmDeliveryStore deliveries;
   long supportId, applicationId, adminId;
   long constructionId = 900;
   String token, residentToken;
@@ -292,6 +297,7 @@ class ConstructionScheduleTest {
     doThrow(new IllegalStateException("simulated persistence failure")).when(constructions).flush();
     save().andExpect(status().isInternalServerError());
     assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
+    verifyNoInteractions(deliveries);
   }
 
   @Test
@@ -321,6 +327,13 @@ class ConstructionScheduleTest {
           .isIn(LocalDateTime.of(2030, 1, 3, 10, 0), LocalDateTime.of(2030, 1, 3, 11, 0));
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM constructions", Integer.class))
           .isEqualTo(1);
+      verify(deliveries)
+          .enqueue(
+              new PushNotificationRequested(
+                  users.findByEmail("resident@construction.test").orElseThrow().getId(),
+                  NotificationType.CONSTRUCTION_SCHEDULED,
+                  applicationId,
+                  "construction-scheduled:" + constructionId));
     } finally {
       pool.shutdownNow();
     }

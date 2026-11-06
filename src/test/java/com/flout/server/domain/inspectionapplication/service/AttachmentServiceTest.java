@@ -9,6 +9,7 @@ import com.flout.server.domain.inspectionapplication.entity.InspectionApplicatio
 import com.flout.server.domain.inspectionapplication.repository.ApplicationAttachmentRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.global.exception.BaseException;
 import java.awt.image.BufferedImage;
@@ -48,6 +49,7 @@ class AttachmentServiceTest {
             mock(
                 com.flout.server.domain.inspectionapplication.repository
                     .ApplicationStatusHistoryRepository.class),
+            mock(NotificationService.class),
             manager);
     var data = new ByteArrayOutputStream();
     ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", data);
@@ -127,6 +129,7 @@ class AttachmentServiceTest {
             mock(
                 com.flout.server.domain.inspectionapplication.repository
                     .ApplicationStatusHistoryRepository.class),
+            mock(NotificationService.class),
             manager);
     assertThatThrownBy(() -> service.upload(1L, 10L, List.of(file)))
         .isInstanceOf(BaseException.class);

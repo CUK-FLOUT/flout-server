@@ -8,6 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.construction.service.ConstructionStatusService;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
@@ -33,6 +36,7 @@ import tools.jackson.databind.ObjectMapper;
       "spring.jpa.hibernate.ddl-auto=validate",
       "spring.datasource.url=jdbc:h2:mem:construction-auto-start;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "app.inspection.auto-start.enabled=false",
+      "app.fcm.enabled=false",
       "app.s3.cleanup-interval-millis=3600000"
     })
 @AutoConfigureMockMvc
@@ -50,6 +54,7 @@ class ConstructionAutoStartTest {
   Clock clock;
 
   @MockitoSpyBean ConstructionRepository constructions;
+  @MockitoBean FcmDeliveryStore deliveries;
   long supportId, applicationId, adminId;
   long constructionId = 900;
   String token, residentToken;
@@ -133,9 +138,19 @@ class ConstructionAutoStartTest {
     jdbc.update("UPDATE constructions SET scheduled_at=?", NOW.plusSeconds(1));
     var before = jdbc.queryForList("SELECT * FROM constructions");
     assertThat(service.startIfDue(constructionId)).isFalse();
+    verifyNoInteractions(deliveries);
     assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
     when(clock.instant()).thenReturn(NOW.plusHours(2).atZone(SEOUL).toInstant());
     assertThat(service.startIfDue(constructionId)).isTrue();
+    assertThat(service.startIfDue(constructionId)).isFalse();
+    verify(deliveries)
+        .enqueue(
+            new PushNotificationRequested(
+                jdbc.queryForObject(
+                    "SELECT applicant_user_id FROM support_applications", Long.class),
+                NotificationType.CONSTRUCTION_STARTED,
+                applicationId,
+                "construction-started:" + constructionId));
   }
 
   @ParameterizedTest

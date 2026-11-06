@@ -7,6 +7,8 @@ import com.flout.server.domain.inspection.repository.*;
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspectionapplication.entity.ApplicationStatusHistory;
 import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
@@ -41,6 +43,7 @@ public class PublishInspectionResultService {
   private final ApplicationStatusHistoryRepository applicationStatusHistories;
   private final InspectionStatusHistoryRepository inspectionStatusHistories;
   private final EntityManager entityManager;
+  private final NotificationService notifications;
 
   /** 선행 상태 변경 없이 결과를 공개하고 점검·신청 완료와 이력을 같은 트랜잭션으로 저장합니다. */
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -132,12 +135,17 @@ public class PublishInspectionResultService {
           InspectionStatusHistory.changed(inspection, previous, operator, now));
     }
 
-    inspection.getApplication().completeInspection();
+    var application = inspection.getApplication();
+    application.completeInspection();
 
-    applicationStatusHistories.save(
-        ApplicationStatusHistory.inspectionCompleted(inspection.getApplication()));
+    applicationStatusHistories.save(ApplicationStatusHistory.inspectionCompleted(application));
 
     results.flush();
+    notifications.send(
+        application.getApplicant().getId(),
+        NotificationType.INSPECTION_RESULT_PUBLISHED,
+        application.getId(),
+        "inspection-result-published:" + inspectionId);
 
     return new PublishInspectionResultResponse(
         inspection.getId(),

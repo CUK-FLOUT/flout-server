@@ -6,6 +6,8 @@ import com.flout.server.domain.construction.entity.ConstructionStatus;
 import com.flout.server.domain.construction.entity.ConstructionStatusHistory;
 import com.flout.server.domain.construction.repository.*;
 import com.flout.server.domain.construction.response.code.ConstructionErrorCode;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
 import com.flout.server.domain.supportapplication.service.SupportDecisionAccess;
@@ -27,6 +29,7 @@ public class ConstructionCompletionService {
   private final ConstructionPhotoRepository photos;
   private final ConstructionStatusHistoryRepository histories;
   private final Clock inspectionClock;
+  private final NotificationService notifications;
 
   /** 지원 신청 → 시공 순서로 잠가 사진 업로드·일정 변경과 직렬화하고 공개 결과와 완료 상태를 원자적으로 저장한다. */
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -63,6 +66,11 @@ public class ConstructionCompletionService {
     histories.saveAndFlush(
         ConstructionStatusHistory.changed(construction, operator, construction.getCompletedAt()));
     constructions.flush();
+    notifications.send(
+        support.getApplicant().getId(),
+        NotificationType.CONSTRUCTION_COMPLETED,
+        support.getApplication().getId(),
+        "construction-completed:" + id);
     return ConstructionCompletionResponse.from(construction);
   }
 }

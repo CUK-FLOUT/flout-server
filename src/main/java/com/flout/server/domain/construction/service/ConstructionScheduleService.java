@@ -7,6 +7,8 @@ import com.flout.server.domain.construction.entity.ConstructionStatusHistory;
 import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.construction.repository.ConstructionStatusHistoryRepository;
 import com.flout.server.domain.construction.response.code.ConstructionErrorCode;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
 import com.flout.server.domain.supportapplication.service.SupportDecisionAccess;
@@ -29,6 +31,7 @@ public class ConstructionScheduleService {
   private final ConstructionRepository constructions;
   private final ConstructionStatusHistoryRepository histories;
   private final Clock inspectionClock;
+  private final NotificationService notifications;
 
   /** 승인 신청을 먼저 잠그고 시공 건을 잠근 뒤 상태와 확정 일정을 검증해 저장한다. */
   @Transactional
@@ -63,6 +66,11 @@ public class ConstructionScheduleService {
     construction.schedule(operator, scheduledAt, now);
     histories.saveAndFlush(ConstructionStatusHistory.changed(construction, operator, now));
     constructions.flush();
+    notifications.send(
+        support.getApplicant().getId(),
+        NotificationType.CONSTRUCTION_SCHEDULED,
+        support.getApplication().getId(),
+        "construction-scheduled:" + id);
     return ConstructionScheduleResponse.from(construction);
   }
 }
