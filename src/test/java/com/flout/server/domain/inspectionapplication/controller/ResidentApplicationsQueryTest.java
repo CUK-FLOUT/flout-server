@@ -366,6 +366,22 @@ class ResidentApplicationsQueryTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString());
+    var tagNames = new ArrayList<String>();
+    doc.path("tags").forEach(tag -> tagNames.add(tag.path("name").asText()));
+    assertThat(tagNames).containsSubsequence("주민-지원신청", "주민-시공 신청", "주민-내신청");
+    var paths = doc.path("paths");
+    for (var path :
+        List.of(
+            "/api/resident/constructions/{constructionId}/schedule",
+            "/api/resident/constructions/{constructionId}")) {
+      assertThat(paths.path(path).path("get").path("tags").path(0).asText()).isEqualTo("주민-시공 신청");
+    }
+    for (var path :
+        List.of("/api/resident/applications", "/api/resident/applications/{applicationId}")) {
+      assertThat(paths.path(path).path("get").path("tags").path(0).asText()).isEqualTo("주민-내신청");
+    }
+    assertThat(paths.path("/api/resident/applications").path("post").path("tags").path(0).asText())
+        .isEqualTo("주민-현장점검 신청");
     var content =
         doc.get("paths")
             .get("/api/resident/applications")

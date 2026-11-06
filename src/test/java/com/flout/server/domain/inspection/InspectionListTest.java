@@ -91,7 +91,14 @@ class InspectionListTest {
   void detailOpenApiDeclaresNullableFields() throws Exception {
     var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     for (String field :
-        List.of("detailAddress", "preferredVisitDate", "preferredTimeSlot", "inspectorName")) {
+        List.of(
+            "detailAddress",
+            "preferredVisitDate",
+            "preferredTimeSlot",
+            "inspectorName",
+            "visitDate",
+            "visitTime",
+            "preVisitNotice")) {
       response.andExpect(
           jsonPath("$.components.schemas.InspectionDetailResponse.properties." + field + ".type")
               .value(hasItems("string", "null")));
@@ -113,6 +120,10 @@ class InspectionListTest {
             LocalDate.of(2026, 11, 3),
             PreferredTimeSlot.MORNING,
             secondOperator.getId());
+    jdbc.update(
+        "UPDATE inspections SET pre_visit_notice=? WHERE inspection_id=?",
+        "방문 전 출입구를 확인해 주세요.",
+        target.inspectionId());
     var before = jdbc.queryForList("SELECT * FROM inspections");
     mvc.perform(
             get("/api/admin/inspections/{inspectionId}", target.inspectionId())
@@ -131,7 +142,10 @@ class InspectionListTest {
         .andExpect(jsonPath("$.result.preferredVisitDate").value("2026-11-03"))
         .andExpect(jsonPath("$.result.preferredTimeSlot").value("MORNING"))
         .andExpect(jsonPath("$.result.inspectorId").value(secondOperator.getId()))
-        .andExpect(jsonPath("$.result.inspectorName").value("이담당"));
+        .andExpect(jsonPath("$.result.inspectorName").value("이담당"))
+        .andExpect(jsonPath("$.result.visitDate").value("2030-01-01"))
+        .andExpect(jsonPath("$.result.visitTime").value("14:00"))
+        .andExpect(jsonPath("$.result.preVisitNotice").value("방문 전 출입구를 확인해 주세요."));
     assertThat(jdbc.queryForList("SELECT * FROM inspections")).isEqualTo(before);
   }
 
@@ -145,7 +159,10 @@ class InspectionListTest {
         .andExpect(jsonPath("$.result.preferredVisitDate").value(nullValue()))
         .andExpect(jsonPath("$.result.preferredTimeSlot").value(nullValue()))
         .andExpect(jsonPath("$.result.inspectorId").value(nullValue()))
-        .andExpect(jsonPath("$.result.inspectorName").value(nullValue()));
+        .andExpect(jsonPath("$.result.inspectorName").value(nullValue()))
+        .andExpect(jsonPath("$.result.visitDate").value(nullValue()))
+        .andExpect(jsonPath("$.result.visitTime").value(nullValue()))
+        .andExpect(jsonPath("$.result.preVisitNotice").value(nullValue()));
   }
 
   @Test

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/applications")
-@Tag(name = "주민-현장점검 신청", description = "현장점검 신청부터 진행 상황 및 결과 조회까지 관리")
+@Tag(name = "주민-내신청", description = "주민 본인의 신청 내역과 상세정보 조회")
 public class ResidentApplicationDetailController {
   private final ResidentApplicationDetailService service;
 
@@ -61,7 +61,7 @@ public class ResidentApplicationDetailController {
 
   @GetMapping("/{applicationId}")
   @Operation(
-      summary = "주민 현장점검 신청 상세 조회",
+      summary = "내 신청 내역 상세 조회",
       description =
           "본인의 기존 신청 정보와 신청·점검 상태·공개 여부를 유지하고 progress에 목록과 동일한 전체 단계 및 공개된 점검 요약, 최신 접수 지원, 시공 정보를 추가합니다. 지원 DRAFT와 점검 초안·내부 메모는 노출하지 않습니다. 지원 범위는 승인 시, 미승인 사유는 미승인 시, 최종 설치 결과는 시공 완료 시에만 반환합니다. 기존 createdAt/submittedAt 형식은 유지하고 새 progress.updatedAt·확정 일정은 서울 시간 오프셋을 사용합니다. 임시 신청 상세 조회는 유지하지만 progress.stage는 null입니다.")
   public SuccessResponse<ResidentApplicationDetailResponse> detail(

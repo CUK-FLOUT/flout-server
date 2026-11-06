@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/constructions")
-@Tag(name = "주민-시공신청", description = "주민 본인의 확정 시공 일정·진행·완료 결과 조회")
+@Tag(name = "주민-시공 신청", description = "주민 본인의 확정 시공 일정·진행·완료 결과 조회")
 @ApiResponse(
     responseCode = "400",
     description = "COMMON_400_3: 양의 Long 형식이 아닌 시공 ID",

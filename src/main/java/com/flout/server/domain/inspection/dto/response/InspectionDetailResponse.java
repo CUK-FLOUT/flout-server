@@ -1,9 +1,11 @@
 package com.flout.server.domain.inspection.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.flout.server.domain.inspection.entity.Inspection;
 import com.flout.server.domain.inspectionapplication.entity.PreferredTimeSlot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Locale;
 
 public record InspectionDetailResponse(
@@ -39,10 +41,30 @@ public record InspectionDetailResponse(
             description = "배정된 담당자 이름. 미배정 시 null",
             nullable = true,
             types = {"string", "null"})
-        String inspectorName) {
+        String inspectorName,
+    @Schema(
+            description = "저장된 확정 방문일. 일정이 없으면 null",
+            format = "date",
+            example = "2026-11-04",
+            nullable = true,
+            types = {"string", "null"})
+        LocalDate visitDate,
+    @JsonFormat(pattern = "HH:mm")
+        @Schema(
+            description = "저장된 확정 방문 시간(HH:mm). 일정이 없으면 null",
+            example = "14:00",
+            nullable = true,
+            types = {"string", "null"})
+        LocalTime visitTime,
+    @Schema(
+            description = "저장된 방문 전 안내. 안내가 없으면 null",
+            nullable = true,
+            types = {"string", "null"})
+        String preVisitNotice) {
   public static InspectionDetailResponse from(Inspection inspection) {
     var application = inspection.getApplication();
     var inspector = inspection.getInspector();
+    var scheduledAt = inspection.getScheduledAt();
     return new InspectionDetailResponse(
         inspection.getId(),
         application.getId(),
@@ -54,6 +76,9 @@ public record InspectionDetailResponse(
         application.getPreferredVisitDate(),
         application.getPreferredTimeSlot(),
         inspector == null ? null : inspector.getId(),
-        inspector == null ? null : inspector.getName());
+        inspector == null ? null : inspector.getName(),
+        scheduledAt == null ? null : scheduledAt.toLocalDate(),
+        scheduledAt == null ? null : scheduledAt.toLocalTime(),
+        inspection.getPreVisitNotice());
   }
 }

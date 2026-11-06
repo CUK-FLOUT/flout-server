@@ -119,7 +119,9 @@ public class OpenApiConfig {
                 "운영자-시공관리",
                 "주민-AI취약도 분석",
                 "주민-현장점검 신청",
-                "주민-지원신청");
+                "주민-지원신청",
+                "주민-시공 신청",
+                "주민-내신청");
         var tags = new ArrayList<>(api.getTags());
         tags.sort(
             Comparator.comparingInt(
@@ -620,8 +622,11 @@ public class OpenApiConfig {
     result.put("contact", "010-1234-1234");
     result.put("preferredVisitDate", "2026-11-03");
     result.put("preferredTimeSlot", "MORNING");
-    result.put("inspectorId", null);
-    result.put("inspectorName", null);
+    result.put("inspectorId", 3);
+    result.put("inspectorName", "김담당");
+    result.put("visitDate", "2026-11-04");
+    result.put("visitTime", "14:00");
+    result.put("preVisitNotice", "방문 전 출입구를 확인해 주세요.");
     addExample(success, "inspectionDetail", envelope(true, code, code.getMessage(), result));
     addError(
         operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
