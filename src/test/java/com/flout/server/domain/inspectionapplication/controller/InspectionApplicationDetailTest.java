@@ -122,6 +122,7 @@ class InspectionApplicationDetailTest {
                   .param("keyword", keyword)
                   .param("size", "1"))
           .andExpect(status().isOk())
+          .andExpect(jsonPath("$.code").value("APPLICATION_200_13"))
           .andExpect(jsonPath("$.result.totalElements").value(1))
           .andExpect(jsonPath("$.result.totalPages").value(1))
           .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))

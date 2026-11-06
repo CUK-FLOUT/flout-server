@@ -22,9 +22,9 @@ public enum InspectionApplicationSuccessCode implements BaseResponseCode {
   HISTORIES_FOUND(200, "APPLICATION_200_7", "신청의 처리 이력을 조회했습니다."),
   RECOMMENDATIONS_FOUND(200, "APPLICATION_200_8", "권장 예방조치를 조회했습니다."),
   RECOMMENDED_FACILITIES_FOUND(200, "APPLICATION_200_9", "권장 설치 시설을 조회했습니다."),
-  LIST_FOUND(200, "APPLICATION_200_10", "신청 목록을 조회했습니다."),
   STATS_FOUND(200, "APPLICATION_200_11", "신청 현황 건수를 조회했습니다."),
-  MAP_LOCATIONS_FOUND(200, "APPLICATION_200_12", "지도 신청 위치를 조회했습니다.");
+  MAP_LOCATIONS_FOUND(200, "APPLICATION_200_12", "지도 신청 위치를 조회했습니다."),
+  ADMIN_LIST_FOUND(200, "APPLICATION_200_13", "신청 목록을 조회했습니다.");
 
   private final int status;
   private final String code;

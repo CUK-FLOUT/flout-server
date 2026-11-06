@@ -33,7 +33,10 @@ public class AdminApplicationListController {
       summary = "신청 목록 조회·검색",
       description =
           "부천시 관할의 접수된 신청을 신청 ID 내림차순으로 조회합니다. 지역·취약도·처리 상태와 주소(상세주소 포함)·접수번호 부분 검색을 조합할 수 있습니다. 처리 상태는 점검, 최근 접수 지원 신청, 연결된 시공의 저장 상태를 사용합니다.")
-  @ApiResponse(responseCode = "200", description = "신청 목록 조회 성공", useReturnTypeSchema = true)
+  @ApiResponse(
+      responseCode = "200",
+      description = "APPLICATION_200_13: 신청 목록 조회 성공",
+      useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",
       description = "잘못된 조회 조건",
@@ -69,7 +72,7 @@ public class AdminApplicationListController {
                     processingStatus,
                     page,
                     size),
-                InspectionApplicationSuccessCode.LIST_FOUND));
+                InspectionApplicationSuccessCode.ADMIN_LIST_FOUND));
   }
 
   @GetMapping(value = "/stats", produces = MediaType.APPLICATION_JSON_VALUE)
