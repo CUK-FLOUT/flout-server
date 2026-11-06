@@ -12,13 +12,19 @@ public enum InspectionApplicationSuccessCode implements BaseResponseCode {
   INSPECTION_APPLICATION_CREATED(
       CREATED, "APPLICATION_201_1", "현장점검 신청이 임시 저장되었습니다. 사진 등록 후 접수됩니다."),
   ATTACHMENTS_CREATED(CREATED, "APPLICATION_201_2", "사진이 등록되었습니다."),
+  LIST_FOUND(200, "APPLICATION_200_10", "내 신청 내역을 조회했습니다."),
   INTERNAL_MEMO_SAVED(200, "APPLICATION_200_1", "내부 메모가 저장되었습니다."),
   DETAIL_FOUND(200, "APPLICATION_200_2", "현장점검 신청 상세정보를 조회했습니다."),
   ATTACHMENTS_FOUND(200, "APPLICATION_200_3", "신청 첨부사진을 조회했습니다."),
   DRAFT_UPDATED(200, "APPLICATION_200_4", "임시 신청 정보를 수정했습니다."),
   SUPPORT_FOUND(200, "APPLICATION_200_5", "신청의 지원 정보를 조회했습니다."),
   CONSTRUCTION_FOUND(200, "APPLICATION_200_6", "신청의 시공 정보를 조회했습니다."),
-  HISTORIES_FOUND(200, "APPLICATION_200_7", "신청의 처리 이력을 조회했습니다.");
+  HISTORIES_FOUND(200, "APPLICATION_200_7", "신청의 처리 이력을 조회했습니다."),
+  RECOMMENDATIONS_FOUND(200, "APPLICATION_200_8", "권장 예방조치를 조회했습니다."),
+  RECOMMENDED_FACILITIES_FOUND(200, "APPLICATION_200_9", "권장 설치 시설을 조회했습니다."),
+  STATS_FOUND(200, "APPLICATION_200_11", "신청 현황 건수를 조회했습니다."),
+  MAP_LOCATIONS_FOUND(200, "APPLICATION_200_12", "지도 신청 위치를 조회했습니다."),
+  ADMIN_LIST_FOUND(200, "APPLICATION_200_13", "신청 목록을 조회했습니다.");
 
   private final int status;
   private final String code;

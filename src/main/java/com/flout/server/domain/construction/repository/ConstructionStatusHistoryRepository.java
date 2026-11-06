@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.*;
 
 public interface ConstructionStatusHistoryRepository
     extends JpaRepository<ConstructionStatusHistory, Long> {
+  List<ConstructionStatusHistory> findByConstructionIdOrderByChangedAtAscIdAsc(Long constructionId);
+
   @EntityGraph(attributePaths = {"construction.supportApplication", "changedBy"})
   List<ConstructionStatusHistory>
       findByConstructionSupportApplicationApplicationIdOrderByChangedAtAscIdAsc(Long applicationId);

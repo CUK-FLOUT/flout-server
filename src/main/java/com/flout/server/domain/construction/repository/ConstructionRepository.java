@@ -10,6 +10,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface ConstructionRepository extends JpaRepository<Construction, Long> {
+  java.util.List<Construction> findBySupportApplicationIdIn(
+      java.util.Collection<Long> supportApplicationIds);
+
   Optional<Construction> findBySupportApplicationId(Long supportApplicationId);
 
   @Query("select c.supportApplication.id from Construction c where c.id = :id")
