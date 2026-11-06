@@ -98,6 +98,6 @@ public class AddressSearchService {
   }
 
   private boolean isBroadRegionOnly(String keyword) {
-    return keyword.matches("(?:(?:(?:경기도|경기)\\s+)?부천시(?:\\s+(?:원미구|소사구|오정구))?|원미구|소사구|오정구)");
+    return keyword.matches("(?:(?:경기도|경기)\\s+)?부천시");
   }
 }
