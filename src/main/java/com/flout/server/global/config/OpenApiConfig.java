@@ -89,9 +89,13 @@ public class OpenApiConfig {
     return api -> {
       // OpenAPI 3.1 nullable enum 허용값에 JSON null 포함
       if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
+        var create = api.getComponents().getSchemas().get("CreateInspectionApplicationRequest");
+        if (create != null && create.getProperties() != null) {
+          Schema locations = (Schema) create.getProperties().get("inflowLocations");
+          if (locations != null) locations.setExample(List.of("ENTRANCE", "DRAIN"));
+        }
         for (String schemaName :
             List.of(
-                "UpdateInspectionApplicationRequest",
                 "InspectionDetailResponse",
                 "InspectionApplicationDetailResponse",
                 "ResidentApplicationDetailResponse")) {

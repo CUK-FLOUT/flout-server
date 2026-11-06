@@ -490,6 +490,15 @@ class InspectionApplicationFlowTest {
         .isEqualTo("array");
     assertThat(create.path("properties").path("inflowLocations").path("minItems").asInt())
         .isEqualTo(1);
+    var locations = create.path("properties").path("inflowLocations");
+    var allowed = new java.util.HashSet<String>();
+    locations.path("items").path("enum").forEach(value -> allowed.add(value.asText()));
+    assertThat(allowed)
+        .containsExactlyInAnyOrder("WINDOW", "ENTRANCE", "BATHROOM", "DRAIN", "ETC", "UNKNOWN");
+    assertThat(locations.path("example").isArray()).isTrue();
+    assertThat(locations.path("example").get(0).asText()).isEqualTo("ENTRANCE");
+    assertThat(locations.path("example").get(1).asText()).isEqualTo("DRAIN");
+    assertThat(locations.path("example").size()).isEqualTo(2);
     var example =
         api.path("paths")
             .path("/api/resident/applications")
@@ -521,6 +530,15 @@ class InspectionApplicationFlowTest {
     assertThat(example.path("inflowLocations").isArray()).isTrue();
     var patchRequired = schemas.path("UpdateInspectionApplicationRequest").path("required");
     assertThat(patchRequired.isMissingNode() || patchRequired.isEmpty()).isTrue();
+    var timeValues =
+        schemas
+            .path("UpdateInspectionApplicationRequest")
+            .path("properties")
+            .path("preferredTimeSlot")
+            .path("enum");
+    var times = new java.util.ArrayList<String>();
+    timeValues.forEach(value -> times.add(value.isNull() ? null : value.asText()));
+    assertThat(times).containsExactlyInAnyOrder("MORNING", "AFTERNOON", "ANY");
   }
 
   @Test

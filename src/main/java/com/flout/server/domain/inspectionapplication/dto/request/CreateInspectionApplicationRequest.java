@@ -79,7 +79,17 @@ public record CreateInspectionApplicationRequest(
     @NotEmpty(message = "침수 유입 위치는 1개 이상 선택해야 합니다.") @ArraySchema(
             arraySchema =
                 @Schema(description = "침수 유입 위치 목록", requiredMode = Schema.RequiredMode.REQUIRED),
-            schema = @Schema(implementation = InflowLocation.class),
+            schema =
+                @Schema(
+                    implementation = InflowLocation.class,
+                    allowableValues = {
+                      "WINDOW",
+                      "ENTRANCE",
+                      "BATHROOM",
+                      "DRAIN",
+                      "ETC",
+                      "UNKNOWN"
+                    }),
             minItems = 1)
         List<@NotNull InflowLocation> inflowLocations,
     @NotBlank(message = "신청자 이름은 필수입니다.") @Size(max = 50, message = "신청자 이름은 50자 이하여야 합니다.") @Schema(
