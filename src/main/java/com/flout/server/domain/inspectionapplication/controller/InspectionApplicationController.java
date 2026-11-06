@@ -45,7 +45,7 @@ public class InspectionApplicationController {
   @Operation(
       summary = "임시 현장점검 신청 수정",
       description =
-          "본인의 DRAFT 신청만 부분 수정합니다. 생략한 필드는 유지하고 요청 사유와 희망 일정은 null로 삭제합니다. 유입 위치는 배열 전체를 교체합니다.")
+          "본인의 DRAFT 신청만 부분 수정합니다. 생략한 필드는 유지하고 요청 사유는 null로 삭제합니다. 희망 일정은 null일 수 없고 유입 위치는 1개 이상으로 전체 교체합니다.")
   public SuccessResponse<UpdateInspectionApplicationResponse> update(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long applicationId,

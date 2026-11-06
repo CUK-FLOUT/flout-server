@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter
-@Schema(description = "생략한 필드는 유지합니다. 요청 사유와 희망 일정은 null로 삭제할 수 있습니다.")
+@Schema(description = "생략한 필드는 유지합니다. 요청 사유는 null로 삭제할 수 있습니다.")
 public class UpdateInspectionApplicationRequest {
   @Setter
   @JsonSetter(nulls = Nulls.FAIL)
@@ -43,15 +43,15 @@ public class UpdateInspectionApplicationRequest {
   @Size(max = 2000, message = "요청 사유는 2000자 이하여야 합니다.") @Schema(description = "점검 요청 사유. null이면 삭제", nullable = true)
   private String requestReason;
 
-  @FutureOrPresent(message = "희망 방문일은 오늘 이후여야 합니다.") @Schema(description = "희망 방문일. null이면 삭제", nullable = true)
+  @FutureOrPresent(message = "희망 방문일은 오늘 이후여야 합니다.") @Schema(description = "희망 방문일")
   private LocalDate preferredVisitDate;
 
-  @Schema(description = "희망 방문 시간대. null이면 삭제", nullable = true)
+  @Schema(description = "희망 방문 시간대")
   private PreferredTimeSlot preferredTimeSlot;
 
   @Setter
   @JsonSetter(nulls = Nulls.FAIL)
-  @Schema(description = "유입 위치 전체 교체. 빈 배열이면 모두 삭제")
+  @Size(min = 1, message = "침수 유입 위치는 1개 이상 선택해야 합니다.") @Schema(description = "유입 위치 전체 교체. 1개 이상 필수")
   private List<@NotNull InflowLocation> inflowLocations;
 
   @Getter(AccessLevel.NONE)
@@ -69,13 +69,13 @@ public class UpdateInspectionApplicationRequest {
     requestReason = value;
   }
 
-  @JsonSetter
+  @JsonSetter(nulls = Nulls.FAIL)
   public void setPreferredVisitDate(LocalDate value) {
     preferredVisitDateProvided = true;
     preferredVisitDate = value;
   }
 
-  @JsonSetter
+  @JsonSetter(nulls = Nulls.FAIL)
   public void setPreferredTimeSlot(PreferredTimeSlot value) {
     preferredTimeSlotProvided = true;
     preferredTimeSlot = value;

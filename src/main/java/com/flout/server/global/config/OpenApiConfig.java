@@ -1563,25 +1563,26 @@ public class OpenApiConfig {
     if (operation.getRequestBody() != null
         && operation.getRequestBody().getContent() != null
         && operation.getRequestBody().getContent().get(JSON) != null) {
+      var requestExample = new LinkedHashMap<String, Object>();
+      requestExample.put("applicantName", "김주민");
+      requestExample.put("contact", "010-1234-5678");
+      requestExample.put("occupancyType", "TENANT");
+      requestExample.put("floodExperience", "NO");
+      requestExample.put("inflowLocations", List.of("DRAIN", "ENTRANCE"));
+      requestExample.put("existingFacility", false);
+      requestExample.put("requestReason", "최근 배수구 역류가 있어 점검을 희망합니다.");
+      requestExample.put("preferredVisitDate", "2099-11-03");
+      requestExample.put("preferredTimeSlot", "MORNING");
+      requestExample.put("assessmentId", 5);
+      requestExample.put("address", "경기도 부천시 원미구 길주로 53");
+      requestExample.put("detailAddress", "101호");
+      requestExample.put("latitude", 37.5);
+      requestExample.put("longitude", 126.7);
       operation
           .getRequestBody()
           .getContent()
           .get(JSON)
-          .addExamples(
-              "inspectionApplication",
-              new Example()
-                  .value(
-                      Map.ofEntries(
-                          Map.entry("assessmentId", 5),
-                          Map.entry("address", "경기도 부천시 원미구 길주로 53"),
-                          Map.entry("detailAddress", "101호"),
-                          Map.entry("latitude", 37.5),
-                          Map.entry("longitude", 126.7),
-                          Map.entry("contact", "010-1234-5678"),
-                          Map.entry("occupancyType", "TENANT"),
-                          Map.entry("floodExperience", "NO"),
-                          Map.entry("existingFacility", false),
-                          Map.entry("applicantName", "김주민"))));
+          .addExamples("inspectionApplication", new Example().value(requestExample));
     }
 
     ApiResponse success = operation.getResponses().remove("200");

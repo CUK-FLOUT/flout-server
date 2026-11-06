@@ -5,6 +5,7 @@ import com.flout.server.domain.inspectionapplication.entity.InflowLocation;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.inspectionapplication.entity.PreferredTimeSlot;
 import com.flout.server.domain.inspectionapplication.validation.KoreanMobileNumber;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -63,17 +64,23 @@ public record CreateInspectionApplicationRequest(
         Boolean existingFacility,
     @Size(max = 2000) @Schema(description = "현장점검 요청 사유 (최대 2000자)", example = "최근 배수구 역류가 있어 점검을 희망합니다.")
         String requestReason,
-    @FutureOrPresent @Schema(description = "희망 방문일(오늘 이후)", format = "date", example = "2026-11-03")
+    @NotNull(message = "희망 방문일은 필수입니다.") @FutureOrPresent @Schema(
+            description = "희망 방문일(오늘 이후)",
+            format = "date",
+            example = "2026-11-03",
+            requiredMode = Schema.RequiredMode.REQUIRED)
         LocalDate preferredVisitDate,
-    @Schema(
+    @NotNull(message = "희망 방문 시간대는 필수입니다.") @Schema(
             description = "희망 방문 시간대",
             allowableValues = {"MORNING", "AFTERNOON", "ANY"},
-            example = "MORNING")
+            example = "MORNING",
+            requiredMode = Schema.RequiredMode.REQUIRED)
         PreferredTimeSlot preferredTimeSlot,
-    @Schema(
-            description = "침수 유입 위치 목록",
-            allowableValues = {"WINDOW", "ENTRANCE", "BATHROOM", "DRAIN", "ETC", "UNKNOWN"},
-            example = "[\"WINDOW\", \"DRAIN\"]")
+    @NotEmpty(message = "침수 유입 위치는 1개 이상 선택해야 합니다.") @ArraySchema(
+            arraySchema =
+                @Schema(description = "침수 유입 위치 목록", requiredMode = Schema.RequiredMode.REQUIRED),
+            schema = @Schema(implementation = InflowLocation.class),
+            minItems = 1)
         List<@NotNull InflowLocation> inflowLocations,
     @NotBlank(message = "신청자 이름은 필수입니다.") @Size(max = 50, message = "신청자 이름은 50자 이하여야 합니다.") @Schema(
             description = "신청 당시 입력한 신청자 이름",
