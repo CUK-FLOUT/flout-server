@@ -620,8 +620,11 @@ public class OpenApiConfig {
     result.put("contact", "010-1234-1234");
     result.put("preferredVisitDate", "2026-11-03");
     result.put("preferredTimeSlot", "MORNING");
-    result.put("inspectorId", null);
-    result.put("inspectorName", null);
+    result.put("inspectorId", 3);
+    result.put("inspectorName", "김담당");
+    result.put("visitDate", "2026-11-04");
+    result.put("visitTime", "14:00");
+    result.put("preVisitNotice", "방문 전 출입구를 확인해 주세요.");
     addExample(success, "inspectionDetail", envelope(true, code, code.getMessage(), result));
     addError(
         operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);

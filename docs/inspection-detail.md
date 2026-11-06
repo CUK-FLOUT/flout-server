@@ -25,9 +25,12 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다.
     "preferredVisitDate": "2026-11-03",
     "preferredTimeSlot": "MORNING",
     "inspectorId": 3,
-    "inspectorName": "김담당"
+    "inspectorName": "김담당",
+    "visitDate": "2026-11-04",
+    "visitTime": "14:00",
+    "preVisitNotice": "방문 전 출입구를 확인해 주세요."
   },
-  "timeStamp": "2026-10-30T10:00:00"
+  "timeStamp": "2026-10-30 10:00:00"
 }
 ```
 
@@ -37,6 +40,8 @@ Swagger 그룹은 `운영자-현장점검 관리`입니다.
 - 이름은 신청 주민의 이름, 연락처는 신청 시 입력한 연락처입니다.
 - 주소는 신청에 저장된 전체 주소와 상세주소를 각각 반환합니다.
 - 방문 희망 날짜·시간대는 주민의 신청 정보이며 확정 방문 일정과 구분합니다.
+- `visitDate`와 `visitTime`은 저장된 확정 방문일과 시간입니다. 시간은 `HH:mm` 형식이며, 저장된 일정이 없으면 둘 다 null입니다.
+- `preVisitNotice`는 저장된 사전 안내입니다. 저장된 안내가 없으면 null입니다.
 - 희망 시간대는 `MORNING`, `AFTERNOON`, `ANY`입니다. 별도 희망 시각은 저장하지 않습니다.
 - 희망 날짜·시간대·상세주소가 없으면 null이며 담당자가 미배정이면 담당자 ID·이름은 null입니다.
 
