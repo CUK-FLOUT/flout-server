@@ -60,9 +60,11 @@ class RiskAssessmentRepositoryTest {
         .thenReturn(
             new RiskPrediction(
                 "REGIONAL_RELATIVE_VULNERABILITY",
+                "r605c713",
                 new BigDecimal("0.2841"),
                 RiskLevel.HIGH,
-                List.of("주변 500m 건물·도로 비율이 높은 지형", "경사가 완만한 지형"),
+                List.of(),
+                "침수 기록 없음 (안전을 뜻하지 않음)",
                 "지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다."));
   }
 
@@ -84,10 +86,12 @@ class RiskAssessmentRepositoryTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.code").value("RISK_ASSESSMENT_201_1"))
             .andExpect(jsonPath("$.result.riskType").value("REGIONAL_RELATIVE_VULNERABILITY"))
+            .andExpect(jsonPath("$.result.cellId").value("r605c713"))
             .andExpect(jsonPath("$.result.score").value(0.2841))
             .andExpect(jsonPath("$.result.riskLevel").value("HIGH"))
             .andExpect(jsonPath("$.result.status").value("COMPLETED"))
-            .andExpect(jsonPath("$.result.reasons.length()").value(2))
+            .andExpect(jsonPath("$.result.reasons.length()").value(0))
+            .andExpect(jsonPath("$.result.floodRecord").value("침수 기록 없음 (안전을 뜻하지 않음)"))
             .andExpect(jsonPath("$.result.disclaimer").value("지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다."));
 
     var saved = riskAssessments.findAll();
@@ -100,7 +104,7 @@ class RiskAssessmentRepositoryTest {
     assertThat(assessment.getRiskLevel()).isEqualTo(RiskLevel.HIGH);
     assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.COMPLETED);
     assertThat(assessment.getResultJson())
-        .contains("REGIONAL_RELATIVE_VULNERABILITY", "0.2841", "경사가 완만한 지형");
+        .contains("REGIONAL_RELATIVE_VULNERABILITY", "r605c713", "0.2841", "floodRecord");
   }
 
   @Test

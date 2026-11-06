@@ -51,10 +51,12 @@ public class RiskAssessmentService {
     return new CreateRiskAssessmentResponse(
         assessment.getId(),
         prediction.riskType(),
+        prediction.cellId(),
         prediction.score(),
         assessment.getRiskLevel(),
         assessment.getStatus(),
         prediction.reasons(),
+        prediction.floodRecord(),
         prediction.disclaimer());
   }
 

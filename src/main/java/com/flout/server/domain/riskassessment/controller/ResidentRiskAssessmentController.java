@@ -29,7 +29,7 @@ public class ResidentRiskAssessmentController {
   @Operation(
       summary = "침수 취약도 분석",
       description =
-          "주소를 좌표로 변환해 Python AI 서비스에서 지역 상대 취약도 등급·점수·주요 근거를 조회하고 결과를 저장합니다. 점수는 실제 침수 확률이 아닙니다. 응답의 assessmentId를 현장점검 신청에 사용합니다.")
+          "주소를 좌표로 변환해 Python 격자 조회 서비스에서 미리 계산된 지역 상대 취약도 등급·점수·과거 침수 기록 안내를 조회하고 저장합니다. 점수는 실제 침수 확률이 아닙니다. 응답의 assessmentId를 현장점검 신청에 사용합니다.")
   @ApiResponse(responseCode = "201", description = "분석 결과 저장 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",

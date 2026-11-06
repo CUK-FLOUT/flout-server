@@ -40,14 +40,19 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
     try {
       var response =
           client
-              .post()
-              .uri(predictPath)
-              .body(new PredictionRequest(latitude, longitude))
+              .get()
+              .uri(
+                  builder ->
+                      builder
+                          .path(predictPath)
+                          .queryParam("lat", latitude)
+                          .queryParam("lon", longitude)
+                          .build())
               .retrieve()
               .body(PredictionResponse.class);
       return validate(response);
     } catch (RestClientResponseException e) {
-      if (e.getStatusCode().value() == 404 || e.getStatusCode().value() == 422) {
+      if (e.getStatusCode().value() == 422) {
         throw new BaseException(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE);
       }
       throw new BaseException(RiskAssessmentErrorCode.AI_SERVICE_ERROR);
@@ -62,25 +67,31 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
   }
 
   private RiskPrediction validate(PredictionResponse response) {
+    if (response != null && "분석 불가".equals(response.status())) {
+      throw new BaseException(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE);
+    }
     if (response == null
+        || !"OK".equals(response.status())
         || !EXPECTED_RISK_TYPE.equals(response.riskType())
+        || response.cellId() == null
+        || !response.cellId().matches("r-?\\d+c-?\\d+")
         || response.score() == null
         || response.score().compareTo(BigDecimal.ZERO) < 0
         || response.score().compareTo(BigDecimal.ONE) > 0
         || response.grade() == null
-        || response.reasons() == null
-        || response.reasons().isEmpty()
-        || response.reasons().size() > 3
-        || response.reasons().stream().anyMatch(reason -> reason == null || reason.isBlank())
+        || response.floodRecord() == null
+        || response.floodRecord().isBlank()
         || response.disclaimer() == null
         || response.disclaimer().isBlank()) {
       throw new BaseException(RiskAssessmentErrorCode.INVALID_AI_RESPONSE);
     }
     return new RiskPrediction(
         response.riskType(),
+        response.cellId(),
         response.score(),
         parseRiskLevel(response.grade()),
-        List.copyOf(response.reasons()),
+        List.of(),
+        response.floodRecord(),
         response.disclaimer());
   }
 
@@ -102,8 +113,13 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
     return false;
   }
 
-  private record PredictionRequest(double latitude, double longitude) {}
-
   private record PredictionResponse(
-      String riskType, BigDecimal score, String grade, List<String> reasons, String disclaimer) {}
+      String riskType,
+      String status,
+      String cellId,
+      BigDecimal score,
+      String grade,
+      String floodRecord,
+      String disclaimer,
+      String message) {}
 }

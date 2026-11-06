@@ -56,7 +56,7 @@ app:
     read-timeout-millis: 3000
   ai:
     base-url: ${AI_MODEL_BASE_URL:http://localhost:8000}
-    predict-path: ${AI_MODEL_PREDICT_PATH:/api/v1/risk-assessments/predict}
+    predict-path: ${AI_MODEL_PREDICT_PATH:/api/vulnerability}
     connect-timeout-millis: ${AI_MODEL_CONNECT_TIMEOUT_MILLIS:3000}
     read-timeout-millis: ${AI_MODEL_READ_TIMEOUT_MILLIS:10000}
   guide-ai:

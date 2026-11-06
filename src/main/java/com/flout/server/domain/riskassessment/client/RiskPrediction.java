@@ -6,7 +6,18 @@ import java.util.List;
 
 public record RiskPrediction(
     String riskType,
+    String cellId,
     BigDecimal score,
     RiskLevel riskLevel,
     List<String> reasons,
-    String disclaimer) {}
+    String floodRecord,
+    String disclaimer) {
+  public RiskPrediction(
+      String riskType,
+      BigDecimal score,
+      RiskLevel riskLevel,
+      List<String> reasons,
+      String disclaimer) {
+    this(riskType, null, score, riskLevel, reasons, null, disclaimer);
+  }
+}

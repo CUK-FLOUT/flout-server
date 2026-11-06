@@ -9,9 +9,12 @@ import java.util.List;
 public record CreateRiskAssessmentResponse(
     @Schema(description = "현장점검 신청에 사용할 분석 결과 ID", example = "1") Long assessmentId,
     @Schema(description = "분석 지표 유형", example = "REGIONAL_RELATIVE_VULNERABILITY") String riskType,
+    @Schema(description = "주소 좌표가 포함된 100m 격자 ID", example = "r605c713") String cellId,
     @Schema(description = "0~1 사이 모델 점수. 실제 침수 확률이 아님", example = "0.2841") BigDecimal score,
     @Schema(description = "침수 취약도 등급", example = "HIGH") RiskLevel riskLevel,
     @Schema(description = "분석 상태", example = "COMPLETED") RiskAssessmentStatus status,
-    @Schema(description = "모델 점수를 높인 주요 지형 근거. 최대 3개") List<String> reasons,
+    @Schema(description = "SHAP 근거가 제공되지 않은 현재 데이터에서는 빈 배열") List<String> reasons,
+    @Schema(description = "과거 침수 기록 안내. 안전 여부를 뜻하지 않음", example = "침수 기록 없음 (안전을 뜻하지 않음)")
+        String floodRecord,
     @Schema(description = "결과 해석 시 함께 표시할 주의 문구", example = "지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다.")
         String disclaimer) {}
