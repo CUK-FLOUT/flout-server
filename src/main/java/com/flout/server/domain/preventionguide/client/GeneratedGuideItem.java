@@ -1,3 +1,3 @@
 package com.flout.server.domain.preventionguide.client;
 
-public record GeneratedGuideItem(String title, String description, int estimatedMinutes) {}
+public record GeneratedGuideItem(String ruleId, String title, String description) {}

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum PreventionGuideErrorCode implements BaseResponseCode {
+  UNSUPPORTED_HOUSING_TYPE(400, "GUIDE_400_1", "맞춤 예방 가이드는 반지하 또는 1층 거주자에게 제공됩니다."),
   ASSESSMENT_NOT_FOUND(404, "GUIDE_404_1", "취약도 분석 결과를 찾을 수 없습니다."),
   ASSESSMENT_ACCESS_DENIED(403, "GUIDE_403_1", "본인의 취약도 분석 결과만 사용할 수 있습니다."),
   ASSESSMENT_NOT_COMPLETED(409, "GUIDE_409_1", "완료된 취약도 분석 결과만 가이드를 생성할 수 있습니다."),

@@ -28,7 +28,7 @@ public class ResidentPreventionGuideController {
   @Operation(
       summary = "맞춤 예방 가이드 생성",
       description =
-          "본인의 완료된 취약도 분석 결과로 맞춤 체크리스트를 생성합니다. 같은 분석 결과에 이미 생성된 가이드가 있으면 외부 AI를 다시 호출하지 않고 기존 결과를 반환합니다.")
+          "본인의 완료된 취약도 분석 등급과 거주층으로 체크리스트 4개를 생성합니다. Gemini 호출 또는 검증 실패 시 검수된 기본 체크리스트를 반환하며, 같은 분석 결과의 기존 가이드는 재사용합니다.")
   @ApiResponse(responseCode = "200", description = "맞춤 예방 가이드 조회 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "403",
@@ -43,12 +43,8 @@ public class ResidentPreventionGuideController {
       description = "완료되지 않은 분석 결과",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   @ApiResponse(
-      responseCode = "502",
-      description = "외부 AI 호출 실패 또는 잘못된 응답",
-      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
-  @ApiResponse(
-      responseCode = "503",
-      description = "외부 AI 설정 누락 또는 응답 시간 초과",
+      responseCode = "400",
+      description = "반지하 또는 1층이 아닌 거주층",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<PreventionGuideResponse> generate(
       @AuthenticationPrincipal Jwt jwt, @PathVariable Long assessmentId) {

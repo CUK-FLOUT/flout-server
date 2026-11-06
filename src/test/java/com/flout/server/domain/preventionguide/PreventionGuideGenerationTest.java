@@ -2,7 +2,6 @@ package com.flout.server.domain.preventionguide;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,13 +14,16 @@ import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.preventionguide.client.GeneratedGuide;
 import com.flout.server.domain.preventionguide.client.GeneratedGuideItem;
 import com.flout.server.domain.preventionguide.client.GuideGenerationClient;
+import com.flout.server.domain.preventionguide.client.GuideGenerationSource;
 import com.flout.server.domain.preventionguide.repository.PreventionGuideRepository;
+import com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode;
 import com.flout.server.domain.riskassessment.client.RiskPrediction;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
+import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -81,15 +83,16 @@ class PreventionGuideGenerationTest {
                     HousingType.SEMI_BASEMENT,
                     objectMapper.writeValueAsString(prediction)))
             .getId();
-    when(generationClient.generate(any(), any(), anyList()))
+    when(generationClient.generate(any(), any()))
         .thenReturn(
             new GeneratedGuide(
-                "이것부터 확인하세요",
-                "우리 집 주변을 먼저 살펴보고, 할 수 있는 것부터 준비해 주세요.",
+                GuideGenerationSource.AI,
+                "반지하는 대피 요령부터 확인해 주세요.",
                 List.of(
-                    new GeneratedGuideItem("배수구·빗물받이 막힘 확인", "낙엽과 쓰레기를 치워 주세요.", 5),
-                    new GeneratedGuideItem("출입문 하단 틈 막기", "물막이판이나 모래주머니를 준비해 주세요.", 10),
-                    new GeneratedGuideItem("전기·가전 높은 곳으로 옮기기", "안전을 먼저 확인해 주세요.", 10))));
+                    new GeneratedGuideItem("BASEMENT_EVAC", "대피 요령 확인", "물이 차면 대피해 주세요."),
+                    new GeneratedGuideItem("BASEMENT_TOOLS", "대피 도구 준비", "대피 도구를 준비해 주세요."),
+                    new GeneratedGuideItem("BARRIER", "물막이 준비", "물막이판을 준비해 주세요."),
+                    new GeneratedGuideItem("POWER", "전기·가스 확인", "젖은 손으로 만지지 마세요."))));
   }
 
   @Test
@@ -103,11 +106,14 @@ class PreventionGuideGenerationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("GUIDE_200_1"))
             .andExpect(jsonPath("$.result.assessmentId").value(assessmentId))
+            .andExpect(jsonPath("$.result.source").value("AI"))
+            .andExpect(jsonPath("$.result.grade").value("HIGH"))
             .andExpect(jsonPath("$.result.title").value("이것부터 확인하세요"))
             .andExpect(jsonPath("$.result.completedCount").value(0))
-            .andExpect(jsonPath("$.result.totalCount").value(3))
+            .andExpect(jsonPath("$.result.totalCount").value(4))
             .andExpect(jsonPath("$.result.items[0].order").value(1))
-            .andExpect(jsonPath("$.result.items[0].estimatedMinutes").value(5))
+            .andExpect(jsonPath("$.result.items[0].ruleId").value("BASEMENT_EVAC"))
+            .andExpect(jsonPath("$.result.items[0].estimatedMinutes").doesNotExist())
             .andExpect(jsonPath("$.result.items[0].completed").value(false))
             .andReturn();
 
@@ -118,16 +124,30 @@ class PreventionGuideGenerationTest {
             .path("guideId")
             .asLong();
     assertThat(guides.count()).isEqualTo(1);
-    assertThat(guides.findById(guideId).orElseThrow().getContentJson()).contains("출입문 하단 틈 막기");
+    assertThat(guides.findById(guideId).orElseThrow().getContentJson())
+        .contains("BASEMENT_EVAC", "대피 요령 확인");
 
     mvc.perform(request)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.guideId").value(guideId));
-    verify(generationClient, times(1))
-        .generate(
-            RiskLevel.HIGH,
-            HousingType.SEMI_BASEMENT,
-            List.of("주변 500m 건물·도로 비율이 높은 지형", "경사가 완만한 지형"));
+    verify(generationClient, times(1)).generate(RiskLevel.HIGH, HousingType.SEMI_BASEMENT);
+  }
+
+  @Test
+  void returnsVerifiedDefaultChecklistWhenGeminiFails() throws Exception {
+    when(generationClient.generate(any(), any()))
+        .thenThrow(new BaseException(PreventionGuideErrorCode.AI_SERVICE_ERROR));
+
+    mvc.perform(
+            post("/api/resident/risk-assessments/{assessmentId}/guide", assessmentId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.source").value("DEFAULT"))
+        .andExpect(jsonPath("$.result.totalCount").value(4))
+        .andExpect(jsonPath("$.result.items[0].ruleId").value("BASEMENT_EVAC"))
+        .andExpect(jsonPath("$.result.items[1].ruleId").value("BASEMENT_TOOLS"))
+        .andExpect(jsonPath("$.result.items[2].ruleId").value("BARRIER"))
+        .andExpect(jsonPath("$.result.items[3].ruleId").value("POWER"));
   }
 
   @Test
@@ -164,7 +184,7 @@ class PreventionGuideGenerationTest {
                 .value("주민-AI취약도 분석"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/resident/risk-assessments/{assessmentId}/guide'].post.responses['502']")
+                    "$.paths['/api/resident/risk-assessments/{assessmentId}/guide'].post.responses['400']")
                 .exists());
   }
 }
