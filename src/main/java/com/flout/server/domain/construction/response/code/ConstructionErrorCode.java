@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum ConstructionErrorCode implements BaseResponseCode {
+  PHOTO_READ_FAILED(500, "CONSTRUCTION_500_2", "시공 사진을 불러오지 못했습니다."),
   PAST_SCHEDULE(400, "CONSTRUCTION_400_1", "확정 시공 일정은 현재 시각 이후로 입력해주세요."),
   JURISDICTION_ACCESS_DENIED(403, "CONSTRUCTION_403_1", "관할 지역의 시공 건만 변경할 수 있습니다."),
   NOT_FOUND(404, "CONSTRUCTION_404_1", "시공 건을 찾을 수 없습니다."),
