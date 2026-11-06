@@ -7,6 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.construction.repository.ConstructionRepository;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
@@ -31,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
       "spring.jpa.hibernate.ddl-auto=validate",
       "spring.datasource.url=jdbc:h2:mem:construction-completion;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "app.inspection.auto-start.enabled=false",
+      "app.fcm.enabled=false",
       "app.s3.cleanup-interval-millis=3600000"
     })
 @AutoConfigureMockMvc
@@ -47,6 +51,7 @@ class ConstructionCompletionTest {
   Clock clock;
 
   @MockitoSpyBean ConstructionRepository constructions;
+  @MockitoBean FcmDeliveryStore deliveries;
   long supportId, applicationId, adminId;
   long constructionId = 900;
   String token, residentToken;
@@ -213,6 +218,7 @@ class ConstructionCompletionTest {
   void rollsBackResultAndCompletionWhenPersistenceFails() throws Exception {
     doThrow(new IllegalStateException("database failure")).when(constructions).flush();
     complete(body(), token).andExpect(status().isInternalServerError());
+    verifyNoInteractions(deliveries);
     assertThat(jdbc.queryForObject("SELECT completed_at FROM constructions", Object.class))
         .isNull();
     assertThat(
@@ -241,6 +247,13 @@ class ConstructionCompletionTest {
       start.countDown();
       assertThat(List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS)))
           .containsExactlyInAnyOrder(200, 409);
+      verify(deliveries)
+          .enqueue(
+              new PushNotificationRequested(
+                  users.findByEmail("resident@construction.test").orElseThrow().getId(),
+                  NotificationType.CONSTRUCTION_COMPLETED,
+                  applicationId,
+                  "construction-completed:" + constructionId));
     } finally {
       executor.shutdownNow();
     }

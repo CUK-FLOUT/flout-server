@@ -140,7 +140,8 @@ class SupportStatusTest {
         .andExpect(jsonPath("$.result.length()").value(4))
         .andExpect(jsonPath("$.result.totalCount").value(0))
         .andExpect(jsonPath("$.result.reviewingCount").value(0))
-        .andExpect(jsonPath("$.result.consentRequiredCount").value(0))
+        .andExpect(jsonPath("$.result.rejectedCount").value(0))
+        .andExpect(jsonPath("$.result.consentRequiredCount").doesNotExist())
         .andExpect(jsonPath("$.result.approvedCount").value(0));
   }
 
@@ -151,12 +152,14 @@ class SupportStatusTest {
     add("APPROVED", "  경기도 부천시 원미구 ", "CONFIRMED");
     add("SUBMITTED", "경기도 부천시 원미구", "CONFIRMED");
     add("REJECTED", "경기도 부천시 원미구", "PENDING");
+    add("REJECTED", "서울시 중구", "PENDING");
+    add("DRAFT", "부천시 원미구", "PENDING");
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     statusRequest(token)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(6))
         .andExpect(jsonPath("$.result.reviewingCount").value(4))
-        .andExpect(jsonPath("$.result.consentRequiredCount").value(0))
+        .andExpect(jsonPath("$.result.rejectedCount").value(1))
         .andExpect(jsonPath("$.result.approvedCount").value(1));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
     mvc.perform(
@@ -293,7 +296,7 @@ class SupportStatusTest {
     statusRequest(token)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(tenant ? 0 : 1))
-        .andExpect(jsonPath("$.result.consentRequiredCount").value(0))
+        .andExpect(jsonPath("$.result.rejectedCount").value(0))
         .andExpect(jsonPath("$.result.reviewingCount").value(tenant ? 0 : 1));
   }
 }

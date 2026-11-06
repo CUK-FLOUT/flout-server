@@ -2,6 +2,8 @@ package com.flout.server.domain.inspection.service;
 
 import com.flout.server.domain.inspection.entity.*;
 import com.flout.server.domain.inspection.repository.*;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -15,6 +17,7 @@ public class InspectionStatusService {
   private final InspectionRepository inspections;
   private final InspectionStatusHistoryRepository histories;
   private final Clock inspectionClock;
+  private final NotificationService notifications;
 
   /** 방문 시간이 된 예정 점검만 진행으로 변경하고 자동 전환 이력을 저장합니다. */
   @Transactional
@@ -27,6 +30,12 @@ public class InspectionStatusService {
         || inspection.getScheduledAt().isAfter(now)) return false;
     inspection.changeStatus(InspectionStatus.IN_PROGRESS, now);
     histories.saveAndFlush(InspectionStatusHistory.autoStarted(inspection, now));
+    var application = inspection.getApplication();
+    notifications.send(
+        application.getApplicant().getId(),
+        NotificationType.INSPECTION_STARTED,
+        application.getId(),
+        "inspection-started:" + inspectionId);
     return true;
   }
 }

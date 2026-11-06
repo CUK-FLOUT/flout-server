@@ -3,6 +3,8 @@ package com.flout.server.domain.supportapplication.service;
 import com.flout.server.domain.construction.entity.Construction;
 import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.supportapplication.dto.request.ApproveSupportApplicationRequest;
 import com.flout.server.domain.supportapplication.dto.response.ApproveSupportApplicationResponse;
 import com.flout.server.domain.supportapplication.entity.*;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupportApprovalService {
   private final SupportDecisionAccess access;
   private final SupportApplicationStatusHistoryRepository histories;
+  private final NotificationService notifications;
   private final SupportAttachmentRepository attachments;
   private final ConstructionRepository constructions;
 
@@ -41,6 +44,11 @@ public class SupportApprovalService {
     histories.saveAndFlush(SupportApplicationStatusHistory.approved(application, previousStatus));
     var construction =
         constructions.saveAndFlush(Construction.pending(application, application.getApprovedAt()));
+    notifications.send(
+        application.getApplicant().getId(),
+        NotificationType.SUPPORT_APPROVED,
+        application.getApplication().getId(),
+        "support-approved:" + id);
     return ApproveSupportApplicationResponse.from(application, construction.getId());
   }
 }

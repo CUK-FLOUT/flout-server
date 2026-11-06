@@ -4,9 +4,12 @@ import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspection.repository.InspectionResultRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.supportapplication.dto.request.CreateSupportApplicationRequest;
 import com.flout.server.domain.supportapplication.dto.response.CreateSupportApplicationResponse;
 import com.flout.server.domain.supportapplication.entity.SupportApplication;
+import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportprogram.repository.SupportProgramRepository;
@@ -34,6 +37,7 @@ public class SupportApplicationService {
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
   private final EntityManager entityManager;
+  private final NotificationService notifications;
   private final TransactionTemplate transaction;
 
   public SupportApplicationService(
@@ -44,6 +48,7 @@ public class SupportApplicationService {
       InspectionRepository inspections,
       InspectionResultRepository results,
       EntityManager entityManager,
+      NotificationService notifications,
       PlatformTransactionManager manager) {
     this.users = users;
     this.applications = applications;
@@ -52,6 +57,7 @@ public class SupportApplicationService {
     this.inspections = inspections;
     this.results = results;
     this.entityManager = entityManager;
+    this.notifications = notifications;
     transaction = new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -113,6 +119,13 @@ public class SupportApplicationService {
                         request.preferredVisitTime()));
 
             entityManager.refresh(saved);
+            if (saved.getStatus() == SupportApplicationStatus.SUBMITTED) {
+              notifications.send(
+                  userId,
+                  NotificationType.SUPPORT_RECEIVED,
+                  source.getId(),
+                  "support-received:" + saved.getId());
+            }
             return CreateSupportApplicationResponse.from(saved);
           });
     } catch (DataIntegrityViolationException e) {

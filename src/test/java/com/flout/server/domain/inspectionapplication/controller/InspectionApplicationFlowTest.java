@@ -221,6 +221,90 @@ class InspectionApplicationFlowTest {
   }
 
   @Test
+  void requiresLocationsAndVisitScheduleEvenWithoutFloodExperience() throws Exception {
+    for (String field : List.of("inflowLocations", "preferredVisitDate", "preferredTimeSlot")) {
+      var body = request();
+      body.put("floodExperience", "NO");
+      body.remove(field);
+      mvc.perform(
+              post("/api/resident/applications")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(body)))
+          .andExpect(status().isBadRequest());
+    }
+    var body = request();
+    body.put("floodExperience", "NO");
+    body.put("inflowLocations", List.of());
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isBadRequest());
+    body.put("inflowLocations", List.of("UNKNOWN"));
+    mvc.perform(
+            post("/api/resident/applications")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void incompleteLegacyDraftCannotBeReceivedOrPersistAttachments() throws Exception {
+    long id = createDraft();
+    for (String defect : List.of("location", "date", "past", "time")) {
+      jdbc.update(
+          "UPDATE inspection_applications SET preferred_visit_date=?, preferred_time_slot='MORNING' WHERE application_id=?",
+          LocalDate.now().plusDays(1),
+          id);
+      jdbc.update("DELETE FROM application_inflow_locations WHERE application_id=?", id);
+      if (!defect.equals("location"))
+        jdbc.update(
+            "INSERT INTO application_inflow_locations(application_id,inflow_location) VALUES (?, 'WINDOW')",
+            id);
+      if (defect.equals("date"))
+        jdbc.update(
+            "UPDATE inspection_applications SET preferred_visit_date=NULL WHERE application_id=?",
+            id);
+      if (defect.equals("past"))
+        jdbc.update(
+            "UPDATE inspection_applications SET preferred_visit_date=? WHERE application_id=?",
+            LocalDate.now().minusDays(1),
+            id);
+      if (defect.equals("time"))
+        jdbc.update(
+            "UPDATE inspection_applications SET preferred_time_slot=NULL WHERE application_id=?",
+            id);
+      mvc.perform(
+              multipart("/api/resident/applications/{id}/attachments", id)
+                  .file(png())
+                  .header("Authorization", "Bearer " + token))
+          .andExpect(status().isBadRequest());
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT status FROM inspection_applications WHERE application_id=?",
+                  String.class,
+                  id))
+          .isEqualTo("DRAFT");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM application_attachments WHERE application_id=?",
+                  Long.class,
+                  id))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM inspections WHERE application_id=?", Long.class, id))
+          .isZero();
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Long.class))
+          .isZero();
+    }
+    verifyNoInteractions(storage);
+  }
+
+  @Test
   void updatesOnlyProvidedFieldsAndPreservesIdentity() throws Exception {
     long id = createDraft();
     var original =
@@ -263,17 +347,13 @@ class InspectionApplicationFlowTest {
         .andExpect(jsonPath("$.result.applicant.name").value("수정 이름"))
         .andExpect(jsonPath("$.result.requestReason").value("사유"))
         .andExpect(jsonPath("$.result.inflowLocations.length()").value(2));
-    update(
-            id,
-            "{\"requestReason\":null,\"preferredVisitDate\":null,\"preferredTimeSlot\":null,\"inflowLocations\":[]}",
-            token)
-        .andExpect(status().isOk());
+    update(id, "{\"requestReason\":null}", token).andExpect(status().isOk());
     mvc.perform(
             get("/api/resident/applications/{id}", id).header("Authorization", "Bearer " + token))
         .andExpect(jsonPath("$.result.requestReason").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.result.preferredVisitDate").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.result.preferredTimeSlot").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.result.inflowLocations").isEmpty());
+        .andExpect(jsonPath("$.result.preferredVisitDate").value("2099-01-01"))
+        .andExpect(jsonPath("$.result.preferredTimeSlot").value("AFTERNOON"))
+        .andExpect(jsonPath("$.result.inflowLocations.length()").value(2));
   }
 
   @Test
@@ -293,7 +373,10 @@ class InspectionApplicationFlowTest {
             "{\"floodExperience\":null}",
             "{\"existingFacility\":null}",
             "{\"inflowLocations\":null}",
+            "{\"inflowLocations\":[]}",
             "{\"inflowLocations\":[null]}",
+            "{\"preferredVisitDate\":null}",
+            "{\"preferredTimeSlot\":null}",
             "{\"contact\":\"   \"}",
             "{\"preferredVisitDate\":\"2000-01-01\"}",
             "{\"assessmentId\":2}",
@@ -372,6 +455,90 @@ class InspectionApplicationFlowTest {
       executor.shutdownNow();
       reset(inspections);
     }
+  }
+
+  @Test
+  void documentsCreateRequiredFieldsAndCompleteExampleWhilePatchRemainsOptional() throws Exception {
+    var body =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var api = mapper.readTree(body);
+    var schemas = api.path("components").path("schemas");
+    var create = schemas.path("CreateInspectionApplicationRequest");
+    var required = new java.util.HashSet<String>();
+    create.path("required").forEach(field -> required.add(field.asText()));
+    var fields =
+        List.of(
+            "assessmentId",
+            "address",
+            "detailAddress",
+            "latitude",
+            "longitude",
+            "contact",
+            "occupancyType",
+            "floodExperience",
+            "existingFacility",
+            "inflowLocations",
+            "preferredVisitDate",
+            "preferredTimeSlot",
+            "applicantName");
+    assertThat(required).containsAll(fields);
+    assertThat(create.path("properties").path("inflowLocations").path("type").asText())
+        .isEqualTo("array");
+    assertThat(create.path("properties").path("inflowLocations").path("minItems").asInt())
+        .isEqualTo(1);
+    var locations = create.path("properties").path("inflowLocations");
+    var allowed = new java.util.HashSet<String>();
+    locations.path("items").path("enum").forEach(value -> allowed.add(value.asText()));
+    assertThat(allowed)
+        .containsExactlyInAnyOrder("WINDOW", "ENTRANCE", "BATHROOM", "DRAIN", "ETC", "UNKNOWN");
+    assertThat(locations.path("example").isArray()).isTrue();
+    assertThat(locations.path("example").get(0).asText()).isEqualTo("ENTRANCE");
+    assertThat(locations.path("example").get(1).asText()).isEqualTo("DRAIN");
+    assertThat(locations.path("example").size()).isEqualTo(2);
+    var example =
+        api.path("paths")
+            .path("/api/resident/applications")
+            .path("post")
+            .path("requestBody")
+            .path("content")
+            .path("application/json")
+            .path("examples")
+            .path("inspectionApplication")
+            .path("value");
+    fields.forEach(field -> assertThat(example.hasNonNull(field)).as(field).isTrue());
+    assertThat(mapper.readValue(example.toString(), java.util.LinkedHashMap.class).keySet())
+        .containsExactly(
+            "applicantName",
+            "contact",
+            "occupancyType",
+            "floodExperience",
+            "inflowLocations",
+            "existingFacility",
+            "requestReason",
+            "preferredVisitDate",
+            "preferredTimeSlot",
+            "assessmentId",
+            "address",
+            "detailAddress",
+            "latitude",
+            "longitude");
+    assertThat(required).doesNotContain("requestReason");
+    assertThat(example.path("inflowLocations").isArray()).isTrue();
+    var patchRequired = schemas.path("UpdateInspectionApplicationRequest").path("required");
+    assertThat(patchRequired.isMissingNode() || patchRequired.isEmpty()).isTrue();
+    var timeValues =
+        schemas
+            .path("UpdateInspectionApplicationRequest")
+            .path("properties")
+            .path("preferredTimeSlot")
+            .path("enum");
+    var times = new java.util.ArrayList<String>();
+    timeValues.forEach(value -> times.add(value.isNull() ? null : value.asText()));
+    assertThat(times).containsExactlyInAnyOrder("MORNING", "AFTERNOON", "ANY");
   }
 
   @Test

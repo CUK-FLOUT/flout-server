@@ -7,6 +7,8 @@ import com.flout.server.domain.inspection.entity.InspectionStatusHistory;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspection.repository.InspectionStatusHistoryRepository;
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
@@ -27,6 +29,7 @@ public class InspectionAssignmentService {
   private final InspectionRepository inspections;
   private final Clock inspectionClock;
   private final InspectionStatusHistoryRepository histories;
+  private final NotificationService notifications;
 
   /** 미배정 접수·예정 점검에 본인을 배정하고 예정 상태 및 전환 이력을 함께 저장합니다. */
   @Transactional
@@ -65,6 +68,12 @@ public class InspectionAssignmentService {
     if (previous != inspection.getStatus())
       histories.saveAndFlush(InspectionStatusHistory.changed(inspection, previous, operator, now));
     inspections.flush();
+    var application = inspection.getApplication();
+    notifications.send(
+        application.getApplicant().getId(),
+        NotificationType.INSPECTION_SCHEDULED,
+        application.getId(),
+        "inspection-scheduled:" + inspectionId);
     return InspectionAssignmentResponse.from(inspection);
   }
 }

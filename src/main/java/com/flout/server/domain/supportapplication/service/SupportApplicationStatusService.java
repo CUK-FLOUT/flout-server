@@ -20,7 +20,7 @@ public class SupportApplicationStatusService {
     return new SupportApplicationStatusResponse(
         counts.getTotalCount(),
         counts.getReviewingCount(),
-        counts.getConsentRequiredCount(),
+        counts.getRejectedCount(),
         counts.getApprovedCount());
   }
 }

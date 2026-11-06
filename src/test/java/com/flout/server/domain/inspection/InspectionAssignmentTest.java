@@ -11,6 +11,9 @@ import com.flout.server.domain.inspection.service.*;
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.entity.*;
 import com.flout.server.domain.inspectionapplication.repository.*;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.riskassessment.entity.*;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.flout.server.domain.user.entity.User;
@@ -41,7 +44,8 @@ import tools.jackson.databind.ObjectMapper;
       "spring.flyway.enabled=true",
       "spring.jpa.hibernate.ddl-auto=validate",
       "spring.datasource.url=jdbc:h2:mem:inspection-assignment;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
-      "app.inspection.auto-start.enabled=false"
+      "app.inspection.auto-start.enabled=false",
+      "app.fcm.enabled=false"
     })
 @AutoConfigureMockMvc
 class InspectionAssignmentTest {
@@ -59,6 +63,7 @@ class InspectionAssignmentTest {
   @Autowired JwtService jwt;
   @MockitoSpyBean InspectionStatusHistoryRepository histories;
   @MockitoBean Clock inspectionClock;
+  @MockitoBean FcmDeliveryStore deliveries;
   User resident;
   Long operatorId;
   Long applicationId;
@@ -324,9 +329,18 @@ class InspectionAssignmentTest {
         inspectionId);
     save(request()).andExpect(status().isOk());
     assertThat(service.startIfDue(inspectionId)).isFalse();
+    var started =
+        new PushNotificationRequested(
+            resident.getId(),
+            NotificationType.INSPECTION_STARTED,
+            applicationId,
+            "inspection-started:" + inspectionId);
+    verify(deliveries, never()).enqueue(started);
     when(inspectionClock.instant())
         .thenReturn(LocalDateTime.of(2030, 1, 3, 14, 0).atZone(SEOUL).toInstant());
     assertThat(service.startIfDue(inspectionId)).isTrue();
+    assertThat(service.startIfDue(inspectionId)).isFalse();
+    verify(deliveries).enqueue(started);
     assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
         .isEqualTo(InspectionStatus.IN_PROGRESS);
     assertThat(histories.count()).isEqualTo(1);
@@ -371,6 +385,13 @@ class InspectionAssignmentTest {
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.code").value("INSPECTION_409_4"));
       assertThat(histories.count()).isEqualTo(1);
+      verify(deliveries)
+          .enqueue(
+              new PushNotificationRequested(
+                  resident.getId(),
+                  NotificationType.INSPECTION_SCHEDULED,
+                  applicationId,
+                  "inspection-scheduled:" + inspectionId));
     }
   }
 
@@ -437,6 +458,7 @@ class InspectionAssignmentTest {
     assertThat(inspection.getInspector()).isNull();
     assertThat(inspection.getScheduledAt()).isNull();
     assertThat(histories.count()).isZero();
+    verifyNoInteractions(deliveries);
   }
 
   // 배정 저장과 자동 전환 간 경합

@@ -6,6 +6,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationStatusHistoryRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
@@ -23,6 +26,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.*;
 import tools.jackson.databind.ObjectMapper;
@@ -44,6 +48,7 @@ class SupportRejectionTest {
   @Autowired ObjectMapper mapper;
   @Autowired JwtEncoder encoder;
   @MockitoSpyBean SupportApplicationStatusHistoryRepository histories;
+  @MockitoBean FcmDeliveryStore deliveries;
   long supportId, adminId, residentId;
   String token, residentToken;
   static final String SCOPE = "출입구 물막이판 설치 지원";
@@ -309,6 +314,15 @@ class SupportRejectionTest {
       assertThat(history.get("STATUS")).isEqualTo(row.get("STATUS"));
       assertThat(history.get("REJECTION_REASON")).isEqualTo(row.get("REJECTION_REASON"));
       assertThat(history.get("SUPPORT_SCOPE")).isEqualTo(row.get("SUPPORT_SCOPE"));
+      boolean approved = "APPROVED".equals(row.get("STATUS"));
+      verify(deliveries)
+          .enqueue(
+              new PushNotificationRequested(
+                  residentId,
+                  approved ? NotificationType.SUPPORT_APPROVED : NotificationType.SUPPORT_REJECTED,
+                  ((Number) row.get("APPLICATION_ID")).longValue(),
+                  (approved ? "support-approved:" : "support-rejected:") + supportId));
+      verifyNoMoreInteractions(deliveries);
     } finally {
       pool.shutdownNow();
     }
@@ -377,6 +391,7 @@ class SupportRejectionTest {
     send(supportId, body(), token).andExpect(status().isInternalServerError());
     unchanged();
     assertThat(snapshot()).isEqualTo(before);
+    verifyNoInteractions(deliveries);
   }
 
   @Test
