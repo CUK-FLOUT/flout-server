@@ -25,7 +25,8 @@ public class AddressController {
   @GetMapping("/search")
   @Operation(
       summary = "주민 주소 검색",
-      description = "도로명, 지번 또는 지역명으로 부천시 주소를 검색합니다. 페이지당 검색 개수는 10건이며 빈 페이지에도 다음 페이지가 있을 수 있습니다.")
+      description =
+          "도로명, 지번, 건물명, 동 또는 구 이름으로 부천시 주소를 검색합니다. 부천시 단독 검색은 지원하지 않으며 빈 결과를 반환합니다. 페이지당 외부 검색 개수는 10건이며 필터링으로 빈 페이지에도 다음 페이지가 있을 수 있습니다.")
   public SuccessResponse<AddressSearchResponse> search(
       @Valid @ModelAttribute AddressSearchRequest request) {
     return SuccessResponse.of(
