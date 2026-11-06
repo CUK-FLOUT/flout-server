@@ -78,35 +78,19 @@ public class AdminApplicationListController {
   @GetMapping(value = "/stats", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "신청 현황 건수 조회",
-      description =
-          "신청 목록과 동일한 지역·취약도·처리 단계·검색어 조건에 맞는 전체 신청을 집계합니다. 지원·시공 진행 중은 지원 검토·승인 및 시공 예정·진행 중을 포함합니다.")
+      description = "운영자 관할의 접수된 신청 전체를 집계합니다. 지원·시공 진행 중은 지원 검토·승인 및 시공 예정·진행 중을 포함합니다.")
   @ApiResponse(responseCode = "200", description = "신청 현황 건수 조회 성공", useReturnTypeSchema = true)
-  @ApiResponse(
-      responseCode = "400",
-      description = "잘못된 조회 조건",
-      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   @ApiResponse(
       responseCode = "403",
       description = "운영자 권한 또는 부천시 관할 없음",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public ResponseEntity<SuccessResponse<AdminApplicationStatsResponse>> stats(
-      @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "원미구·소사구·오정구. 생략하면 관할 전체") @RequestParam(defaultValue = "")
-          String district,
-      @Parameter(description = "HIGH=높음, CAUTION=보통, LOW=낮음. 생략하면 전체")
-          @RequestParam(required = false)
-          RiskLevel riskLevel,
-      @Parameter(description = "INSPECTION=점검, SUPPORT=지원, CONSTRUCTION=시공. 생략하면 전체")
-          @RequestParam(required = false)
-          ApplicationProcessingStage processingStatus,
-      @Parameter(description = "주소·상세주소·접수번호 부분 검색, 최대 255자") @RequestParam(defaultValue = "")
-          String keyword) {
+      @AuthenticationPrincipal Jwt jwt) {
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
         .body(
             SuccessResponse.of(
-                service.stats(
-                    Long.valueOf(jwt.getSubject()), district, keyword, riskLevel, processingStatus),
+                service.stats(Long.valueOf(jwt.getSubject())),
                 InspectionApplicationSuccessCode.STATS_FOUND));
   }
 }

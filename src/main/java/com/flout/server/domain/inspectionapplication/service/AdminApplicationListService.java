@@ -40,14 +40,9 @@ public class AdminApplicationListService {
   }
 
   @Transactional(readOnly = true)
-  public AdminApplicationStatsResponse stats(
-      Long operatorId,
-      String district,
-      String keyword,
-      RiskLevel riskLevel,
-      ApplicationProcessingStage processingStatus) {
-    validateSearch(operatorId, district, keyword);
-    return applications.stats(district, keyword.strip(), riskLevel, processingStatus);
+  public AdminApplicationStatsResponse stats(Long operatorId) {
+    requireOperator(operatorId);
+    return applications.stats();
   }
 
   @Transactional(readOnly = true)
@@ -62,6 +57,12 @@ public class AdminApplicationListService {
   }
 
   private void validateSearch(Long operatorId, String district, String keyword) {
+    requireOperator(operatorId);
+    if (!DISTRICTS.contains(district) || keyword.length() > 255)
+      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+  }
+
+  private void requireOperator(Long operatorId) {
     var operator =
         users
             .findById(operatorId)
@@ -70,8 +71,5 @@ public class AdminApplicationListService {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
       throw new BaseException(InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED);
-
-    if (!DISTRICTS.contains(district) || keyword.length() > 255)
-      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
   }
 }

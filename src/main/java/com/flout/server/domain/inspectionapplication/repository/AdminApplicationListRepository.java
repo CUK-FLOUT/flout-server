@@ -17,7 +17,7 @@ public class AdminApplicationListRepository {
   private static final String BUCHEON = "^(?:(?:경기도|경기)\\s+)?부천시";
 
   // Use the same latest submitted support application as the support and construction detail tabs.
-  private static final String FILTERED_APPLICATIONS =
+  private static final String JURISDICTION_APPLICATIONS =
       """
       FROM (
         SELECT a.application_id, a.applicant_name, a.address, a.detail_address, a.latitude, a.longitude,
@@ -48,6 +48,11 @@ public class AdminApplicationListRepository {
         LEFT JOIN constructions c ON c.support_application_id = s.support_application_id
         WHERE a.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(a.address), :region)
       ) applications
+      """;
+
+  private static final String FILTERED_APPLICATIONS =
+      JURISDICTION_APPLICATIONS
+          + """
       WHERE (:riskLevel = '' OR risk_level = :riskLevel)
         AND (:processingStage = ''
           OR LOCATE(CONCAT(:processingStage, '_'), processing_status) = 1
@@ -89,11 +94,7 @@ public class AdminApplicationListRepository {
     return new AdminApplicationListResponse(items, page, size, total, Math.ceilDiv(total, size));
   }
 
-  public AdminApplicationStatsResponse stats(
-      String district,
-      String keyword,
-      RiskLevel riskLevel,
-      ApplicationProcessingStage processingStage) {
+  public AdminApplicationStatsResponse stats() {
     return jdbc.queryForObject(
         """
         SELECT COUNT(*) AS total_count,
@@ -103,8 +104,8 @@ public class AdminApplicationListRepository {
             'SUPPORT_REVIEWING', 'SUPPORT_APPROVED', 'CONSTRUCTION_SCHEDULED', 'CONSTRUCTION_IN_PROGRESS'
           ) THEN 1 END) AS support_construction_in_progress_count
         """
-            + FILTERED_APPLICATIONS,
-        filters(district, keyword, riskLevel, processingStage),
+            + JURISDICTION_APPLICATIONS,
+        new MapSqlParameterSource("region", BUCHEON + "(?:\\s|$)"),
         (rs, rowNum) ->
             new AdminApplicationStatsResponse(
                 rs.getLong("total_count"),

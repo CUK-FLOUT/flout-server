@@ -168,15 +168,15 @@ class InspectionApplicationDetailTest {
   }
 
   @Test
-  void gisStatsUseTheListFiltersAndCountTheCurrentInspectionState() throws Exception {
-    var stats =
-        get("/api/admin/applications/stats")
-            .header("Authorization", "Bearer " + token)
-            .param("district", "원미구")
-            .param("riskLevel", "HIGH")
-            .param("processingStatus", "INSPECTION")
-            .param("keyword", "101호");
-    mvc.perform(stats)
+  void gisStatsCountAllReceivedApplicationsWithinJurisdictionWithoutSearchFilters()
+      throws Exception {
+    var stats = get("/api/admin/applications/stats").header("Authorization", "Bearer " + token);
+    mvc.perform(
+            stats
+                .param("district", "소사구")
+                .param("riskLevel", "LOW")
+                .param("processingStatus", "SUPPORT")
+                .param("keyword", "검색되지 않는 주소"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("APPLICATION_200_11"))
         .andExpect(jsonPath("$.result.totalCount").value(1))
@@ -190,13 +190,19 @@ class InspectionApplicationDetailTest {
         .andExpect(jsonPath("$.result.totalCount").value(1))
         .andExpect(jsonPath("$.result.assignmentPendingCount").value(0))
         .andExpect(jsonPath("$.result.inspectionInProgressCount").value(1));
-    jdbc.update("UPDATE risk_assessments SET risk_level='LOW' WHERE assessment_id=?", assessmentId);
+    jdbc.update(
+        "UPDATE inspection_applications SET address='서울시 종로구' WHERE application_id=?",
+        applicationId);
     mvc.perform(stats)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(0))
         .andExpect(jsonPath("$.result.assignmentPendingCount").value(0))
         .andExpect(jsonPath("$.result.inspectionInProgressCount").value(0))
         .andExpect(jsonPath("$.result.supportConstructionInProgressCount").value(0));
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.paths['/api/admin/applications/stats'].get.parameters").doesNotExist());
   }
 
   @Test
