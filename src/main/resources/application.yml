@@ -59,6 +59,12 @@ app:
     predict-path: ${AI_MODEL_PREDICT_PATH:/api/v1/risk-assessments/predict}
     connect-timeout-millis: ${AI_MODEL_CONNECT_TIMEOUT_MILLIS:3000}
     read-timeout-millis: ${AI_MODEL_READ_TIMEOUT_MILLIS:10000}
+  guide-ai:
+    base-url: ${GUIDE_AI_BASE_URL:http://localhost:8001}
+    generate-path: ${GUIDE_AI_GENERATE_PATH:/api/v1/guides/generate}
+    api-key: ${GUIDE_AI_API_KEY:}
+    connect-timeout-millis: ${GUIDE_AI_CONNECT_TIMEOUT_MILLIS:3000}
+    read-timeout-millis: ${GUIDE_AI_READ_TIMEOUT_MILLIS:15000}
 
 springdoc:
   swagger-ui:
