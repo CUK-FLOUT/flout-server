@@ -53,6 +53,8 @@ class InspectionApplicationDetailTest {
   void setup() {
     for (String table :
         List.of(
+            "support_applications",
+            "support_programs",
             "priority_inspection_designations",
             "inspection_status_histories",
             "inspections",
@@ -105,6 +107,169 @@ class InspectionApplicationDetailTest {
   private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder detail() {
     return get("/api/admin/applications/{applicationId}", applicationId)
         .header("Authorization", "Bearer " + token);
+  }
+
+  @Test
+  void searchesGisListWithMatchingTotalsAndSeparateAddressFields() throws Exception {
+    var receiptNo = String.format(Locale.ROOT, "%06d", applicationId);
+    for (String keyword : List.of(receiptNo, "길주로 53", "101호")) {
+      mvc.perform(
+              get("/api/admin/applications")
+                  .header("Authorization", "Bearer " + token)
+                  .param("district", "원미구")
+                  .param("riskLevel", "HIGH")
+                  .param("processingStatus", "INSPECTION")
+                  .param("keyword", keyword)
+                  .param("size", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.totalElements").value(1))
+          .andExpect(jsonPath("$.result.totalPages").value(1))
+          .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))
+          .andExpect(jsonPath("$.result.applications[0].receiptNo").value(receiptNo))
+          .andExpect(jsonPath("$.result.applications[0].applicantName").value("신청이름"))
+          .andExpect(jsonPath("$.result.applications[0].address").value("경기도 부천시 원미구 길주로 53"))
+          .andExpect(jsonPath("$.result.applications[0].detailAddress").value("101호"))
+          .andExpect(jsonPath("$.result.applications[0].riskLevel").value("HIGH"))
+          .andExpect(jsonPath("$.result.applications[0].processingStatus").value("RECEIVED"));
+    }
+    mvc.perform(
+            get("/api/admin/applications")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "%"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0))
+        .andExpect(jsonPath("$.result.applications").isEmpty());
+  }
+
+  @Test
+  void gisMapReturnsStoredCoordinatesAndAppliesTheListFilters() throws Exception {
+    var markers =
+        get("/api/admin/map/applications")
+            .header("Authorization", "Bearer " + token)
+            .param("district", "원미구")
+            .param("riskLevel", "HIGH")
+            .param("processingStatus", "INSPECTION")
+            .param("keyword", "101호");
+    mvc.perform(markers)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("APPLICATION_200_12"))
+        .andExpect(jsonPath("$.result.applications.length()").value(1))
+        .andExpect(jsonPath("$.result.applications[0].applicationId").value(applicationId))
+        .andExpect(jsonPath("$.result.applications[0].latitude").value(37.5))
+        .andExpect(jsonPath("$.result.applications[0].longitude").value(126.7))
+        .andExpect(jsonPath("$.result.applications[0].riskLevel").value("HIGH"))
+        .andExpect(jsonPath("$.result.applications[0].processingStatus").value("RECEIVED"));
+    jdbc.update("UPDATE inspection_applications SET status='DRAFT'");
+    mvc.perform(markers)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.applications").isEmpty());
+    mvc.perform(get("/api/admin/map/applications")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void gisStatsUseTheListFiltersAndCountTheCurrentInspectionState() throws Exception {
+    var stats =
+        get("/api/admin/applications/stats")
+            .header("Authorization", "Bearer " + token)
+            .param("district", "원미구")
+            .param("riskLevel", "HIGH")
+            .param("processingStatus", "INSPECTION")
+            .param("keyword", "101호");
+    mvc.perform(stats)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("APPLICATION_200_11"))
+        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.assignmentPendingCount").value(1))
+        .andExpect(jsonPath("$.result.inspectionInProgressCount").value(0))
+        .andExpect(jsonPath("$.result.supportConstructionInProgressCount").value(0));
+    jdbc.update(
+        "INSERT INTO inspections(application_id,status) VALUES(?,'IN_PROGRESS')", applicationId);
+    mvc.perform(stats)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.assignmentPendingCount").value(0))
+        .andExpect(jsonPath("$.result.inspectionInProgressCount").value(1));
+    jdbc.update("UPDATE risk_assessments SET risk_level='LOW' WHERE assessment_id=?", assessmentId);
+    mvc.perform(stats)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(0))
+        .andExpect(jsonPath("$.result.assignmentPendingCount").value(0))
+        .andExpect(jsonPath("$.result.inspectionInProgressCount").value(0))
+        .andExpect(jsonPath("$.result.supportConstructionInProgressCount").value(0));
+  }
+
+  @Test
+  void filtersGisListByLatestSubmittedSupportAndConstructionState() throws Exception {
+    jdbc.update(
+        "INSERT INTO support_programs(name,created_at) VALUES('지원사업',CURRENT_TIMESTAMP),('임시 지원사업',CURRENT_TIMESTAMP)");
+    jdbc.update(
+        """
+        INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,
+          applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,
+          status,submitted_at,landlord_consent_status)
+        SELECT a.application_id,p.program_id,a.applicant_user_id,'물막이판',
+          a.applicant_name,a.contact,a.address,'OWNER',CURRENT_DATE,'ANY',
+          CASE WHEN p.name='지원사업' THEN 'APPROVED' ELSE 'DRAFT' END,
+          CASE WHEN p.name='지원사업' THEN CURRENT_TIMESTAMP ELSE NULL END,'NOT_REQUIRED'
+        FROM inspection_applications a CROSS JOIN support_programs p WHERE a.application_id=?
+        """,
+        applicationId);
+    jdbc.update(
+        """
+        INSERT INTO constructions(support_application_id,status,created_at,updated_at)
+        SELECT support_application_id,'IN_PROGRESS',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+        FROM support_applications WHERE status='APPROVED'
+        """);
+    mvc.perform(
+            get("/api/admin/applications")
+                .header("Authorization", "Bearer " + token)
+                .param("processingStatus", "CONSTRUCTION"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(
+            jsonPath("$.result.applications[0].processingStatus")
+                .value("CONSTRUCTION_IN_PROGRESS"));
+    mvc.perform(
+            get("/api/admin/applications")
+                .header("Authorization", "Bearer " + token)
+                .param("processingStatus", "INSPECTION"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+    jdbc.update("UPDATE constructions SET status='PENDING'");
+    mvc.perform(
+            get("/api/admin/applications")
+                .header("Authorization", "Bearer " + token)
+                .param("processingStatus", "SUPPORT"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(1))
+        .andExpect(jsonPath("$.result.applications[0].processingStatus").value("SUPPORT_APPROVED"));
+    var stats = get("/api/admin/applications/stats").header("Authorization", "Bearer " + token);
+    mvc.perform(stats)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.supportConstructionInProgressCount").value(1));
+    jdbc.update("UPDATE constructions SET status='COMPLETED'");
+    mvc.perform(stats)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(1))
+        .andExpect(jsonPath("$.result.supportConstructionInProgressCount").value(0));
+  }
+
+  @Test
+  void gisListExcludesDraftsAndOtherJurisdictionsAndRequiresAnAdmin() throws Exception {
+    mvc.perform(get("/api/admin/applications")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/applications")
+                .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
+        .andExpect(status().isForbidden());
+    jdbc.update("UPDATE inspection_applications SET status='DRAFT'");
+    mvc.perform(get("/api/admin/applications").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
+    jdbc.update("UPDATE inspection_applications SET status='RECEIVED',address='서울시 부천시 원미구'");
+    mvc.perform(get("/api/admin/applications").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalElements").value(0));
   }
 
   // 화면 필드 출처와 신청·주민·분석·유입 위치 보존 검증
