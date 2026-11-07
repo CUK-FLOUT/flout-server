@@ -7,15 +7,20 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.address.dto.response.AddressCoordinatesResponse;
+import com.flout.server.domain.address.service.AddressCoordinatesService;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.inspectionapplication.service.ReceiptNumberGenerator;
+import com.flout.server.domain.riskassessment.client.RiskPrediction;
+import com.flout.server.domain.riskassessment.client.RiskPredictionClient;
 import com.flout.server.domain.riskassessment.entity.*;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -51,6 +56,8 @@ class InspectionApplicationFlowTest {
   @MockitoSpyBean InspectionRepository inspections;
   @MockitoSpyBean ReceiptNumberGenerator receiptNumbers;
   @MockitoBean AttachmentStorage storage;
+  @MockitoBean AddressCoordinatesService coordinatesService;
+  @MockitoBean RiskPredictionClient predictionClient;
   Long assessmentId;
   String token;
 
@@ -73,6 +80,16 @@ class InspectionApplicationFlowTest {
             "users")) jdbc.update("DELETE FROM " + table);
     var resident = users.saveAndFlush(User.resident("flow@example.com", "hash", "주민"));
     token = jwt.issue(resident).accessToken();
+    when(coordinatesService.coordinates(anyString()))
+        .thenReturn(new AddressCoordinatesResponse(37.5035, 126.7660));
+    when(predictionClient.predict(anyDouble(), anyDouble()))
+        .thenReturn(
+            new RiskPrediction(
+                "REGIONAL_RELATIVE_VULNERABILITY",
+                new BigDecimal("0.2841"),
+                RiskLevel.HIGH,
+                List.of("주변 500m 건물·도로 비율이 높은 지형"),
+                "지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다."));
     assessmentId =
         assessments
             .saveAndFlush(

@@ -54,6 +54,17 @@ app:
     base-url: https://business.juso.go.kr
     connect-timeout-millis: 3000
     read-timeout-millis: 3000
+  ai:
+    base-url: ${AI_MODEL_BASE_URL:http://localhost:8000}
+    predict-path: ${AI_MODEL_PREDICT_PATH:/api/vulnerability}
+    connect-timeout-millis: ${AI_MODEL_CONNECT_TIMEOUT_MILLIS:3000}
+    read-timeout-millis: ${AI_MODEL_READ_TIMEOUT_MILLIS:10000}
+  gemini:
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+    api-key: ${GEMINI_API_KEY:}
+    connect-timeout-millis: ${GEMINI_CONNECT_TIMEOUT_MILLIS:3000}
+    read-timeout-millis: ${GEMINI_READ_TIMEOUT_MILLIS:15000}
 
 springdoc:
   swagger-ui:
