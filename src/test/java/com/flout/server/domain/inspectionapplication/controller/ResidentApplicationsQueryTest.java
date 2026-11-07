@@ -212,6 +212,7 @@ class ResidentApplicationsQueryTest {
     verifyNoInteractions(storage);
   }
 
+  /** 공개 결과가 없는 점검의 목록·상세 단계와 공개 여부를 검증하며, 완료·미공개 건도 점검 진행으로 표시한다. */
   @ParameterizedTest
   @CsvSource({
     "RECEIVED,INSPECTION_RECEIVED",
