@@ -14,7 +14,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,15 +47,13 @@ public class ResidentNotificationController {
         NotificationSuccessCode.UNREAD_STATUS_FOUND);
   }
 
-  @PatchMapping("/{notificationId}/read-all")
+  @PatchMapping("/read-all")
   @Operation(
       summary = "전체 알림 읽음 처리",
-      description =
-          "경로의 알림이 로그인한 주민의 것인지 확인한 후 해당 주민의 미확인 알림 전체를 읽음 처리합니다. 이미 모두 읽은 경우 readCount는 0입니다.")
-  public SuccessResponse<ReadAllNotificationsResponse> readAll(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable Long notificationId) {
+      description = "로그인한 주민의 미확인 알림 전체를 읽음 처리합니다. 알림이 없거나 이미 모두 읽은 경우 readCount는 0입니다.")
+  public SuccessResponse<ReadAllNotificationsResponse> readAll(@AuthenticationPrincipal Jwt jwt) {
     return SuccessResponse.of(
-        service.readAll(Long.valueOf(jwt.getSubject()), notificationId),
+        service.readAll(Long.valueOf(jwt.getSubject())),
         NotificationSuccessCode.NOTIFICATIONS_READ_ALL);
   }
 }

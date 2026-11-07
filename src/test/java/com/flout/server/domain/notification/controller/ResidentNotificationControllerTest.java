@@ -109,18 +109,13 @@ class ResidentNotificationControllerTest {
         resident.getId(), NotificationType.SUPPORT_APPROVED, 3L, "read-all-second");
     notificationService.send(
         other.getId(), NotificationType.CONSTRUCTION_COMPLETED, 9L, "read-all-other");
-    Long notificationId =
-        notifications
-            .findAllByUserIdOrderByCreatedAtDescIdDesc(resident.getId())
-            .getFirst()
-            .getId();
 
     mvc.perform(
-            patch("/api/resident/notifications/{notificationId}/read-all", notificationId)
+            patch("/api/resident/notifications/read-all")
                 .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("NOTIFICATION_200_3"))
-        .andExpect(jsonPath("$.result.notificationId").value(notificationId))
+        .andExpect(jsonPath("$.result.notificationId").doesNotExist())
         .andExpect(jsonPath("$.result.readCount").value(2))
         .andExpect(jsonPath("$.result.readAt").isNotEmpty());
 
@@ -132,35 +127,20 @@ class ResidentNotificationControllerTest {
         .allMatch(notification -> notification.getReadAt() == null);
 
     mvc.perform(
-            patch("/api/resident/notifications/{notificationId}/read-all", notificationId)
+            patch("/api/resident/notifications/read-all")
                 .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.readCount").value(0));
   }
 
   @Test
-  void rejectsMissingInvalidAndOtherResidentsNotification() throws Exception {
-    notificationService.send(
-        other.getId(), NotificationType.INSPECTION_RECEIVED, 9L, "read-all-forbidden");
-    Long otherNotificationId =
-        notifications.findAllByUserIdOrderByCreatedAtDescIdDesc(other.getId()).getFirst().getId();
-    String token = jwt.issue(resident).accessToken();
-
+  void readsEmptyNotificationsWithoutIdAndRequiresAuthentication() throws Exception {
     mvc.perform(
-            patch("/api/resident/notifications/{notificationId}/read-all", otherNotificationId)
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("NOTIFICATION_403_1"));
-    mvc.perform(
-            patch("/api/resident/notifications/{notificationId}/read-all", Long.MAX_VALUE)
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.code").value("NOTIFICATION_404_1"));
-    mvc.perform(
-            patch("/api/resident/notifications/0/read-all")
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+            patch("/api/resident/notifications/read-all")
+                .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.readCount").value(0));
+    mvc.perform(patch("/api/resident/notifications/read-all")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -176,11 +156,6 @@ class ResidentNotificationControllerTest {
 
     notificationService.send(
         resident.getId(), NotificationType.INSPECTION_RECEIVED, 3L, "unread-status");
-    Long notificationId =
-        notifications
-            .findAllByUserIdOrderByCreatedAtDescIdDesc(resident.getId())
-            .getFirst()
-            .getId();
     mvc.perform(
             get("/api/resident/notifications/unread-status")
                 .header("Authorization", "Bearer " + token))
@@ -188,7 +163,7 @@ class ResidentNotificationControllerTest {
         .andExpect(jsonPath("$.result.hasUnread").value(true));
 
     mvc.perform(
-            patch("/api/resident/notifications/{notificationId}/read-all", notificationId)
+            patch("/api/resident/notifications/read-all")
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
     mvc.perform(
