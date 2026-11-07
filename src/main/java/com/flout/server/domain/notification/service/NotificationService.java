@@ -1,6 +1,8 @@
 package com.flout.server.domain.notification.service;
 
 import com.flout.server.domain.notification.entity.NotificationType;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -11,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
+  private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+
   private final ApplicationEventPublisher events;
   private final JdbcTemplate jdbc;
 
@@ -34,14 +38,15 @@ public class NotificationService {
     }
     jdbc.update(
         """
-        INSERT INTO notifications (event_id,user_id,notification_type,application_id)
-        VALUES (?,?,?,?)
+        INSERT INTO notifications (event_id,user_id,notification_type,application_id,created_at)
+        VALUES (?,?,?,?,?)
         ON DUPLICATE KEY UPDATE event_id = event_id
         """,
         eventId,
         userId,
         type.name(),
-        applicationId);
+        applicationId,
+        LocalDateTime.now(SEOUL_ZONE));
     events.publishEvent(new PushNotificationRequested(userId, type, applicationId, eventId));
   }
 }

@@ -11,6 +11,8 @@ import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +71,21 @@ class ResidentNotificationControllerTest {
         .andExpect(jsonPath("$.result[0].createdAt").isNotEmpty())
         .andExpect(jsonPath("$.result[1].applicationId").value(3L))
         .andExpect(jsonPath("$.result[1].receiptNumber").value("000003"));
+  }
+
+  @Test
+  void storesNotificationCreatedAtAsSeoulLocalTime() {
+    var before = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusSeconds(1);
+    notificationService.send(
+        resident.getId(), NotificationType.INSPECTION_RECEIVED, 3L, "seoul-created-at");
+    var after = LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusSeconds(1);
+
+    var createdAt =
+        notifications
+            .findAllByUserIdOrderByCreatedAtDescIdDesc(resident.getId())
+            .getFirst()
+            .getCreatedAt();
+    org.assertj.core.api.Assertions.assertThat(createdAt).isBetween(before, after);
   }
 
   @Test
