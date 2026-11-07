@@ -217,7 +217,7 @@ class ResidentApplicationsQueryTest {
     "RECEIVED,INSPECTION_RECEIVED",
     "SCHEDULED,VISIT_SCHEDULED",
     "IN_PROGRESS,INSPECTION_IN_PROGRESS",
-    "COMPLETED,INSPECTION_RESULT_PENDING"
+    "COMPLETED,INSPECTION_IN_PROGRESS"
   })
   void actualInspectionStateIsSharedWithListWithoutClaimingPublication(String state, String stage)
       throws Exception {

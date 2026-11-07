@@ -170,8 +170,7 @@ public class ResidentApplicationProgressReader {
     return switch (i.getStatus()) {
       case RECEIVED -> ResidentApplicationStage.INSPECTION_RECEIVED;
       case SCHEDULED -> ResidentApplicationStage.VISIT_SCHEDULED;
-      case IN_PROGRESS -> ResidentApplicationStage.INSPECTION_IN_PROGRESS;
-      case COMPLETED -> ResidentApplicationStage.INSPECTION_RESULT_PENDING;
+      case IN_PROGRESS, COMPLETED -> ResidentApplicationStage.INSPECTION_IN_PROGRESS;
     };
   }
 
