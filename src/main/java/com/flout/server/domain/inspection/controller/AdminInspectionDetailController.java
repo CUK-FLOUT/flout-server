@@ -24,7 +24,7 @@ public class AdminInspectionDetailController {
   @Operation(
       summary = "현장점검 배정 상세정보 조회",
       description =
-          "본인 관할 점검의 접수번호, 주민 이름, 전체 주소·상세주소, 신청 연락처, 주민 방문 희망일·시간대와 배정된 담당자를 조회합니다. 희망일·시간대 및 담당자가 없으면 null을 반환합니다. 확정 방문 일정과 구분하며 데이터를 변경하지 않습니다.")
+          "본인 관할 점검의 신청 정보, 주민 방문 희망일·시간대, 배정 담당자, 저장된 확정 방문일·시간 및 사전 안내를 조회합니다. 저장된 일정이나 사전 안내가 없으면 해당 필드는 null입니다.")
   public SuccessResponse<InspectionDetailResponse> find(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "현장점검 ID (신청 ID와 구분), 양의 정수", example = "1") @PathVariable

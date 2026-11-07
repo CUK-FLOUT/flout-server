@@ -1,9 +1,12 @@
 package com.flout.server.domain.inspectionapplication.controller;
 
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
+import com.flout.server.domain.inspectionapplication.dto.request.UpdateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.dto.response.CreateInspectionApplicationResponse;
+import com.flout.server.domain.inspectionapplication.dto.response.UpdateInspectionApplicationResponse;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.domain.inspectionapplication.service.InspectionApplicationService;
+import com.flout.server.domain.inspectionapplication.service.ResidentApplicationUpdateService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "주민-현장점검 신청", description = "현장점검 신청부터 진행 상황 및 결과 조회까지 관리")
 public class InspectionApplicationController {
   private final InspectionApplicationService inspectionApplicationService;
+  private final ResidentApplicationUpdateService updateService;
 
   @PostMapping
   @Operation(
@@ -35,5 +39,19 @@ public class InspectionApplicationController {
         .body(
             SuccessResponse.of(
                 response, InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED));
+  }
+
+  @PatchMapping("/{applicationId}")
+  @Operation(
+      summary = "임시 현장점검 신청 수정",
+      description =
+          "본인의 DRAFT 신청만 부분 수정합니다. 생략한 필드는 유지하고 요청 사유는 null로 삭제합니다. 희망 일정은 null일 수 없고 유입 위치는 1개 이상으로 전체 교체합니다.")
+  public SuccessResponse<UpdateInspectionApplicationResponse> update(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable Long applicationId,
+      @Valid @RequestBody UpdateInspectionApplicationRequest request) {
+    return SuccessResponse.of(
+        updateService.update(Long.valueOf(jwt.getSubject()), applicationId, request),
+        InspectionApplicationSuccessCode.DRAFT_UPDATED);
   }
 }

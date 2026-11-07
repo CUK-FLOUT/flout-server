@@ -2,6 +2,8 @@ package com.flout.server.domain.supportapplication.service;
 
 import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.inspectionapplication.service.*;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.supportapplication.dto.response.SupportAttachmentResponse;
 import com.flout.server.domain.supportapplication.entity.*;
 import com.flout.server.domain.supportapplication.repository.*;
@@ -31,6 +33,7 @@ public class SupportAttachmentService {
   private final AttachmentStorage storage;
   private final AttachmentCleanupService cleanup;
   private final SupportDocumentValidator validator;
+  private final NotificationService notifications;
   private final TransactionTemplate tx;
 
   public SupportAttachmentService(
@@ -40,6 +43,7 @@ public class SupportAttachmentService {
       AttachmentStorage storage,
       AttachmentCleanupService cleanup,
       SupportDocumentValidator validator,
+      NotificationService notifications,
       PlatformTransactionManager manager) {
     this.users = users;
     this.applications = applications;
@@ -47,6 +51,7 @@ public class SupportAttachmentService {
     this.storage = storage;
     this.cleanup = cleanup;
     this.validator = validator;
+    this.notifications = notifications;
     tx = new TransactionTemplate(manager);
     tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
@@ -62,6 +67,7 @@ public class SupportAttachmentService {
               var application = authorize(userId, applicationId, false);
               var determined = resolveType(application);
               rejectDuplicate(applicationId, determined);
+              requireDraft(application);
               return determined;
             });
     var document = validator.validate(file);
@@ -80,6 +86,7 @@ public class SupportAttachmentService {
                 if (currentType != type)
                   throw new BaseException(SupportAttachmentErrorCode.INVALID_OCCUPANCY);
                 rejectDuplicate(applicationId, currentType);
+                requireDraft(application);
                 var saved =
                     attachments.saveAndFlush(
                         SupportAttachment.submitted(
@@ -89,7 +96,13 @@ public class SupportAttachmentService {
                             document.filename(),
                             document.bytes().length,
                             document.contentType()));
+                application.submitDraft();
                 cleanup.completed(key);
+                notifications.send(
+                    userId,
+                    NotificationType.SUPPORT_RECEIVED,
+                    application.getApplication().getId(),
+                    "support-received:" + application.getId());
                 return SupportAttachmentResponse.from(saved);
               });
       cleanup.reconcile(keys);
@@ -128,6 +141,11 @@ public class SupportAttachmentService {
   private void rejectDuplicate(Long id, SupportAttachmentType type) {
     if (attachments.existsByApplicationIdAndAttachmentType(id, type))
       throw new BaseException(SupportAttachmentErrorCode.ALREADY_SUBMITTED);
+  }
+
+  private void requireDraft(SupportApplication application) {
+    if (application.getStatus() != SupportApplicationStatus.DRAFT)
+      throw new BaseException(SupportAttachmentErrorCode.APPLICATION_NOT_DRAFT);
   }
 
   private boolean duplicate(Throwable e) {

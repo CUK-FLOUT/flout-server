@@ -14,6 +14,9 @@ import com.flout.server.domain.inspectionapplication.response.code.InspectionApp
 import com.flout.server.domain.inspectionapplication.service.AttachmentCleanupService;
 import com.flout.server.domain.inspectionapplication.service.AttachmentService;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.FcmDeliveryStore;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.riskassessment.entity.*;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.flout.server.domain.user.entity.User;
@@ -59,6 +62,7 @@ class AttachmentControllerTest {
   @Autowired JwtService jwt;
   @Autowired AttachmentCleanupService cleanup;
   @MockitoBean AttachmentStorage storage;
+  @MockitoBean FcmDeliveryStore deliveries;
   @MockitoSpyBean ApplicationAttachmentRepository attachments;
   @MockitoSpyBean AttachmentService attachmentService;
   Long applicationId;
@@ -75,6 +79,8 @@ class AttachmentControllerTest {
             "application_attachments",
             "inspection_status_histories",
             "inspections",
+            "application_status_histories",
+            "application_inflow_locations",
             "inspection_applications",
             "risk_assessments",
             "users")) jdbc.update("DELETE FROM " + table);
@@ -153,6 +159,14 @@ class AttachmentControllerTest {
 
   @Test
   void uploadsOneThenFourAndEnforcesTotalLimit() throws Exception {
+    jdbc.update("DELETE FROM inspections WHERE application_id = ?", applicationId);
+    jdbc.update(
+        "UPDATE inspection_applications SET status = 'DRAFT', submitted_at = NULL, preferred_visit_date = CURRENT_DATE, preferred_time_slot = 'MORNING' WHERE application_id = ?",
+        applicationId);
+    jdbc.update(
+        "INSERT INTO application_inflow_locations(application_id, inflow_location) VALUES (?, 'DRAIN')",
+        applicationId);
+    verifyNoInteractions(deliveries);
     submit(token, applicationId, file("one.png", png))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.code").value("APPLICATION_201_2"))
@@ -176,6 +190,13 @@ class AttachmentControllerTest {
         submit(token, applicationId, file("six.png", png)),
         InspectionApplicationErrorCode.INVALID_ATTACHMENTS);
     verify(storage, times(5)).upload(anyString(), any(), anyString());
+    verify(deliveries)
+        .enqueue(
+            new PushNotificationRequested(
+                users.findByEmail("owner@example.com").orElseThrow().getId(),
+                NotificationType.INSPECTION_RECEIVED,
+                applicationId,
+                "inspection-received:" + applicationId));
   }
 
   @Test

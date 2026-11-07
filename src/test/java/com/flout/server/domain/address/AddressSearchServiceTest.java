@@ -40,18 +40,7 @@ class AddressSearchServiceTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "부천시",
-        "경기도 부천시",
-        "경기 부천시",
-        "원미구",
-        "소사구",
-        "오정구",
-        "부천시 원미구",
-        "경기도 부천시 소사구",
-        "  경기도   부천시   오정구  "
-      })
+  @ValueSource(strings = {"부천시", "경기도 부천시", "경기 부천시"})
   void returnsEmptyWithoutCallingJusoForBroadRegion(String keyword) {
     var result = service.search(keyword, 3);
     assertThat(result.addresses()).isEmpty();
@@ -60,6 +49,15 @@ class AddressSearchServiceTest {
     assertThat(result.hasMore()).isFalse();
     assertThat(result.nextPage()).isNull();
     verifyNoInteractions(client);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"원미구", "소사구", "오정구", "부천시 원미구", "부천시 소사구", "부천시 오정구", "경기도 부천시 원미구"})
+  void searchesDistricts(String keyword) {
+    String query = keyword.contains("부천시") ? keyword : "부천시 " + keyword;
+    when(client.search(query, 1, 10)).thenReturn(response("1", List.of(row("4119210100"))));
+    assertThat(service.search(keyword, 1).addresses()).hasSize(1);
+    verify(client).search(query, 1, 10);
   }
 
   @Test

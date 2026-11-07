@@ -10,6 +10,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface InspectionRepository extends JpaRepository<Inspection, Long> {
+  @EntityGraph(attributePaths = {"inspector"})
+  java.util.List<Inspection> findByApplicationIdIn(java.util.Collection<Long> applicationIds);
+
   Optional<Inspection> findByApplicationId(Long applicationId);
 
   @Query(

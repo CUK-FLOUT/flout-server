@@ -6,11 +6,11 @@ import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspection.response.code.InspectionSuccessCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
+import com.flout.server.domain.notification.response.code.NotificationSuccessCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
-import com.flout.server.domain.supportapplication.response.code.LandlordConsentErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
@@ -89,6 +89,11 @@ public class OpenApiConfig {
     return api -> {
       // OpenAPI 3.1 nullable enum 허용값에 JSON null 포함
       if (api.getComponents() != null && api.getComponents().getSchemas() != null) {
+        var create = api.getComponents().getSchemas().get("CreateInspectionApplicationRequest");
+        if (create != null && create.getProperties() != null) {
+          Schema locations = (Schema) create.getProperties().get("inflowLocations");
+          if (locations != null) locations.setExample(List.of("ENTRANCE", "DRAIN"));
+        }
         for (String schemaName :
             List.of(
                 "InspectionDetailResponse",
@@ -115,9 +120,12 @@ public class OpenApiConfig {
                 "운영자-우선점검 관리",
                 "운영자-현장점검 관리",
                 "운영자-지원관리",
+                "운영자-시공관리",
                 "주민-AI취약도 분석",
                 "주민-현장점검 신청",
-                "주민-지원신청");
+                "주민-지원신청",
+                "주민-시공 신청",
+                "주민-내신청");
         var tags = new ArrayList<>(api.getTags());
         tags.sort(
             Comparator.comparingInt(
@@ -199,6 +207,14 @@ public class OpenApiConfig {
                                     null);
                               }
                             }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
+                                        "/api/admin/support-applications",
+                                        "/api/admin/support-applications/{supportApplicationId}",
+                                        "/api/admin/support-applications/{supportApplicationId}/histories")
+                                    .contains(path)) {
+                              describeAdminSupportRead(operation, path);
+                            }
                             if (path.equals(
                                     "/api/admin/support-applications/{supportApplicationId}/approve")
                                 && method == PathItem.HttpMethod.POST) {
@@ -209,10 +225,9 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportRejection(operation);
                             }
-                            if (path.equals(
-                                    "/api/admin/support-applications/{supportApplicationId}/landlord-consent")
-                                && method == PathItem.HttpMethod.PATCH) {
-                              describeLandlordConsent(operation);
+                            if (path.equals("/api/notifications/tokens")
+                                && method == PathItem.HttpMethod.PUT) {
+                              describeFcmTokenRegistration(operation);
                             }
                             if (path.equals("/api/admin/public-issues")
                                 && method == PathItem.HttpMethod.POST) {
@@ -235,6 +250,15 @@ public class OpenApiConfig {
                                     "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images")
                                 && method == PathItem.HttpMethod.POST) {
                               describeFacilityActionImageUpload(operation);
+                            }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
+                                        "/api/resident/support-applications/{supportApplicationId}/review",
+                                        "/api/resident/support-applications/{supportApplicationId}/approval",
+                                        "/api/resident/support-applications/{supportApplicationId}/rejection")
+                                    .contains(path)) {
+                              describeResidentSupportDetail(
+                                  operation, path.substring(path.lastIndexOf('/') + 1));
                             }
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
@@ -282,6 +306,23 @@ public class OpenApiConfig {
                               describeResidentApplicationDetail(operation);
                             }
 
+                            if (path.equals(
+                                    "/api/resident/applications/{applicationId}/recommendations")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeResidentRecommendations(operation);
+                            }
+
+                            if (path.equals(
+                                    "/api/resident/applications/{applicationId}/recommended-facilities")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeResidentRecommendedFacilities(operation);
+                            }
+
+                            if (path.equals("/api/resident/applications/{applicationId}")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeResidentApplicationUpdate(operation);
+                            }
+
                             if (path.equals("/api/admin/applications/{applicationId}")
                                 && method == PathItem.HttpMethod.GET) {
                               describeApplicationDetail(operation);
@@ -311,11 +352,6 @@ public class OpenApiConfig {
                             if (path.equals("/api/admin/inspections/{inspectionId}")
                                 && method == PathItem.HttpMethod.GET) {
                               describeInspectionDetail(operation);
-                            }
-
-                            if (path.equals("/api/admin/inspections/{inspectionId}/status")
-                                && method == PathItem.HttpMethod.PATCH) {
-                              describeInspectionStatus(operation);
                             }
 
                             if (path.equals("/api/admin/inspections/{inspectionId}/result")
@@ -795,8 +831,11 @@ public class OpenApiConfig {
     result.put("contact", "010-1234-1234");
     result.put("preferredVisitDate", "2026-11-03");
     result.put("preferredTimeSlot", "MORNING");
-    result.put("inspectorId", null);
-    result.put("inspectorName", null);
+    result.put("inspectorId", 3);
+    result.put("inspectorName", "김담당");
+    result.put("visitDate", "2026-11-04");
+    result.put("visitTime", "14:00");
+    result.put("preVisitNotice", "방문 전 출입구를 확인해 주세요.");
     addExample(success, "inspectionDetail", envelope(true, code, code.getMessage(), result));
     addError(
         operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
@@ -1389,63 +1428,150 @@ public class OpenApiConfig {
     addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
     operation.getResponses().get("404").setDescription("점검을 찾을 수 없습니다.");
     addError(
-        operation, "scheduledRequired", InspectionErrorCode.ASSIGNMENT_REQUIRES_SCHEDULED, null);
+        operation, "invalidStatusTransition", InspectionErrorCode.INVALID_STATUS_TRANSITION, null);
     addError(operation, "alreadyAssigned", InspectionErrorCode.ALREADY_ASSIGNED, null);
-    operation.getResponses().get("409").setDescription("이미 배정된 점검이거나 예정 상태로 저장되지 않은 점검입니다.");
+    operation.getResponses().get("409").setDescription("이미 배정되었거나 배정할 수 없는 상태의 점검입니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
-  // 상태 변경 응답과 오류 예시
-  private void describeInspectionStatus(Operation operation) {
-    var code = InspectionSuccessCode.STATUS_CHANGED;
+  // 토큰 등록·갱신 응답 및 본문 오류 문서화
+  private void describeFcmTokenRegistration(Operation operation) {
+    var code = NotificationSuccessCode.FCM_TOKEN_REGISTERED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(code.getMessage());
     addExample(
-        success,
-        "inspectionStatusChanged",
-        envelope(
-            true,
-            code,
-            code.getMessage(),
-            Map.of(
-                "inspectionId",
-                1,
-                "receiptNo",
-                "000001",
-                "status",
-                "SCHEDULED",
-                "updatedAt",
-                "2026-10-28T19:00:00")));
-    addError(
-        operation, "statusRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "점검 상태를 선택해주세요.");
-    addError(operation, "invalidStatusOrBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
-    addError(
-        operation, "invalidInspectionId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
-    addError(
-        operation,
-        "jurisdictionAccessDenied",
-        InspectionErrorCode.JURISDICTION_ACCESS_DENIED,
-        null);
-    addError(operation, "inspectionNotFound", InspectionErrorCode.INSPECTION_NOT_FOUND, null);
-    operation
-        .getResponses()
-        .get("404")
-        .setDescription(InspectionErrorCode.INSPECTION_NOT_FOUND.getMessage());
-    addError(
-        operation, "invalidStatusTransition", InspectionErrorCode.INVALID_STATUS_TRANSITION, null);
-    addError(operation, "visitTimeNotReached", InspectionErrorCode.VISIT_TIME_NOT_REACHED, null);
-    operation
-        .getResponses()
-        .get("409")
-        .setDescription(InspectionErrorCode.INVALID_STATUS_TRANSITION.getMessage());
+        success, "tokenRegistered", envelope(true, code, code.getMessage(), Map.of("tokenId", 1)));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
   // GIS 신청 응답 예시와 ID·관할 오류 문서화
+  private void describeResidentApplicationUpdate(Operation operation) {
+    var requestExample = new LinkedHashMap<String, Object>();
+    requestExample.put("contact", "010-1234-5678");
+    requestExample.put("requestReason", null);
+    requestExample.put("inflowLocations", List.of("DRAIN", "ENTRANCE"));
+    var request = operation.getRequestBody();
+    if (request != null && request.getContent() != null && request.getContent().get(JSON) != null) {
+      request
+          .getContent()
+          .get(JSON)
+          .addExamples("partialUpdate", new Example().value(requestExample));
+    }
+    var code = InspectionApplicationSuccessCode.DRAFT_UPDATED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "draftUpdated",
+        envelope(true, code, code.getMessage(), Map.of("applicationId", 1, "status", "DRAFT")));
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(
+        operation,
+        "invalidContact",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "연락처는 국내 휴대전화 형식이어야 합니다. 예: 010-1234-5678 또는 01012345678.");
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "applicationUpdateAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_UPDATE_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(
+        operation,
+        "applicationNotDraft",
+        InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND.getMessage());
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(InspectionApplicationErrorCode.APPLICATION_NOT_DRAFT.getMessage());
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeResidentRecommendedFacilities(Operation operation) {
+    var code = InspectionApplicationSuccessCode.RECOMMENDED_FACILITIES_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "residentRecommendedFacilities",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            Map.of(
+                "applicationId",
+                101,
+                "recommendationCount",
+                2,
+                "facilities",
+                List.of("출입구 물막이판", "창문 차수판"))));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", InspectionApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeResidentRecommendations(Operation operation) {
+    var code = InspectionApplicationSuccessCode.RECOMMENDATIONS_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result =
+        Map.of(
+            "applicationId",
+            5,
+            "recommendedActions",
+            List.of(
+                Map.of("description", "출입구: 빗물 유입을 줄이는 물막이판 설치를 검토해요."),
+                Map.of("description", "배수구: 주변을 정리하고 막힘 여부와 배수 상태를 확인해요.")));
+    addExample(success, "residentRecommendations", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", InspectionApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
   private void describeResidentApplicationDetail(Operation operation) {
     var code = InspectionApplicationSuccessCode.DETAIL_FOUND;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
@@ -1468,6 +1594,25 @@ public class OpenApiConfig {
     result.put("inspectionStatus", "RECEIVED");
     result.put("resultPublished", false);
     result.put("createdAt", "2026-10-21T22:30:00");
+    result.put("submittedAt", "2026-10-21T22:35:00");
+    var progress = new LinkedHashMap<String, Object>();
+    progress.put("title", "현장점검 · 침수 위험 점검 신청");
+    progress.put("stage", "INSPECTION_RECEIVED");
+    progress.put("closed", false);
+    progress.put("updatedAt", "2026-10-21T22:35:00+09:00");
+    progress.put("inspectionId", 1);
+    progress.put("supportApplicationId", null);
+    progress.put("constructionId", null);
+    progress.put("resultPublished", false);
+    progress.put("inspectionResultSummary", null);
+    var visit = new LinkedHashMap<String, Object>();
+    visit.put("scheduledAt", null);
+    visit.put("inspectorName", null);
+    visit.put("preVisitNotice", null);
+    progress.put("visit", visit);
+    progress.put("support", null);
+    progress.put("construction", null);
+    result.put("progress", progress);
     addExample(
         success, "residentApplicationDetail", envelope(true, code, code.getMessage(), result));
     addError(
@@ -1500,6 +1645,7 @@ public class OpenApiConfig {
     result.put("contact", "010-1234-1234");
     result.put("address", "경기도 부천시 원미구 길주로 53");
     result.put("detailAddress", "101호");
+    result.put("housingType", "SEMI_BASEMENT");
     result.put("occupancyType", "TENANT");
     result.put("riskLevel", "HIGH");
     result.put("floodExperience", "YES");
@@ -1623,6 +1769,31 @@ public class OpenApiConfig {
 
   // 신청 생성 201 응답과 점검 ID 예시
   private void describeInspectionApplication(Operation operation) {
+    if (operation.getRequestBody() != null
+        && operation.getRequestBody().getContent() != null
+        && operation.getRequestBody().getContent().get(JSON) != null) {
+      var requestExample = new LinkedHashMap<String, Object>();
+      requestExample.put("applicantName", "김주민");
+      requestExample.put("contact", "010-1234-5678");
+      requestExample.put("occupancyType", "TENANT");
+      requestExample.put("floodExperience", "NO");
+      requestExample.put("inflowLocations", List.of("DRAIN", "ENTRANCE"));
+      requestExample.put("existingFacility", false);
+      requestExample.put("requestReason", "최근 배수구 역류가 있어 점검을 희망합니다.");
+      requestExample.put("preferredVisitDate", "2099-11-03");
+      requestExample.put("preferredTimeSlot", "MORNING");
+      requestExample.put("assessmentId", 5);
+      requestExample.put("address", "경기도 부천시 원미구 길주로 53");
+      requestExample.put("detailAddress", "101호");
+      requestExample.put("latitude", 37.5);
+      requestExample.put("longitude", 126.7);
+      operation
+          .getRequestBody()
+          .getContent()
+          .get(JSON)
+          .addExamples("inspectionApplication", new Example().value(requestExample));
+    }
+
     ApiResponse success = operation.getResponses().remove("200");
     if (success == null) {
       success = new ApiResponse();
@@ -1657,6 +1828,11 @@ public class OpenApiConfig {
         "위도는 -90 이상이어야 합니다.");
     addError(
         operation, "contactRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "연락처는 필수입니다.");
+    addError(
+        operation,
+        "invalidContact",
+        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
+        "연락처는 국내 휴대전화 형식이어야 합니다. 예: 010-1234-5678 또는 01012345678.");
     addError(
         operation,
         "guideNotLinkedToAssessment",
@@ -1758,40 +1934,6 @@ public class OpenApiConfig {
         null);
   }
 
-  private void describeLandlordConsent(Operation operation) {
-    var code = SupportApplicationSuccessCode.LANDLORD_CONSENT_CONFIRMED;
-    var success = operation.getResponses().computeIfAbsent("200", k -> new ApiResponse());
-    success.setDescription(code.getMessage());
-    addExample(
-        success,
-        "consentConfirmed",
-        envelope(
-            true,
-            code,
-            code.getMessage(),
-            Map.of("supportApplicationId", 15, "landlordConsentStatus", "CONFIRMED")));
-    operation
-        .getRequestBody()
-        .getContent()
-        .get(JSON)
-        .addExamples(
-            "confirmation",
-            new Example().summary("제출된 임대인 동의서 확인").value(Map.of("status", "CONFIRMED")));
-    for (var error : LandlordConsentErrorCode.values())
-      addError(operation, error.name(), error, null);
-    for (var error :
-        List.of(
-            SupportApprovalErrorCode.JURISDICTION_ACCESS_DENIED,
-            SupportApprovalErrorCode.APPLICATION_NOT_FOUND,
-            SupportApprovalErrorCode.ALREADY_DECIDED))
-      addError(operation, error.name(), error, null);
-    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
-    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
-    operation.getResponses().get("400").setDescription("요청값·지원 신청 ID 오류, 세입자 아님 또는 동의서 미제출");
-    operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
-    operation.getResponses().get("409").setDescription("이미 처리된 신청 또는 동의 확인 대기 상태가 아님");
-  }
-
   private void describeSupportRejection(Operation operation) {
     var code = SupportApplicationSuccessCode.REJECTED;
     var success = operation.getResponses().computeIfAbsent("200", k -> new ApiResponse());
@@ -1852,6 +1994,8 @@ public class OpenApiConfig {
                 "출입구 물막이판 설치 지원",
                 "approvedByUserId",
                 1,
+                "constructionId",
+                301,
                 "approvedAt",
                 "2026-11-02T15:00:00+09:00")));
     operation
@@ -1876,7 +2020,7 @@ public class OpenApiConfig {
       addError(operation, error.name(), error, null);
     addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
-    operation.getResponses().get("400").setDescription("필수값·지원 범위·검토 항목 오류, 동의 미확인 또는 승인 불가 거주 형태");
+    operation.getResponses().get("400").setDescription("필수값·지원 범위·검토 항목 오류 또는 임대인 동의서 미제출");
     operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
     operation.getResponses().get("409").setDescription("이미 처리된 지원 신청입니다.");
   }
@@ -1923,7 +2067,9 @@ public class OpenApiConfig {
                 "contentType",
                 "application/pdf",
                 "submittedAt",
-                "2026-11-02T15:00:00+09:00")));
+                "2026-11-02T15:00:00+09:00",
+                "status",
+                "SUBMITTED")));
     for (var error : SupportAttachmentErrorCode.values())
       addError(operation, error.name(), error, null);
     addError(operation, "invalidMultipart", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
@@ -1976,6 +2122,18 @@ public class OpenApiConfig {
                 "침수 예방시설 설치 지원",
                 "createdAt",
                 "2026-10-21T14:00:00+09:00")));
+    var draft = new LinkedHashMap<String, Object>();
+    draft.put("supportApplicationId", 201);
+    draft.put("applicationId", 101);
+    draft.put("programId", 1);
+    draft.put("status", "DRAFT");
+    draft.put("submittedAt", null);
+    draft.put("createdAt", "2026-10-21T14:00:00+09:00");
+    draft.put("receiptNumber", "000101");
+    draft.put("applicantName", "홍길동");
+    draft.put("programName", "침수 예방시설 설치 지원");
+    var draftCode = SupportApplicationSuccessCode.DRAFT_CREATED;
+    addExample(success, "draft", envelope(true, draftCode, draftCode.getMessage(), draft));
     addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
         operation,
@@ -2042,6 +2200,67 @@ public class OpenApiConfig {
     };
   }
 
+  /** Documents each resident detail view with its own status and approval schedule examples. */
+  private void describeResidentSupportDetail(Operation operation, String view) {
+    var result = new LinkedHashMap<String, Object>();
+    long applicationId = view.equals("review") ? 2L : view.equals("approval") ? 3L : 4L;
+    result.put(
+        "supportApplicationId",
+        view.equals("review") ? 201L : view.equals("approval") ? 202L : 203L);
+    result.put("applicationId", applicationId);
+    result.put("receiptNo", String.format(java.util.Locale.ROOT, "%06d", applicationId));
+    result.put(
+        "applicantName", view.equals("review") ? "이주민" : view.equals("approval") ? "박주민" : "최주민");
+    result.put("address", "경기도 부천시 원미구 중동로 12");
+    result.put("detailAddress", "지하 101호");
+    result.put("programName", "침수 예방시설 설치 지원");
+    result.put(
+        "status",
+        view.equals("review") ? "SUBMITTED" : view.equals("approval") ? "APPROVED" : "REJECTED");
+    result.put("requestedFacility", "출입구 물막이판");
+    if (view.equals("review")) {
+      result.put("submittedAt", "2026-10-07T10:00:00");
+      result.put("occupancyType", "TENANT");
+      result.put("preferredConstructionDate", "2026-10-21");
+      result.put("preferredTimeSlot", "MORNING");
+      result.put("landlordConsentStatus", "PENDING");
+    } else if (view.equals("approval")) {
+      result.put("approvedAt", "2026-10-13T14:00:00");
+      result.put("supportScope", "출입구 물막이판 1개 설치 지원");
+      result.put("landlordConsentStatus", "VERIFIED");
+      result.put("scheduledConstructionDate", null);
+      result.put("scheduledConstructionTime", null);
+    } else {
+      result.put("rejectionReason", "지원 대상 조건에 해당하지 않아 이번 신청은 미승인되었습니다.");
+      result.put("rejectedAt", "2026-10-13T14:00:00");
+      result.put("inspectionId", 12L);
+      result.put("inspectionResultPublished", true);
+    }
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription("Figma 화면 기준 예시 데이터이며 실제 응답은 DB 저장값을 반환합니다.");
+    addExample(
+        success,
+        view,
+        envelope(
+            true,
+            GeneralSuccessCode.SUCCESS_OK,
+            GeneralSuccessCode.SUCCESS_OK.getMessage(),
+            result));
+    if (view.equals("approval")) {
+      var scheduled = new LinkedHashMap<>(result);
+      scheduled.put("scheduledConstructionDate", "2026-10-21");
+      scheduled.put("scheduledConstructionTime", "10:00:00");
+      addExample(
+          success,
+          "approvalScheduled",
+          envelope(
+              true,
+              GeneralSuccessCode.SUCCESS_OK,
+              GeneralSuccessCode.SUCCESS_OK.getMessage(),
+              scheduled));
+    }
+  }
+
   private void addExample(ApiResponse response, String name, Map<String, Object> body) {
     if (response.getContent() == null) {
       response.setContent(new Content());
@@ -2078,5 +2297,74 @@ public class OpenApiConfig {
         .addProperty("result", new Schema<>().description("오류 응답에서는 null입니다.").nullable(true))
         .addProperty("timeStamp", new StringSchema().example(EXAMPLE_TIME))
         .required(List.of("isSuccess", "status", "code", "message", "result", "timeStamp"));
+  }
+
+  private void describeAdminSupportRead(Operation operation, String path) {
+    var code = GeneralSuccessCode.SUCCESS_OK;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    if (path.equals("/api/admin/support-applications")) {
+      result.put(
+          "supportApplications",
+          List.of(
+              Map.of(
+                  "supportApplicationId",
+                  201,
+                  "receiptNo",
+                  "000002",
+                  "applicantName",
+                  "김주민",
+                  "requestedFacility",
+                  "출입구 물막이판",
+                  "landlordConsentStatus",
+                  "VERIFIED",
+                  "status",
+                  "SUBMITTED")));
+      result.put("page", 0);
+      result.put("size", 10);
+      result.put("totalElements", 1);
+      result.put("totalPages", 1);
+    } else {
+      boolean review = path.endsWith("/histories");
+      result.put("supportApplicationId", 201);
+      result.put("receiptNo", "000002");
+      result.put("applicantName", "김주민");
+      result.put("contact", "010-1234-0002");
+      result.put("address", "경기도 부천시 원미구 길주로 53");
+      result.put("detailAddress", "101호");
+      result.put("housingType", "SEMI_BASEMENT");
+      result.put("occupancyType", "TENANT");
+      result.put("recommendedActions", List.of("출입구 물막이판 설치", "배수구 정비"));
+      result.put("requestedFacility", "출입구 물막이판");
+      result.put("residentRequest", "출입구 통행을 확보해주세요.");
+      result.put("preferredConstructionDate", "2026-11-20");
+      result.put("preferredTimeSlot", "MORNING");
+      result.put("inspectionId", 101);
+      result.put("inspectionStatus", "COMPLETED");
+      result.put("inspectionResultPublished", true);
+      result.put("attachments", List.of());
+      result.put("status", "SUBMITTED");
+      if (review) {
+        result.put("applicationId", 2);
+        result.put("vulnerabilityTypes", List.of("ENTRANCE", "DRAIN"));
+        result.put("landlordConsentRequired", true);
+        result.put("supportScope", null);
+        result.put(
+            "program",
+            Map.of(
+                "programId",
+                1,
+                "name",
+                "침수 예방시설 지원",
+                "description",
+                "침수 예방시설 설치 지원",
+                "targetDescription",
+                "부천시 지원 대상 주택",
+                "operatingStatus",
+                "OPEN"));
+      } else result.put("landlordConsentStatus", "VERIFIED");
+    }
+    addExample(success, "screenData", envelope(true, code, code.getMessage(), result));
   }
 }

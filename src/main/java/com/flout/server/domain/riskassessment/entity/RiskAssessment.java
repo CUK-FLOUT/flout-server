@@ -1,5 +1,6 @@
 package com.flout.server.domain.riskassessment.entity;
 
+import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -32,6 +33,12 @@ public class RiskAssessment {
   private String detailAddress;
 
   @Enumerated(EnumType.STRING)
+  @Column(
+      name = "housing_type",
+      columnDefinition = "enum('SEMI_BASEMENT','FIRST_FLOOR','SECOND_FLOOR_OR_ABOVE')")
+  private HousingType housingType;
+
+  @Enumerated(EnumType.STRING)
   @Column(name = "risk_level", nullable = false, length = 20)
   private RiskLevel riskLevel;
 
@@ -47,6 +54,25 @@ public class RiskAssessment {
 
   public static RiskAssessment completedDemo(
       User user, String address, String detailAddress, RiskLevel riskLevel) {
+    return completedDemo(user, address, detailAddress, riskLevel, null);
+  }
+
+  public static RiskAssessment completedDemo(
+      User user,
+      String address,
+      String detailAddress,
+      RiskLevel riskLevel,
+      HousingType housingType) {
+    return completed(user, address, detailAddress, riskLevel, housingType, "{\"source\":\"DEMO\"}");
+  }
+
+  public static RiskAssessment completed(
+      User user,
+      String address,
+      String detailAddress,
+      RiskLevel riskLevel,
+      HousingType housingType,
+      String resultJson) {
     RiskAssessment assessment = new RiskAssessment();
     assessment.user = Objects.requireNonNull(user);
     assessment.address = Objects.requireNonNull(address);
@@ -54,9 +80,10 @@ public class RiskAssessment {
       throw new IllegalArgumentException("상세 주소는 필수입니다.");
     }
     assessment.detailAddress = detailAddress;
+    assessment.housingType = housingType;
     assessment.riskLevel = Objects.requireNonNull(riskLevel);
     assessment.status = RiskAssessmentStatus.COMPLETED;
-    assessment.resultJson = "{\"source\":\"DEMO\"}";
+    assessment.resultJson = Objects.requireNonNull(resultJson);
     return assessment;
   }
 

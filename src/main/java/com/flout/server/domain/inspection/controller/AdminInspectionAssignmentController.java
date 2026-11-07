@@ -24,7 +24,7 @@ public class AdminInspectionAssignmentController {
   @Operation(
       summary = "점검 배정·일정 저장",
       description =
-          "점검 상태를 먼저 예정(SCHEDULED)으로 저장해야 합니다. 로그인한 관할 운영자 본인을 담당자로 배정하고 한국 시간 기준 현재 이후의 방문일·시간과 주민 방문 전 안내를 저장합니다. 요청에 inspectorId는 필요하지 않습니다. 배정은 한 번만 가능하며 이미 배정된 점검은 상태와 관계없이 409를 반환합니다. 점검 상태는 변경하지 않습니다. 알림은 발송하지 않습니다.")
+          "접수 또는 예정 상태의 미배정 점검에 로그인한 관할 운영자 본인을 배정합니다. 한국 시간 기준 현재 이후의 방문일·시간과 주민 방문 전 안내를 저장하며 성공 시 예정(SCHEDULED)으로 변경합니다. 별도 상태 변경 요청과 inspectorId는 필요하지 않습니다. 이미 배정되었거나 진행·완료 상태이면 409를 반환합니다. 배정 저장이 확정되면 신청 주민의 등록 기기에 점검 예정 푸시를 요청합니다.")
   public SuccessResponse<InspectionAssignmentResponse> save(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long inspectionId,

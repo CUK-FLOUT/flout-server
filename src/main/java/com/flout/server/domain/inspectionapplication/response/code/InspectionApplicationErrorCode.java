@@ -15,10 +15,14 @@ public enum InspectionApplicationErrorCode implements BaseResponseCode {
 
   DUPLICATE_ASSESSMENT_APPLICATION(409, "APPLICATION_409_3", "이미 현장점검을 신청한 취약도 분석 결과입니다."),
   DRAFT_REQUEST_MISMATCH(409, "APPLICATION_409_4", "기존 임시 신청의 내용과 요청이 다릅니다."),
+  APPLICATION_NOT_DRAFT(409, "APPLICATION_409_5", "임시 저장 상태의 신청만 수정할 수 있습니다."),
+  APPLICATION_UPDATE_ACCESS_DENIED(403, "APPLICATION_403_7", "본인의 신청서만 수정할 수 있습니다."),
 
   GUIDE_NOT_FOUND(400, "APPLICATION_400_1", "가이드가 취약도 분석 결과에 연결되어 있지 않습니다."),
 
   INVALID_APPLICATION_ADDRESS(400, "APPLICATION_400_2", "부천시 관할 주소만 현장점검을 신청할 수 있습니다."),
+
+  RESULT_NOT_PUBLISHED(400, "APPLICATION_400_5", "주민에게 공개된 현장점검 결과가 없습니다."),
 
   ASSESSMENT_ADDRESS_MISMATCH(400, "APPLICATION_400_3", "현장점검 신청 주소가 취약도 분석 주소와 일치하지 않습니다."),
 

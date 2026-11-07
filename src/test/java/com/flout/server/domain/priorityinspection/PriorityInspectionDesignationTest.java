@@ -6,11 +6,12 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.inspection.dto.request.PublishInspectionResultRequest;
 import com.flout.server.domain.inspection.entity.Inspection;
 import com.flout.server.domain.inspection.entity.InspectionStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspection.repository.InspectionStatusHistoryRepository;
-import com.flout.server.domain.inspection.service.InspectionStatusService;
+import com.flout.server.domain.inspection.service.PublishInspectionResultService;
 import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.entity.*;
 import com.flout.server.domain.inspectionapplication.repository.*;
@@ -49,7 +50,7 @@ import tools.jackson.databind.ObjectMapper;
     })
 @AutoConfigureMockMvc
 class PriorityInspectionDesignationTest {
-  @Autowired InspectionStatusService statusService;
+  @Autowired PublishInspectionResultService publishService;
   @MockitoSpyBean InspectionStatusHistoryRepository inspectionHistories;
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final LocalDateTime NOW = LocalDateTime.of(2030, 1, 2, 14, 0);
@@ -175,6 +176,10 @@ class PriorityInspectionDesignationTest {
     for (String table :
         List.of(
             "priority_inspection_designations",
+            "inspection_result_photos",
+            "inspection_vulnerabilities",
+            "prevention_recommendations",
+            "inspection_results",
             "inspection_status_histories",
             "inspections",
             "application_inflow_locations",
@@ -1546,6 +1551,12 @@ class PriorityInspectionDesignationTest {
     var second = additionalApplication("부천시 길주로 211");
     bulk(List.of(applicationId, second), true).andExpect(status().isOk());
     jdbc.update("UPDATE inspections SET status='IN_PROGRESS' WHERE inspection_id=?", inspectionId);
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
+        inspectionId);
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) SELECT result_id,CONCAT('completion-', result_id),'test.png',100,'image/png' FROM inspection_results WHERE inspection_id=?",
+        inspectionId);
     var completedBefore =
         jdbc.queryForMap(
             "SELECT * FROM priority_inspection_designations WHERE application_id=?", applicationId);
@@ -1586,7 +1597,12 @@ class PriorityInspectionDesignationTest {
         () -> saveOrder(List.of(second, applicationId)).andReturn().getResponse().getStatus();
     Callable<Integer> complete =
         () -> {
-          statusService.change(operatorId, inspectionId, InspectionStatus.COMPLETED);
+          publishService.publish(
+              operatorId,
+              inspectionId,
+              mapper.readValue(
+                  "{\"summary\":\"결과\",\"vulnerabilities\":[{\"type\":\"ENTRANCE\",\"title\":\"출입구\",\"expertOpinion\":\"의견\"}],\"recommendedActions\":[{\"description\":\"조치\"}],\"followUpType\":\"INDIVIDUAL_HOUSE\"}",
+                  PublishInspectionResultRequest.class));
           return 200;
         };
     try (var executor = Executors.newFixedThreadPool(2)) {

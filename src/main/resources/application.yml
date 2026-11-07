@@ -17,6 +17,12 @@ management:
         include: health,info
 
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  fcm:
+    enabled: ${FCM_ENABLED:true}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    interval-millis: ${FCM_INTERVAL_MILLIS:5000}
   s3:
     region: ${AWS_REGION:}
     bucket: ${AWS_S3_BUCKET:}
@@ -24,6 +30,10 @@ app:
     auto-start:
       enabled: ${INSPECTION_AUTO_START_ENABLED:true}
       interval-millis: ${INSPECTION_AUTO_START_INTERVAL_MILLIS:5000}
+  construction:
+    auto-start:
+      enabled: ${CONSTRUCTION_AUTO_START_ENABLED:true}
+      interval-millis: ${CONSTRUCTION_AUTO_START_INTERVAL_MILLIS:5000}
   google:
     client-ids: ${GOOGLE_CLIENT_IDS:}
   jwt:
@@ -44,6 +54,17 @@ app:
     base-url: https://business.juso.go.kr
     connect-timeout-millis: 3000
     read-timeout-millis: 3000
+  ai:
+    base-url: ${AI_MODEL_BASE_URL:http://localhost:8000}
+    predict-path: ${AI_MODEL_PREDICT_PATH:/api/vulnerability}
+    connect-timeout-millis: ${AI_MODEL_CONNECT_TIMEOUT_MILLIS:3000}
+    read-timeout-millis: ${AI_MODEL_READ_TIMEOUT_MILLIS:10000}
+  gemini:
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+    api-key: ${GEMINI_API_KEY:}
+    connect-timeout-millis: ${GEMINI_CONNECT_TIMEOUT_MILLIS:3000}
+    read-timeout-millis: ${GEMINI_READ_TIMEOUT_MILLIS:15000}
 
 springdoc:
   swagger-ui:

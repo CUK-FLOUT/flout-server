@@ -10,7 +10,8 @@ public record SupportAttachmentResponse(
     String fileName,
     long size,
     String contentType,
-    OffsetDateTime submittedAt) {
+    OffsetDateTime submittedAt,
+    SupportApplicationStatus status) {
   public static SupportAttachmentResponse from(SupportAttachment a) {
     return new SupportAttachmentResponse(
         a.getId(),
@@ -22,6 +23,7 @@ public record SupportAttachmentResponse(
         a.getSubmittedAt()
             .atZone(ZoneId.systemDefault())
             .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime());
+            .toOffsetDateTime(),
+        a.getApplication().getStatus());
   }
 }

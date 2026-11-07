@@ -161,9 +161,9 @@ class SupportApplicationTest {
             .andExpect(jsonPath("$.code").value("SUPPORT_201_1"))
             .andExpect(jsonPath("$.result.applicationId").value(applicationId))
             .andExpect(jsonPath("$.result.programId").value(programId))
-            .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
             .andExpect(
-                jsonPath("$.result.submittedAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
+                jsonPath("$.result.status")
+                    .value("TENANT".equals(occupancy) ? "DRAFT" : "SUBMITTED"))
             .andExpect(
                 jsonPath("$.result.receiptNumber")
                     .value(String.format(Locale.ROOT, "%06d", applicationId)))
@@ -182,9 +182,14 @@ class SupportApplicationTest {
     assertThat(result.path("supportApplicationId").asLong())
         .isEqualTo(((Number) row.get("SUPPORT_APPLICATION_ID")).longValue());
     assertThat(java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toInstant())
-        .isEqualTo(((java.sql.Timestamp) row.get("SUBMITTED_AT")).toInstant());
-    assertThat(result.path("createdAt").asString())
-        .isEqualTo(result.path("submittedAt").asString());
+        .isEqualTo(((java.sql.Timestamp) row.get("CREATED_AT")).toInstant());
+    if ("TENANT".equals(occupancy)) {
+      assertThat(row.get("SUBMITTED_AT")).isNull();
+      assertThat(result.path("submittedAt").isNull()).isTrue();
+    } else {
+      assertThat(result.path("createdAt").asString())
+          .isEqualTo(result.path("submittedAt").asString());
+    }
     var detail =
         mvc.perform(
                 get("/api/resident/applications/" + applicationId)

@@ -2,16 +2,22 @@ package com.flout.server.domain.inspectionapplication.service;
 
 import com.flout.server.domain.inspection.entity.Inspection;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
+import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectionApplicationRequest;
 import com.flout.server.domain.inspectionapplication.entity.ApplicationAttachment;
 import com.flout.server.domain.inspectionapplication.entity.ApplicationStatusHistory;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus;
 import com.flout.server.domain.inspectionapplication.repository.ApplicationAttachmentRepository;
+import com.flout.server.domain.inspectionapplication.repository.ApplicationInflowLocationRepository;
 import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.response.code.GeneralErrorCode;
+import jakarta.validation.Validator;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -48,6 +54,9 @@ public class AttachmentService {
   private final AttachmentCleanupService cleanup;
   private final InspectionRepository inspections;
   private final ApplicationStatusHistoryRepository histories;
+  private final NotificationService notifications;
+  private final ApplicationInflowLocationRepository inflowLocations;
+  private final Validator validator;
   private final TransactionTemplate transactions;
 
   public AttachmentService(
@@ -57,6 +66,9 @@ public class AttachmentService {
       AttachmentCleanupService cleanup,
       InspectionRepository inspections,
       ApplicationStatusHistoryRepository histories,
+      NotificationService notifications,
+      ApplicationInflowLocationRepository inflowLocations,
+      Validator validator,
       PlatformTransactionManager transactionManager) {
     this.applications = applications;
     this.attachments = attachments;
@@ -64,6 +76,9 @@ public class AttachmentService {
     this.cleanup = cleanup;
     this.inspections = inspections;
     this.histories = histories;
+    this.notifications = notifications;
+    this.inflowLocations = inflowLocations;
+    this.validator = validator;
     this.transactions = new TransactionTemplate(transactionManager);
     this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -90,6 +105,9 @@ public class AttachmentService {
                       () ->
                           new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
           authorize(application, userId);
+          if (application.getStatus() == InspectionApplicationStatus.DRAFT) {
+            validateSubmission(application);
+          }
           if (storedKey == null
               && attachments.countByApplicationId(applicationId) + files.size() > 5)
             throw invalid();
@@ -131,6 +149,9 @@ public class AttachmentService {
                 }
                 if (attachments.countByApplicationId(applicationId) + files.size() > 5)
                   throw invalid();
+                if (application.getStatus() == InspectionApplicationStatus.DRAFT) {
+                  validateSubmission(application);
+                }
                 List<AttachmentResult> saved = new ArrayList<>();
                 for (int i = 0; i < validated.size(); i++) {
                   ValidatedFile file = validated.get(i);
@@ -154,6 +175,11 @@ public class AttachmentService {
                   application.receive();
                   histories.save(ApplicationStatusHistory.received(application));
                   inspections.saveAndFlush(Inspection.received(application));
+                  notifications.send(
+                      userId,
+                      NotificationType.INSPECTION_RECEIVED,
+                      applicationId,
+                      "inspection-received:" + applicationId);
                 }
                 return uploadResponse(applicationId, saved);
               });
@@ -165,6 +191,28 @@ public class AttachmentService {
       log.error("사진 등록 실패", e);
       throw new BaseException(InspectionApplicationErrorCode.ATTACHMENT_UPLOAD_FAILED);
     }
+  }
+
+  private void validateSubmission(InspectionApplication application) {
+    var request =
+        new CreateInspectionApplicationRequest(
+            application.getAssessment().getId(),
+            application.getGuideId(),
+            application.getAddress(),
+            application.getDetailAddress(),
+            application.getLatitude(),
+            application.getLongitude(),
+            application.getContact(),
+            application.getOccupancyType(),
+            application.getFloodExperience(),
+            application.isExistingFacility(),
+            application.getRequestReason(),
+            application.getPreferredVisitDate(),
+            application.getPreferredTimeSlot(),
+            inflowLocations.findLocationsByApplicationId(application.getId()),
+            application.getApplicantName());
+    if (!validator.validate(request).isEmpty())
+      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY);
   }
 
   /** 호출한 저장·재사용 트랜잭션 안에서 점검 ID를 확인하며, 누락되면 저장도 롤백한다. */

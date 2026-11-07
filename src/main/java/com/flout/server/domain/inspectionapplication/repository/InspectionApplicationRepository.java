@@ -12,6 +12,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface InspectionApplicationRepository
     extends JpaRepository<InspectionApplication, Long> {
+  @Query(
+      "select a from InspectionApplication a where a.applicant.id = :userId and a.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT order by coalesce(a.submittedAt, a.createdAt) desc, a.id desc")
+  java.util.List<InspectionApplication> findResidentApplications(@Param("userId") Long userId);
+
   boolean existsByReceiptNo(String receiptNo);
 
   boolean existsByAssessmentId(Long assessmentId);

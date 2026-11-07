@@ -26,7 +26,14 @@ public record ResidentApplicationDetailResponse(
     @Schema(description = "현장점검 진행 상태. 점검 데이터가 없으면 null", nullable = true)
         InspectionStatus inspectionStatus,
     @Schema(description = "공개된 점검 결과 존재 여부") boolean resultPublished,
-    LocalDateTime createdAt) {
+    LocalDateTime createdAt,
+    @Schema(
+            description = "사진 등록으로 접수된 시각. 임시 신청 또는 확인할 수 없는 기존 접수 건은 null",
+            nullable = true,
+            types = {"string", "null"})
+        LocalDateTime submittedAt,
+    @Schema(description = "내 신청 통합 진행 상태와 공개된 점검·지원·시공 요약. 기존 신청 필드는 유지됩니다.")
+        ResidentApplicationProgressResponse progress) {
 
   public record Applicant(String name, String phone) {}
 
@@ -35,7 +42,8 @@ public record ResidentApplicationDetailResponse(
       List<InflowLocation> locations,
       long attachmentCount,
       InspectionStatus inspectionStatus,
-      boolean resultPublished) {
+      boolean resultPublished,
+      ResidentApplicationProgressResponse progress) {
     return new ResidentApplicationDetailResponse(
         application.getId(),
         String.format(Locale.ROOT, "%06d", application.getId()),
@@ -53,6 +61,8 @@ public record ResidentApplicationDetailResponse(
         application.getStatus(),
         inspectionStatus,
         resultPublished,
-        application.getCreatedAt());
+        application.getCreatedAt(),
+        application.getSubmittedAt(),
+        progress);
   }
 }

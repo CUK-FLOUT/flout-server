@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flout.server.domain.notification.entity.NotificationType;
+import com.flout.server.domain.notification.service.PushNotificationRequested;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
@@ -20,6 +22,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -33,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
     })
 @AutoConfigureMockMvc
 @Transactional
+@RecordApplicationEvents
 class InspectionResultDraftTest {
   @Autowired MockMvc mvc;
   @Autowired jakarta.persistence.EntityManager entityManager;
@@ -40,6 +45,7 @@ class InspectionResultDraftTest {
   @Autowired ObjectMapper mapper;
   @Autowired UserRepository users;
   @Autowired JwtService jwt;
+  @Autowired ApplicationEvents events;
   Long inspectionId;
   Long applicationId;
   Long operatorId;
@@ -125,12 +131,8 @@ class InspectionResultDraftTest {
   }
 
   void completeInspection() throws Exception {
-    mvc.perform(
-            patch("/api/admin/inspections/" + inspectionId + "/status")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"COMPLETED\"}"))
-        .andExpect(status().isOk());
+    jdbc.update("UPDATE inspections SET status='COMPLETED' WHERE inspection_id=?", inspectionId);
+    entityManager.clear();
   }
 
   void addPhoto() throws Exception {
@@ -177,20 +179,44 @@ class InspectionResultDraftTest {
         .isEqualTo("DRAFT");
   }
 
-  @Test
-  void publishRequiresCompletedInspectionAndDoesNotDuplicateCompletionHistory() throws Exception {
-    for (String state : List.of("RECEIVED", "SCHEDULED", "IN_PROGRESS")) {
-      jdbc.update("UPDATE inspections SET status=? WHERE inspection_id=?", state, inspectionId);
-      entityManager.clear();
-      mvc.perform(
-              post("/api/admin/inspections/" + inspectionId + "/result")
-                  .header("Authorization", "Bearer " + token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(mapper.writeValueAsString(full())))
-          .andExpect(status().isConflict());
-    }
-    assertThat(count("inspection_results")).isZero();
+  /** 결과 공개 시 별도 상태 API 없이 완료 상태와 이력을 저장하는지 검증합니다. */
+  @ParameterizedTest
+  @ValueSource(strings = {"RECEIVED", "SCHEDULED", "IN_PROGRESS"})
+  void publishingCompletesInspectionWithoutStatusPatch(String previous) throws Exception {
+    jdbc.update("UPDATE inspections SET status=? WHERE inspection_id=?", previous, inspectionId);
     entityManager.clear();
+    addPhoto();
+    mvc.perform(
+            post("/api/admin/inspections/" + inspectionId + "/result")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(full())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.inspectionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.result.applicationStatus").value("INSPECTION_COMPLETED"));
+    assertThat(events.stream(PushNotificationRequested.class))
+        .containsExactly(
+            new PushNotificationRequested(
+                resident.getId(),
+                NotificationType.INSPECTION_RESULT_PUBLISHED,
+                applicationId,
+                "inspection-result-published:" + inspectionId));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT previous_status FROM inspection_status_histories WHERE inspection_id=?",
+                String.class,
+                inspectionId))
+        .isEqualTo(previous);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM inspection_status_histories WHERE inspection_id=?",
+                String.class,
+                inspectionId))
+        .isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void publishesLegacyCompletedInspectionWithoutDuplicatingCompletionHistory() throws Exception {
     completeInspection();
     addPhoto();
     var historyCount = count("inspection_status_histories");
