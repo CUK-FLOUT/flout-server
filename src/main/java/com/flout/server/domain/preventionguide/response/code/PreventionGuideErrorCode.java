@@ -15,7 +15,10 @@ public enum PreventionGuideErrorCode implements BaseResponseCode {
   AI_SERVICE_TIMEOUT(503, "GUIDE_503_2", "맞춤 예방 가이드 생성 서비스 응답 시간이 초과되었습니다."),
   AI_SERVICE_ERROR(502, "GUIDE_502_1", "맞춤 예방 가이드 생성 서비스 호출에 실패했습니다."),
   INVALID_AI_RESPONSE(502, "GUIDE_502_2", "맞춤 예방 가이드 생성 결과의 형식이 올바르지 않습니다."),
-  GUIDE_SAVE_FAILED(500, "GUIDE_500_1", "맞춤 예방 가이드 저장에 실패했습니다.");
+  GUIDE_SAVE_FAILED(500, "GUIDE_500_1", "맞춤 예방 가이드 저장에 실패했습니다."),
+  GUIDE_NOT_FOUND(404, "GUIDE_404_2", "예방 가이드를 찾을 수 없습니다."),
+  ITEM_NOT_FOUND(404, "GUIDE_404_3", "예방 가이드 항목을 찾을 수 없습니다."),
+  GUIDE_ACCESS_DENIED(403, "GUIDE_403_2", "본인의 예방 가이드만 이용할 수 있습니다.");
 
   private final int status;
   private final String code;

@@ -1,6 +1,7 @@
 package com.flout.server.domain.preventionguide.dto.response;
 
 import com.flout.server.domain.preventionguide.client.GuideGenerationSource;
+import com.flout.server.domain.preventionguide.entity.GuideResolution;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.OffsetDateTime;
@@ -16,4 +17,6 @@ public record PreventionGuideResponse(
     @Schema(example = "0") int completedCount,
     @Schema(example = "4") int totalCount,
     List<PreventionGuideItemResponse> items,
+    @Schema(description = "최종 선택 전에는 null", nullable = true, example = "CONFIRMED")
+        GuideResolution resolution,
     OffsetDateTime generatedAt) {}

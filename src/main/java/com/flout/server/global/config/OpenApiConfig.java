@@ -281,6 +281,33 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/addresses/coordinates")) {
                               describeAddressCoordinates(operation);
                             }
+                            if (path.equals("/api/resident/prevention-guides/{guideId}")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeGuideProgress(
+                                  operation,
+                                  com.flout.server.domain.preventionguide.response.code
+                                      .PreventionGuideSuccessCode.GUIDE_FOUND,
+                                  false,
+                                  false);
+                            }
+                            if (path.equals("/api/resident/guide-items/{itemId}/progress")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeGuideProgress(
+                                  operation,
+                                  com.flout.server.domain.preventionguide.response.code
+                                      .PreventionGuideSuccessCode.ITEM_UPDATED,
+                                  true,
+                                  true);
+                            }
+                            if (path.equals("/api/resident/prevention-guides/{guideId}/resolution")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeGuideProgress(
+                                  operation,
+                                  com.flout.server.domain.preventionguide.response.code
+                                      .PreventionGuideSuccessCode.RESOLUTION_UPDATED,
+                                  false,
+                                  true);
+                            }
                             if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
                               var success =
                                   operation
@@ -1457,6 +1484,62 @@ public class OpenApiConfig {
   }
 
   // GIS 신청 응답 예시와 ID·관할 오류 문서화
+  private void describeGuideProgress(
+      Operation operation,
+      com.flout.server.domain.preventionguide.response.code.PreventionGuideSuccessCode code,
+      boolean item,
+      boolean hasBody) {
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("guideId", 1);
+    result.put("assessmentId", 1);
+    result.put("source", "AI");
+    result.put("grade", "HIGH");
+    result.put("title", "이것부터 확인하세요");
+    result.put("subtitle", "우리 집 주변을 확인해 주세요.");
+    result.put("completedCount", 1);
+    result.put("totalCount", 1);
+    result.put(
+        "items",
+        List.of(
+            Map.of(
+                "itemId",
+                1,
+                "order",
+                1,
+                "ruleId",
+                "DRAIN",
+                "title",
+                "배수구 확인",
+                "description",
+                "배수구 주변을 확인해 주세요.",
+                "completed",
+                true)));
+    result.put("resolution", "CONFIRMED");
+    result.put("generatedAt", "2026-11-04T10:00:00+09:00");
+    addExample(success, "guideProgress", envelope(true, code, code.getMessage(), result));
+    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "guideAccessDenied",
+        com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+            .GUIDE_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        item ? "itemNotFound" : "guideNotFound",
+        item
+            ? com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+                .ITEM_NOT_FOUND
+            : com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+                .GUIDE_NOT_FOUND,
+        null);
+    if (hasBody) {
+      addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    }
+  }
+
   private void describeResidentApplicationUpdate(Operation operation) {
     var requestExample = new LinkedHashMap<String, Object>();
     requestExample.put("contact", "010-1234-5678");

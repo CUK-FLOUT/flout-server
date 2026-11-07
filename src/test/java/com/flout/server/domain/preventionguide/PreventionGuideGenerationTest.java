@@ -2,10 +2,12 @@ package com.flout.server.domain.preventionguide;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,8 +17,11 @@ import com.flout.server.domain.preventionguide.client.GeneratedGuide;
 import com.flout.server.domain.preventionguide.client.GeneratedGuideItem;
 import com.flout.server.domain.preventionguide.client.GuideGenerationClient;
 import com.flout.server.domain.preventionguide.client.GuideGenerationSource;
+import com.flout.server.domain.preventionguide.entity.GuideResolution;
 import com.flout.server.domain.preventionguide.repository.PreventionGuideRepository;
 import com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode;
+import com.flout.server.domain.preventionguide.service.PreventionGuideService;
+import com.flout.server.domain.preventionguide.service.ResidentGuideProgressService;
 import com.flout.server.domain.riskassessment.client.RiskPrediction;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
@@ -27,14 +32,19 @@ import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
@@ -52,6 +62,8 @@ class PreventionGuideGenerationTest {
   @Autowired JwtService jwt;
   @Autowired ObjectMapper objectMapper;
   @Autowired JdbcTemplate jdbc;
+  @Autowired PreventionGuideService guideService;
+  @Autowired ResidentGuideProgressService progressService;
   @MockitoBean GuideGenerationClient generationClient;
 
   User owner;
@@ -93,6 +105,313 @@ class PreventionGuideGenerationTest {
                     new GeneratedGuideItem("BASEMENT_TOOLS", "대피 도구 준비", "대피 도구를 준비해 주세요."),
                     new GeneratedGuideItem("BARRIER", "물막이 준비", "물막이판을 준비해 주세요."),
                     new GeneratedGuideItem("POWER", "전기·가스 확인", "젖은 손으로 만지지 마세요."))));
+  }
+
+  @Test
+  void savedIncompleteProgressPreventsDefaultRegeneration() {
+    when(generationClient.generate(any(), any()))
+        .thenThrow(new BaseException(PreventionGuideErrorCode.AI_SERVICE_ERROR));
+    var original = guideService.generate(owner.getId(), assessmentId);
+    progressService.updateProgress(owner.getId(), original.items().getFirst().itemId(), false);
+    var result = guideService.generate(owner.getId(), assessmentId);
+    assertThat(result.source()).isEqualTo(GuideGenerationSource.DEFAULT);
+    verify(generationClient, times(1)).generate(RiskLevel.HIGH, HousingType.SEMI_BASEMENT);
+  }
+
+  @Test
+  void finalChoiceDuringDefaultRegenerationIsNotOverwritten() throws Exception {
+    when(generationClient.generate(any(), any()))
+        .thenThrow(new BaseException(PreventionGuideErrorCode.AI_SERVICE_ERROR));
+    var original = guideService.generate(owner.getId(), assessmentId);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var ai =
+        new GeneratedGuide(
+            GuideGenerationSource.AI,
+            "새 안내",
+            original.items().stream()
+                .map(
+                    item ->
+                        new GeneratedGuideItem(
+                            item.ruleId(), "변경 " + item.title(), item.description()))
+                .toList());
+    doAnswer(
+            invocation -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              entered.countDown();
+              if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("AI 대기 시간 초과");
+              return ai;
+            })
+        .when(generationClient)
+        .generate(any(), any());
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var retried = executor.submit(() -> guideService.generate(owner.getId(), assessmentId));
+      try {
+        assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+        var update =
+            executor.submit(
+                () ->
+                    progressService.updateResolution(
+                        owner.getId(), original.guideId(), GuideResolution.CONFIRMED));
+        assertThat(update.get(5, TimeUnit.SECONDS).resolution())
+            .isEqualTo(GuideResolution.CONFIRMED);
+      } finally {
+        release.countDown();
+      }
+      var result = retried.get(15, TimeUnit.SECONDS);
+      assertThat(result.source()).isEqualTo(GuideGenerationSource.DEFAULT);
+      assertThat(result.resolution()).isEqualTo(GuideResolution.CONFIRMED);
+      assertThat(result.items().getFirst().title()).isEqualTo(original.items().getFirst().title());
+    }
+  }
+
+  @Test
+  void concurrentGenerationDoesNotHoldAssessmentLockDuringAiCallAndCreatesOneGuide()
+      throws Exception {
+    var entered = new CountDownLatch(2);
+    var release = new CountDownLatch(1);
+    var generated =
+        new GeneratedGuide(
+            GuideGenerationSource.AI, "안내", List.of(new GeneratedGuideItem("A", "제목", "설명")));
+    when(generationClient.generate(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              entered.countDown();
+              if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("AI 대기 시간 초과");
+              return generated;
+            });
+    try (var executor = Executors.newFixedThreadPool(3)) {
+      var first = executor.submit(() -> guideService.generate(owner.getId(), assessmentId));
+      var second = executor.submit(() -> guideService.generate(owner.getId(), assessmentId));
+      try {
+        assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+        var update =
+            executor.submit(
+                () ->
+                    jdbc.update(
+                        "UPDATE risk_assessments SET detail_address=detail_address WHERE assessment_id=?",
+                        assessmentId));
+        assertThat(update.get(5, TimeUnit.SECONDS)).isEqualTo(1);
+      } finally {
+        release.countDown();
+      }
+      assertThat(first.get(15, TimeUnit.SECONDS).guideId())
+          .isEqualTo(second.get(15, TimeUnit.SECONDS).guideId());
+      assertThat(guides.count()).isEqualTo(1);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM prevention_guide_items", Integer.class))
+          .isEqualTo(1);
+    }
+  }
+
+  @Test
+  void progressDuringDefaultRegenerationIsNotOverwritten() throws Exception {
+    when(generationClient.generate(any(), any()))
+        .thenThrow(new BaseException(PreventionGuideErrorCode.AI_SERVICE_ERROR));
+    var original = guideService.generate(owner.getId(), assessmentId);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var ai =
+        new GeneratedGuide(
+            GuideGenerationSource.AI,
+            "새 안내",
+            original.items().stream()
+                .map(
+                    item ->
+                        new GeneratedGuideItem(
+                            item.ruleId(), "변경 " + item.title(), item.description()))
+                .toList());
+    doAnswer(
+            invocation -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              entered.countDown();
+              if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("AI 대기 시간 초과");
+              return ai;
+            })
+        .when(generationClient)
+        .generate(any(), any());
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var retried = executor.submit(() -> guideService.generate(owner.getId(), assessmentId));
+      try {
+        assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+        var update =
+            executor.submit(
+                () ->
+                    progressService.updateProgress(
+                        owner.getId(), original.items().getFirst().itemId(), true));
+        assertThat(update.get(5, TimeUnit.SECONDS).completedCount()).isEqualTo(1);
+      } finally {
+        release.countDown();
+      }
+      var result = retried.get(15, TimeUnit.SECONDS);
+      assertThat(result.source()).isEqualTo(GuideGenerationSource.DEFAULT);
+      assertThat(result.completedCount()).isEqualTo(1);
+      assertThat(result.items().getFirst().title()).isEqualTo(original.items().getFirst().title());
+    }
+  }
+
+  @Test
+  void documentsGuideProgressApis() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/prevention-guides/{guideId}'].get.responses['200'].content['application/json'].examples.guideProgress.value.result.items[0].itemId")
+                .value(1))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/guide-items/{itemId}/progress'].patch.responses['404'].content['application/json'].examples.itemNotFound.value.code")
+                .value("GUIDE_404_3"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/prevention-guides/{guideId}/resolution'].patch.responses['403'].content['application/json'].examples.guideAccessDenied.value.code")
+                .value("GUIDE_403_2"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/prevention-guides/{guideId}'].get.responses['400'].content['application/json'].examples.invalidBody")
+                .doesNotExist())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/guide-items/{itemId}/progress'].patch.responses['400'].content['application/json'].examples.invalidBody")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/prevention-guides/{guideId}/resolution'].patch.responses['400'].content['application/json'].examples.invalidBody")
+                .exists());
+  }
+
+  @Test
+  void persistsProgressAndResolutionAcrossRequestsWithoutCreatingInspectionApplication()
+      throws Exception {
+    var created =
+        mvc.perform(
+                post("/api/resident/risk-assessments/{id}/guide", assessmentId)
+                    .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+    var data = objectMapper.readTree(created.getResponse().getContentAsString()).path("result");
+    long guideId = data.path("guideId").asLong();
+    long itemId = data.path("items").get(0).path("itemId").asLong();
+    mvc.perform(
+            patch("/api/resident/guide-items/{id}/progress", itemId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"completed\":true}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.completedCount").value(1))
+        .andExpect(jsonPath("$.result.items[0].completed").value(true));
+    mvc.perform(
+            patch("/api/resident/prevention-guides/{id}/resolution", guideId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resolution\":\"NEEDS_INSPECTION\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.resolution").value("NEEDS_INSPECTION"));
+    mvc.perform(
+            get("/api/resident/prevention-guides/{id}", guideId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(4))
+        .andExpect(jsonPath("$.result.completedCount").value(1))
+        .andExpect(jsonPath("$.result.items[0].itemId").value(itemId))
+        .andExpect(jsonPath("$.result.resolution").value("NEEDS_INSPECTION"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inspection_applications WHERE assessment_id=?",
+                Long.class,
+                assessmentId))
+        .isZero();
+    mvc.perform(
+            patch("/api/resident/guide-items/{id}/progress", itemId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"completed\":false}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.completedCount").value(0));
+    mvc.perform(
+            patch("/api/resident/prevention-guides/{id}/resolution", guideId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resolution\":\"CONFIRMED\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.resolution").value("CONFIRMED"));
+  }
+
+  @Test
+  void protectsGuideAndItemAndValidatesRequests() throws Exception {
+    var created =
+        mvc.perform(
+                post("/api/resident/risk-assessments/{id}/guide", assessmentId)
+                    .header("Authorization", "Bearer " + token))
+            .andReturn();
+    var data = objectMapper.readTree(created.getResponse().getContentAsString()).path("result");
+    long guideId = data.path("guideId").asLong();
+    long itemId = data.path("items").get(0).path("itemId").asLong();
+    var other = users.save(User.resident("guide-other@example.com", "hash", "타인"));
+    String otherToken = jwt.issue(other).accessToken();
+    mvc.perform(get("/api/resident/prevention-guides/{id}", guideId))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/resident/prevention-guides/{id}", guideId)
+                .header("Authorization", "Bearer " + otherToken))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            patch("/api/resident/guide-items/{id}/progress", itemId)
+                .header("Authorization", "Bearer " + otherToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"completed\":true}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            patch("/api/resident/prevention-guides/{id}/resolution", guideId)
+                .header("Authorization", "Bearer " + otherToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resolution\":\"CONFIRMED\"}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get("/api/resident/prevention-guides/{id}", Long.MAX_VALUE)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            patch("/api/resident/guide-items/{id}/progress", Long.MAX_VALUE)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"completed\":true}"))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            patch("/api/resident/guide-items/{id}/progress", itemId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            patch("/api/resident/prevention-guides/{id}/resolution", guideId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resolution\":\"OTHER\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void legacyJsonWithoutItemsIsInitializedOnRead() throws Exception {
+    var created =
+        mvc.perform(
+                post("/api/resident/risk-assessments/{id}/guide", assessmentId)
+                    .header("Authorization", "Bearer " + token))
+            .andReturn();
+    long guideId =
+        objectMapper
+            .readTree(created.getResponse().getContentAsString())
+            .path("result")
+            .path("guideId")
+            .asLong();
+    jdbc.update("DELETE FROM prevention_guide_items WHERE guide_id=?", guideId);
+    mvc.perform(
+            get("/api/resident/prevention-guides/{id}", guideId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.totalCount").value(4))
+        .andExpect(jsonPath("$.result.completedCount").value(0))
+        .andExpect(jsonPath("$.result.items[0].itemId").isNumber());
   }
 
   @Test
