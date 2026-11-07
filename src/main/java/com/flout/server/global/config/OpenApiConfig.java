@@ -308,6 +308,11 @@ public class OpenApiConfig {
                               describeResidentApplicationDetail(operation);
                             }
 
+                            if (path.equals("/api/resident/applications/{applicationId}/result")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeResidentInspectionResult(operation);
+                            }
+
                             if (path.equals(
                                     "/api/resident/applications/{applicationId}/recommendations")
                                 && method == PathItem.HttpMethod.GET) {
@@ -1525,6 +1530,51 @@ public class OpenApiConfig {
                 2,
                 "facilities",
                 List.of("출입구 물막이판", "창문 차수판"))));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", InspectionApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeResidentInspectionResult(Operation operation) {
+    var code = InspectionApplicationSuccessCode.RESULT_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result =
+        Map.of(
+            "applicationId",
+            101,
+            "summary",
+            "출입구와 배수구의 침수 예방이 필요합니다.",
+            "publishedAt",
+            "2026-11-04T10:00:00+09:00",
+            "vulnerabilities",
+            List.of(
+                Map.of(
+                    "type",
+                    "ENTRANCE",
+                    "title",
+                    "낮은 출입구 높이",
+                    "expertOpinion",
+                    "빗물 유입 가능성이 있습니다.",
+                    "fieldFindings",
+                    "출입구 주변 바닥보다 낮습니다.")),
+            "photos",
+            List.of(Map.of("photoId", 10, "url", "https://example.com/photo?signature=example")));
+    addExample(
+        success, "residentInspectionResult", envelope(true, code, code.getMessage(), result));
     addError(
         operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
     addError(
