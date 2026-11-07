@@ -139,6 +139,11 @@ public class ResidentApplicationProgressReader {
                     : null));
   }
 
+  /**
+   * 주민 표시 단계를 시공, 최신 접수 지원, 공개된 점검 결과, 점검 상태 순으로 결정한다.
+   *
+   * <p>임시 신청은 단계가 없으며, 점검이 완료돼도 결과 공개 전에는 점검 진행으로 표시한다.
+   */
   private ResidentApplicationStage stage(
       InspectionApplication a,
       Inspection i,
@@ -170,8 +175,7 @@ public class ResidentApplicationProgressReader {
     return switch (i.getStatus()) {
       case RECEIVED -> ResidentApplicationStage.INSPECTION_RECEIVED;
       case SCHEDULED -> ResidentApplicationStage.VISIT_SCHEDULED;
-      case IN_PROGRESS -> ResidentApplicationStage.INSPECTION_IN_PROGRESS;
-      case COMPLETED -> ResidentApplicationStage.INSPECTION_RESULT_PENDING;
+      case IN_PROGRESS, COMPLETED -> ResidentApplicationStage.INSPECTION_IN_PROGRESS;
     };
   }
 

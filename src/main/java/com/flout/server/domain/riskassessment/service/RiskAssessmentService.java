@@ -1,26 +1,32 @@
 package com.flout.server.domain.riskassessment.service;
 
+import com.flout.server.domain.address.service.AddressCoordinatesService;
+import com.flout.server.domain.riskassessment.client.RiskPrediction;
+import com.flout.server.domain.riskassessment.client.RiskPredictionClient;
 import com.flout.server.domain.riskassessment.dto.request.CreateRiskAssessmentRequest;
 import com.flout.server.domain.riskassessment.dto.response.CreateRiskAssessmentResponse;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
-import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
+import com.flout.server.domain.riskassessment.response.code.RiskAssessmentErrorCode;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RiskAssessmentService {
   private final UserRepository users;
   private final RiskAssessmentRepository assessments;
+  private final AddressCoordinatesService coordinatesService;
+  private final RiskPredictionClient predictionClient;
+  private final ObjectMapper objectMapper;
 
-  /** 로그인한 주민의 주소에 임시 분석 결과를 저장한다. */
-  @Transactional
   public CreateRiskAssessmentResponse create(Long userId, CreateRiskAssessmentRequest request) {
     var resident =
         users
@@ -30,15 +36,38 @@ public class RiskAssessmentService {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     }
 
+    String address = request.address().strip();
+    String detailAddress = request.detailAddress().strip();
+    var coordinates = coordinatesService.coordinates(address);
+    var prediction = predictionClient.predict(coordinates.latitude(), coordinates.longitude());
+
     var assessment =
         assessments.save(
-            RiskAssessment.completedDemo(
+            RiskAssessment.completed(
                 resident,
-                request.address().strip(),
-                request.detailAddress(),
-                RiskLevel.HIGH,
-                request.housingType()));
+                address,
+                detailAddress,
+                prediction.riskLevel(),
+                request.housingType(),
+                serialize(prediction)));
     return new CreateRiskAssessmentResponse(
-        assessment.getId(), assessment.getRiskLevel(), assessment.getStatus());
+        assessment.getId(),
+        prediction.riskType(),
+        prediction.cellId(),
+        prediction.score(),
+        assessment.getRiskLevel(),
+        assessment.getStatus(),
+        prediction.reasons(),
+        prediction.floodRecord(),
+        prediction.disclaimer());
+  }
+
+  private String serialize(RiskPrediction prediction) {
+    try {
+      return objectMapper.writeValueAsString(prediction);
+    } catch (Exception e) {
+      log.error("Failed to serialize the risk prediction result", e);
+      throw new BaseException(RiskAssessmentErrorCode.RESULT_SERIALIZATION_FAILED);
+    }
   }
 }

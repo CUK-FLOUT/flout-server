@@ -11,7 +11,7 @@ public record ResidentApplicationProgressResponse(
     @Schema(
             nullable = true,
             description =
-                "임시 신청 상세는 null. 점검 종료 후 미공개는 INSPECTION_RESULT_PENDING이며 공개 시에만 INSPECTION_COMPLETED")
+                "임시 신청 상세는 null. 점검 종료 후 미공개는 INSPECTION_IN_PROGRESS이며 공개 시에만 INSPECTION_COMPLETED")
         ResidentApplicationStage stage,
     @Schema(description = "COMPLETED 또는 SUPPORT_REJECTED일 때만 true") boolean closed,
     OffsetDateTime updatedAt,
