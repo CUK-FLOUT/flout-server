@@ -56,6 +56,12 @@ public class PreventionGuide {
     return guide;
   }
 
+  public void replaceGeneratedContent(String title, String contentJson, LocalDateTime generatedAt) {
+    this.title = Objects.requireNonNull(title);
+    this.contentJson = Objects.requireNonNull(contentJson);
+    this.generatedAt = Objects.requireNonNull(generatedAt);
+  }
+
   @PrePersist
   void onCreate() {
     createdAt = LocalDateTime.now();

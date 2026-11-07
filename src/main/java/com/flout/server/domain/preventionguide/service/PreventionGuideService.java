@@ -3,6 +3,7 @@ package com.flout.server.domain.preventionguide.service;
 import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.preventionguide.client.GeneratedGuide;
 import com.flout.server.domain.preventionguide.client.GuideGenerationClient;
+import com.flout.server.domain.preventionguide.client.GuideGenerationSource;
 import com.flout.server.domain.preventionguide.client.GuideRuleCatalog;
 import com.flout.server.domain.preventionguide.dto.response.PreventionGuideItemResponse;
 import com.flout.server.domain.preventionguide.dto.response.PreventionGuideResponse;
@@ -50,8 +51,8 @@ public class PreventionGuideService {
 
     var existing = guides.findByAssessmentId(assessmentId);
     if (existing.isPresent()) {
-      return response(
-          existing.get(), deserialize(existing.get()), assessmentId, assessment.getRiskLevel());
+      return resolveExisting(
+          existing.get(), assessmentId, assessment.getRiskLevel(), assessment.getHousingType());
     }
 
     var generated = generateOrDefault(assessment.getRiskLevel(), assessment.getHousingType());
@@ -69,6 +70,22 @@ public class PreventionGuideService {
               guide -> response(guide, deserialize(guide), assessmentId, assessment.getRiskLevel()))
           .orElseThrow(() -> new BaseException(PreventionGuideErrorCode.GUIDE_SAVE_FAILED));
     }
+  }
+
+  private PreventionGuideResponse resolveExisting(
+      PreventionGuide guide, Long assessmentId, RiskLevel riskLevel, HousingType housingType) {
+    var stored = deserialize(guide);
+    if (stored.source() != GuideGenerationSource.DEFAULT) {
+      return response(guide, stored, assessmentId, riskLevel);
+    }
+
+    var retried = generateOrDefault(riskLevel, housingType);
+    if (retried.source() == GuideGenerationSource.AI) {
+      guide.replaceGeneratedContent(GUIDE_TITLE, serialize(retried), LocalDateTime.now());
+      guides.saveAndFlush(guide);
+      return response(guide, retried, assessmentId, riskLevel);
+    }
+    return response(guide, stored, assessmentId, riskLevel);
   }
 
   private GeneratedGuide generateOrDefault(RiskLevel riskLevel, HousingType housingType) {

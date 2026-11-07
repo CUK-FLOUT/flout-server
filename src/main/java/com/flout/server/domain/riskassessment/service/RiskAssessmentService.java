@@ -13,11 +13,13 @@ import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RiskAssessmentService {
   private final UserRepository users;
   private final RiskAssessmentRepository assessments;
@@ -64,6 +66,7 @@ public class RiskAssessmentService {
     try {
       return objectMapper.writeValueAsString(prediction);
     } catch (Exception e) {
+      log.error("Failed to serialize the risk prediction result", e);
       throw new BaseException(RiskAssessmentErrorCode.RESULT_SERIALIZATION_FAILED);
     }
   }

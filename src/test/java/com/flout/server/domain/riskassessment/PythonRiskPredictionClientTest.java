@@ -104,9 +104,90 @@ class PythonRiskPredictionClientTest {
                     .isEqualTo(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE));
   }
 
+  @Test
+  void mapsHttp422ToAnalysisUnavailable() throws Exception {
+    startServer(422, "{}", new AtomicReference<>(), new AtomicReference<>());
+
+    assertError(client(), RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE);
+  }
+
+  @Test
+  void mapsHttp500ToAiServiceError() throws Exception {
+    startServer(500, "{}", new AtomicReference<>(), new AtomicReference<>());
+
+    assertError(client(), RiskAssessmentErrorCode.AI_SERVICE_ERROR);
+  }
+
+  @Test
+  void mapsDelayedResponseToAiServiceTimeout() throws Exception {
+    startServer(
+        200,
+        validResponse("높음", "침수 기록 없음 (안전을 뜻하지 않음)"),
+        new AtomicReference<>(),
+        new AtomicReference<>(),
+        300);
+
+    assertError(client(50), RiskAssessmentErrorCode.AI_SERVICE_TIMEOUT);
+  }
+
+  @Test
+  void rejectsUnknownGrade() throws Exception {
+    startServer(
+        200,
+        validResponse("매우 높음", "침수 기록 없음 (안전을 뜻하지 않음)"),
+        new AtomicReference<>(),
+        new AtomicReference<>());
+
+    assertError(client(), RiskAssessmentErrorCode.INVALID_AI_RESPONSE);
+  }
+
+  @Test
+  void rejectsEmptyResponseBody() throws Exception {
+    startServer(200, "", new AtomicReference<>(), new AtomicReference<>());
+
+    assertError(client(), RiskAssessmentErrorCode.INVALID_AI_RESPONSE);
+  }
+
+  @Test
+  void rejectsMissingFloodRecord() throws Exception {
+    startServer(200, validResponse("높음", null), new AtomicReference<>(), new AtomicReference<>());
+
+    assertError(client(), RiskAssessmentErrorCode.INVALID_AI_RESPONSE);
+  }
+
   private PythonRiskPredictionClient client() {
+    return client(1000);
+  }
+
+  private PythonRiskPredictionClient client(long readTimeoutMillis) {
     return new PythonRiskPredictionClient(
-        "http://127.0.0.1:" + server.getAddress().getPort(), "/api/vulnerability", 1000, 1000);
+        "http://127.0.0.1:" + server.getAddress().getPort(),
+        "/api/vulnerability",
+        1000,
+        readTimeoutMillis);
+  }
+
+  private void assertError(
+      PythonRiskPredictionClient client, RiskAssessmentErrorCode expectedError) {
+    assertThatThrownBy(() -> client.predict(37.5035, 126.7660))
+        .isInstanceOfSatisfying(
+            BaseException.class,
+            exception -> assertThat(exception.getBaseResponseCode()).isEqualTo(expectedError));
+  }
+
+  private String validResponse(String grade, String floodRecord) {
+    String floodRecordJson = floodRecord == null ? "" : ",\"floodRecord\":\"" + floodRecord + "\"";
+    return """
+        {
+          "riskType":"REGIONAL_RELATIVE_VULNERABILITY",
+          "status":"OK",
+          "cellId":"r605c713",
+          "score":0.2841,
+          "grade":"%s"%s,
+          "disclaimer":"지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다."
+        }
+        """
+        .formatted(grade, floodRecordJson);
   }
 
   private void startServer(
@@ -115,12 +196,31 @@ class PythonRiskPredictionClientTest {
       AtomicReference<String> requestMethod,
       AtomicReference<String> requestQuery)
       throws IOException {
+    startServer(status, responseBody, requestMethod, requestQuery, 0);
+  }
+
+  private void startServer(
+      int status,
+      String responseBody,
+      AtomicReference<String> requestMethod,
+      AtomicReference<String> requestQuery,
+      long delayMillis)
+      throws IOException {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext(
         "/api/vulnerability",
         exchange -> {
           requestMethod.set(exchange.getRequestMethod());
           requestQuery.set(exchange.getRequestURI().getRawQuery());
+          if (delayMillis > 0) {
+            try {
+              Thread.sleep(delayMillis);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              exchange.close();
+              return;
+            }
+          }
           byte[] response = responseBody.getBytes(StandardCharsets.UTF_8);
           exchange.getResponseHeaders().add("Content-Type", "application/json");
           exchange.sendResponseHeaders(status, response.length);

@@ -85,14 +85,39 @@ class GeminiGuideGenerationClientTest {
   }
 
   @Test
-  void rejectsChangedRuleOrderOrBannedWording() throws Exception {
+  void rejectsChangedRuleOrder() throws Exception {
+    startServer(
+        200,
+        geminiResponse(
+            """
+            {"subtitle":"대피 요령부터 확인해 주세요","items":[
+              {"ruleId":"BASEMENT_TOOLS","title":"확인","description":"확인해요"},
+              {"ruleId":"BASEMENT_EVAC","title":"확인","description":"확인해요"},
+              {"ruleId":"BARRIER","title":"확인","description":"확인해요"},
+              {"ruleId":"POWER","title":"확인","description":"확인해요"}
+            ]}
+            """),
+        new StringBuilder(),
+        new AtomicReference<>(),
+        new AtomicReference<>());
+
+    assertThatThrownBy(() -> client("test-key").generate(RiskLevel.HIGH, HousingType.SEMI_BASEMENT))
+        .isInstanceOfSatisfying(
+            BaseException.class,
+            exception ->
+                assertThat(exception.getBaseResponseCode())
+                    .isEqualTo(PreventionGuideErrorCode.INVALID_AI_RESPONSE));
+  }
+
+  @Test
+  void rejectsBannedWording() throws Exception {
     startServer(
         200,
         geminiResponse(
             """
             {"subtitle":"우리 집은 안전해요","items":[
-              {"ruleId":"DRAIN","title":"확인","description":"확인해요"},
               {"ruleId":"BASEMENT_EVAC","title":"확인","description":"확인해요"},
+              {"ruleId":"BASEMENT_TOOLS","title":"확인","description":"확인해요"},
               {"ruleId":"BARRIER","title":"확인","description":"확인해요"},
               {"ruleId":"POWER","title":"확인","description":"확인해요"}
             ]}

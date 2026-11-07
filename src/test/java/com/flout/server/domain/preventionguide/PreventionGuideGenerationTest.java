@@ -151,6 +151,47 @@ class PreventionGuideGenerationTest {
   }
 
   @Test
+  void retriesStoredDefaultGuideAndReplacesItWhenGeminiRecovers() throws Exception {
+    var aiGuide =
+        new GeneratedGuide(
+            GuideGenerationSource.AI,
+            "반지하는 대피 요령부터 확인해 주세요.",
+            List.of(
+                new GeneratedGuideItem("BASEMENT_EVAC", "새 대피 요령", "새 대피 요령을 확인해 주세요."),
+                new GeneratedGuideItem("BASEMENT_TOOLS", "새 대피 도구", "새 대피 도구를 준비해 주세요."),
+                new GeneratedGuideItem("BARRIER", "새 물막이 준비", "새 물막이 수칙을 확인해 주세요."),
+                new GeneratedGuideItem("POWER", "새 전기 확인", "새 전기 수칙을 확인해 주세요.")));
+    when(generationClient.generate(any(), any()))
+        .thenThrow(new BaseException(PreventionGuideErrorCode.AI_SERVICE_TIMEOUT))
+        .thenReturn(aiGuide);
+    var request =
+        post("/api/resident/risk-assessments/{assessmentId}/guide", assessmentId)
+            .header("Authorization", "Bearer " + token);
+
+    var first =
+        mvc.perform(request)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result.source").value("DEFAULT"))
+            .andReturn();
+    long guideId =
+        objectMapper
+            .readTree(first.getResponse().getContentAsString())
+            .path("result")
+            .path("guideId")
+            .asLong();
+
+    mvc.perform(request)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.guideId").value(guideId))
+        .andExpect(jsonPath("$.result.source").value("AI"))
+        .andExpect(jsonPath("$.result.items[0].title").value("새 대피 요령"));
+
+    assertThat(guides.findById(guideId).orElseThrow().getContentJson())
+        .contains("\"source\":\"AI\"", "새 대피 요령");
+    verify(generationClient, times(2)).generate(RiskLevel.HIGH, HousingType.SEMI_BASEMENT);
+  }
+
+  @Test
   void validatesOwnerAssessmentStateAndId() throws Exception {
     var other = users.save(User.resident("other-guide@example.com", "hash", "다른 주민"));
     mvc.perform(
