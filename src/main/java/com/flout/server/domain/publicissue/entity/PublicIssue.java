@@ -46,7 +46,10 @@ public class PublicIssue {
   private String fieldFindings;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, columnDefinition = "enum('RECEIVED')")
+  @Column(
+      nullable = false,
+      columnDefinition =
+          "enum('RECEIVED','UNDER_REVIEW','INSPECTION_REQUIRED','ACTION_IN_PROGRESS','COMPLETED')")
   private PublicIssueStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -75,5 +78,24 @@ public class PublicIssue {
     issue.fieldFindings = findings;
     issue.status = PublicIssueStatus.RECEIVED;
     return issue;
+  }
+
+  public void completeAction() {
+    status = PublicIssueStatus.COMPLETED;
+  }
+
+  public void startAction() {
+    status = PublicIssueStatus.ACTION_IN_PROGRESS;
+  }
+
+  public void saveReview(FacilityReviewStatus reviewStatus) {
+    status =
+        switch (reviewStatus) {
+          case PENDING -> PublicIssueStatus.RECEIVED;
+          case UNDER_REVIEW -> PublicIssueStatus.UNDER_REVIEW;
+          case INSPECTION_REQUIRED -> PublicIssueStatus.INSPECTION_REQUIRED;
+          case ACTION_IN_PROGRESS -> PublicIssueStatus.ACTION_IN_PROGRESS;
+          case COMPLETED -> PublicIssueStatus.COMPLETED;
+        };
   }
 }
