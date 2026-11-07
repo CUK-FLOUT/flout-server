@@ -83,6 +83,10 @@ public class FacilityReview {
     reviewStatus = FacilityReviewStatus.COMPLETED;
   }
 
+  public void startAction() {
+    reviewStatus = FacilityReviewStatus.ACTION_IN_PROGRESS;
+  }
+
   @PrePersist
   void onCreate() {
     createdAt = LocalDateTime.now();

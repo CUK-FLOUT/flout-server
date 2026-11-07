@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminFacilityReviewController {
   private final FacilityReviewService service;
 
-  @PostMapping(
+  @PutMapping(
       value = "/{publicIssueId}/review",
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)

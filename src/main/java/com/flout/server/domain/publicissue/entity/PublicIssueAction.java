@@ -1,5 +1,6 @@
 package com.flout.server.domain.publicissue.entity;
 
+import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -20,6 +21,10 @@ public class PublicIssueAction {
   @JoinColumn(name = "review_id", nullable = false)
   private FacilityReview review;
 
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "user_id", nullable = false)
+  private User operator;
+
   @Column(name = "action_description", nullable = false, columnDefinition = "TEXT")
   private String actionDescription;
 
@@ -36,14 +41,19 @@ public class PublicIssueAction {
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
-  public static PublicIssueAction complete(
-      FacilityReview review, String actionDescription, LocalDateTime completedAt) {
+  public static PublicIssueAction start(
+      FacilityReview review, User operator, String actionDescription) {
     var action = new PublicIssueAction();
     action.review = review;
+    action.operator = operator;
     action.actionDescription = actionDescription;
-    action.status = PublicIssueActionStatus.COMPLETED;
-    action.completedAt = completedAt;
+    action.status = PublicIssueActionStatus.IN_PROGRESS;
     return action;
+  }
+
+  public void complete(LocalDateTime completedAt) {
+    status = PublicIssueActionStatus.COMPLETED;
+    this.completedAt = completedAt;
   }
 
   @PrePersist

@@ -35,6 +35,7 @@ CREATE TABLE facility_review (
 CREATE TABLE facility_action (
     action_id BIGINT NOT NULL AUTO_INCREMENT,
     review_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
     action_description TEXT NOT NULL,
     action_status ENUM('IN_PROGRESS','COMPLETED') NOT NULL DEFAULT 'IN_PROGRESS',
     completed_at DATETIME NULL,
@@ -42,6 +43,7 @@ CREATE TABLE facility_action (
     PRIMARY KEY (action_id),
     CONSTRAINT fk_facility_action_review FOREIGN KEY (review_id)
         REFERENCES facility_review(review_id),
+    CONSTRAINT fk_facility_action_user FOREIGN KEY (user_id) REFERENCES users(user_id),
     INDEX idx_facility_action_review_created (review_id, created_at, action_id)
 );
 
@@ -53,5 +55,6 @@ CREATE TABLE facility_action_image (
     PRIMARY KEY (image_id),
     CONSTRAINT fk_facility_action_image_action FOREIGN KEY (action_id)
         REFERENCES facility_action(action_id),
-    INDEX idx_facility_action_image_action (action_id, image_id)
+    INDEX idx_facility_action_image_action (action_id, image_id),
+    CONSTRAINT uk_facility_action_image_url UNIQUE (image_url)
 );

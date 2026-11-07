@@ -165,10 +165,22 @@ class PublicIssueActionTest {
 
   org.springframework.test.web.servlet.ResultActions postReview(Object body) throws Exception {
     return mvc.perform(
-        post("/api/admin/public-issues/{publicIssueId}/review", publicIssueId)
+        put("/api/admin/public-issues/{publicIssueId}/review", publicIssueId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content(mapper.writeValueAsString(body)));
+  }
+
+  org.springframework.test.web.servlet.ResultActions patchActionStatus(
+      long issueId, long actionId, String status) throws Exception {
+    return mvc.perform(
+        patch(
+                "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status",
+                issueId,
+                actionId)
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of("status", status))));
   }
 
   Map<String, Object> body(Object description) {
@@ -261,7 +273,7 @@ class PublicIssueActionTest {
   }
 
   @Test
-  void completesActionReviewAndIssueAtomically() throws Exception {
+  void registersThenCompletesActionReviewAndIssueAtomically() throws Exception {
     postAction(publicIssueId, token, body("  빗물받이 퇴적물 제거 및 주변 배수로 정비  "))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.isSuccess").value(true))
@@ -269,17 +281,37 @@ class PublicIssueActionTest {
         .andExpect(jsonPath("$.result.actionId").isNumber())
         .andExpect(jsonPath("$.result.reviewId").value(reviewId))
         .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
+        .andExpect(jsonPath("$.result.operatorUserId").value(adminId))
         .andExpect(jsonPath("$.result.actionDescription").value("빗물받이 퇴적물 제거 및 주변 배수로 정비"))
+        .andExpect(jsonPath("$.result.actionStatus").value("IN_PROGRESS"))
+        .andExpect(jsonPath("$.result.reviewStatus").value("ACTION_IN_PROGRESS"))
+        .andExpect(jsonPath("$.result.publicIssueStatus").value("ACTION_IN_PROGRESS"))
+        .andExpect(jsonPath("$.result.completedAt").doesNotExist());
+    var action = jdbc.queryForMap("SELECT * FROM facility_action");
+    assertThat(action.get("ACTION_DESCRIPTION")).isEqualTo("빗물받이 퇴적물 제거 및 주변 배수로 정비");
+    assertThat(action.get("ACTION_STATUS").toString()).isEqualTo("IN_PROGRESS");
+    assertThat(((Number) action.get("REVIEW_ID")).longValue()).isEqualTo(reviewId);
+    assertThat(((Number) action.get("USER_ID")).longValue()).isEqualTo(adminId);
+    assertThat(action.get("COMPLETED_AT")).isNull();
+    long actionId = ((Number) action.get("ACTION_ID")).longValue();
+    jdbc.update(
+        "INSERT INTO facility_action_image(image_url,action_id) VALUES(?,?)",
+        "public-issues/test-evidence",
+        actionId);
+    patchActionStatus(publicIssueId, actionId, "COMPLETED")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_5"))
         .andExpect(jsonPath("$.result.actionStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.reviewStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.publicIssueStatus").value("COMPLETED"))
         .andExpect(
             jsonPath("$.result.completedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
-    var action = jdbc.queryForMap("SELECT * FROM facility_action");
-    assertThat(action.get("ACTION_DESCRIPTION")).isEqualTo("빗물받이 퇴적물 제거 및 주변 배수로 정비");
-    assertThat(action.get("ACTION_STATUS").toString()).isEqualTo("COMPLETED");
-    assertThat(((Number) action.get("REVIEW_ID")).longValue()).isEqualTo(reviewId);
-    assertThat(action.get("COMPLETED_AT")).isNotNull();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT action_status FROM facility_action WHERE action_id=?",
+                String.class,
+                actionId))
+        .isEqualTo("COMPLETED");
     assertThat(
             jdbc.queryForObject(
                 "SELECT review_status FROM facility_review WHERE review_id=?",
@@ -296,6 +328,25 @@ class PublicIssueActionTest {
             jdbc.queryForObject(
                 "SELECT status FROM inspections WHERE inspection_id=?", String.class, inspectionId))
         .isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void requiresEvidenceAndRejectsInvalidActionStatusTransitions() throws Exception {
+    long actionId = createAction();
+    patchActionStatus(publicIssueId, actionId, "COMPLETED")
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_5"));
+    patchActionStatus(publicIssueId, actionId, "IN_PROGRESS")
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_4"));
+    jdbc.update(
+        "INSERT INTO facility_action_image(image_url,action_id) VALUES(?,?)",
+        "public-issues/status-evidence",
+        actionId);
+    patchActionStatus(publicIssueId, actionId, "COMPLETED").andExpect(status().isOk());
+    patchActionStatus(publicIssueId, actionId, "IN_PROGRESS")
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_4"));
   }
 
   static Stream<Object> invalidDescriptions() {
@@ -475,31 +526,35 @@ class PublicIssueActionTest {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['200'].content['application/json'].examples.facilityReviewSaved.value.code")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].put.responses['200'].content['application/json'].examples.facilityReviewSaved.value.code")
                 .value("PUBLIC_ISSUE_200_3"))
         .andExpect(
             jsonPath("$.components.schemas.SaveFacilityReviewRequest.properties.facilityId.type")
                 .value("integer"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['404']")
-                .exists())
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].put.responses['404'].description")
+                .value("공공시설 문제 또는 공공시설을 찾을 수 없습니다."))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionCompleted.value.code")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].put.responses['409'].description")
+                .value("완료된 공공시설 문제의 검토 내용은 변경할 수 없습니다."))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionRegistered.value.code")
                 .value("PUBLIC_ISSUE_200_2"))
         .andExpect(
             jsonPath(
-                    "$.components.schemas.CompletePublicIssueActionRequest.properties.actionDescription.maxLength")
+                    "$.components.schemas.CreatePublicIssueActionRequest.properties.actionDescription.maxLength")
                 .value(4000))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['404']")
-                .exists())
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['404'].description")
+                .value("공공시설 문제를 찾을 수 없습니다."))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['409']")
-                .exists())
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['409'].description")
+                .value("이미 완료된 문제이거나 검토 내용이 저장되지 않았습니다."))
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['401']")
@@ -514,7 +569,19 @@ class PublicIssueActionTest {
                 .value("PUBLIC_ISSUE_200_4"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['413']")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['404'].description")
+                .value("공공시설 문제 또는 조치를 찾을 수 없습니다."))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['413'].description")
+                .value("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다."))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status'].patch.responses['200'].content['application/json'].examples.publicIssueActionStatusChanged.value.code")
+                .value("PUBLIC_ISSUE_200_5"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status'].patch.responses['409']")
                 .exists());
   }
 }
