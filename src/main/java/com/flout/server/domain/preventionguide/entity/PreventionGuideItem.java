@@ -30,6 +30,9 @@ public class PreventionGuideItem {
   @Column(nullable = false)
   private boolean completed;
 
+  @Column(name = "progress_recorded", nullable = false)
+  private boolean progressRecorded;
+
   public static PreventionGuideItem create(PreventionGuide guide, int order) {
     var item = new PreventionGuideItem();
     item.guide = guide;
@@ -39,5 +42,6 @@ public class PreventionGuideItem {
 
   public void setCompleted(boolean completed) {
     this.completed = completed;
+    this.progressRecorded = true;
   }
 }

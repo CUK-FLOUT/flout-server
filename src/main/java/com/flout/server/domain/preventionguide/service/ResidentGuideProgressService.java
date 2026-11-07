@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResidentGuideProgressService {
   private final PreventionGuideRepository guides;
   private final PreventionGuideItemRepository items;
-  private final PreventionGuideService generation;
+  private final PreventionGuideResponseMapper generation;
 
   @Transactional
   public PreventionGuideResponse get(Long userId, Long guideId) {

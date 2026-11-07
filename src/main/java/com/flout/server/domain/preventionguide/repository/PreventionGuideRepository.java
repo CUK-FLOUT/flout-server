@@ -13,6 +13,9 @@ public interface PreventionGuideRepository extends JpaRepository<PreventionGuide
 
   Optional<PreventionGuide> findByAssessmentId(Long assessmentId);
 
+  @Query("select g.id from PreventionGuide g where g.assessment.id = :assessmentId")
+  Optional<Long> findGuideIdByAssessmentId(@Param("assessmentId") Long assessmentId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select g from PreventionGuide g where g.id = :id")
   Optional<PreventionGuide> findLockedById(@Param("id") Long id);

@@ -287,6 +287,7 @@ public class OpenApiConfig {
                                   operation,
                                   com.flout.server.domain.preventionguide.response.code
                                       .PreventionGuideSuccessCode.GUIDE_FOUND,
+                                  false,
                                   false);
                             }
                             if (path.equals("/api/resident/guide-items/{itemId}/progress")
@@ -295,6 +296,7 @@ public class OpenApiConfig {
                                   operation,
                                   com.flout.server.domain.preventionguide.response.code
                                       .PreventionGuideSuccessCode.ITEM_UPDATED,
+                                  true,
                                   true);
                             }
                             if (path.equals("/api/resident/prevention-guides/{guideId}/resolution")
@@ -303,7 +305,8 @@ public class OpenApiConfig {
                                   operation,
                                   com.flout.server.domain.preventionguide.response.code
                                       .PreventionGuideSuccessCode.RESOLUTION_UPDATED,
-                                  false);
+                                  false,
+                                  true);
                             }
                             if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
                               var success =
@@ -1484,7 +1487,8 @@ public class OpenApiConfig {
   private void describeGuideProgress(
       Operation operation,
       com.flout.server.domain.preventionguide.response.code.PreventionGuideSuccessCode code,
-      boolean item) {
+      boolean item,
+      boolean hasBody) {
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(code.getMessage());
     var result = new LinkedHashMap<String, Object>();
@@ -1531,7 +1535,9 @@ public class OpenApiConfig {
             : com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
                 .GUIDE_NOT_FOUND,
         null);
-    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    if (hasBody) {
+      addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    }
   }
 
   private void describeResidentApplicationUpdate(Operation operation) {
