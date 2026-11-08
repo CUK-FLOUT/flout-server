@@ -2278,7 +2278,7 @@ public class OpenApiConfig {
     }
     operation.getResponses().get("403").setDescription("주민 권한이 없거나 본인 소유의 현장점검 신청이 아닙니다.");
     operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없습니다.");
-    operation.getResponses().get("409").setDescription("동일 현장점검 신청과 동일 지원사업으로 이미 신청했습니다.");
+    operation.getResponses().get("409").setDescription("동일 현장점검 신청으로 이미 신청했습니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

@@ -374,6 +374,7 @@ class SupportAttachmentTest {
 
   @Test
   void ownerCanSubmitAndBeApprovedWithoutAnyDocument() throws Exception {
+    jdbc.update("DELETE FROM support_applications WHERE support_application_id=?", support);
     jdbc.update(
         "UPDATE inspection_applications SET occupancy_type='OWNER' WHERE application_id=?", app);
     jdbc.update(
