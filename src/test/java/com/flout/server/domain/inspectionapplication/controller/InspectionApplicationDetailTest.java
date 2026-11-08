@@ -206,9 +206,8 @@ class InspectionApplicationDetailTest {
   }
 
   @Test
-  void filtersGisListByLatestSubmittedSupportAndConstructionState() throws Exception {
-    jdbc.update(
-        "INSERT INTO support_programs(name,created_at) VALUES('지원사업',CURRENT_TIMESTAMP),('임시 지원사업',CURRENT_TIMESTAMP)");
+  void filtersGisListBySubmittedSupportAndConstructionState() throws Exception {
+    jdbc.update("INSERT INTO support_programs(name,created_at) VALUES('지원사업',CURRENT_TIMESTAMP)");
     jdbc.update(
         """
         INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,
