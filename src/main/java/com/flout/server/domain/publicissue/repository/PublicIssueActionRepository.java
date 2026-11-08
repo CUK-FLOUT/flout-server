@@ -13,9 +13,4 @@ public interface PublicIssueActionRepository extends JpaRepository<PublicIssueAc
   @Query(
       "select a from PublicIssueAction a join fetch a.review r join fetch r.localProblem where a.id = :id")
   Optional<PublicIssueAction> findForImageUpload(@Param("id") Long id);
-
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query(
-      "select a from PublicIssueAction a join fetch a.operator join fetch a.review r join fetch r.localProblem where a.id = :id")
-  Optional<PublicIssueAction> findForStatusChange(@Param("id") Long id);
 }

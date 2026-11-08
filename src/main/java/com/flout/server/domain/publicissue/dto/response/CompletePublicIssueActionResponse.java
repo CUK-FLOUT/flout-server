@@ -7,7 +7,7 @@ import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 
-public record PublicIssueActionResponse(
+public record CompletePublicIssueActionResponse(
     Long actionId,
     Long reviewId,
     Long publicIssueId,
@@ -17,7 +17,7 @@ public record PublicIssueActionResponse(
     FacilityReviewStatus reviewStatus,
     PublicIssueStatus publicIssueStatus,
     OffsetDateTime completedAt) {
-  public static PublicIssueActionResponse from(PublicIssueAction action) {
+  public static CompletePublicIssueActionResponse from(PublicIssueAction action) {
     OffsetDateTime completedAt =
         action.getCompletedAt() == null
             ? null
@@ -26,7 +26,7 @@ public record PublicIssueActionResponse(
                 .atZone(ZoneId.systemDefault())
                 .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
                 .toOffsetDateTime();
-    return new PublicIssueActionResponse(
+    return new CompletePublicIssueActionResponse(
         action.getId(),
         action.getReview().getId(),
         action.getReview().getLocalProblem().getId(),

@@ -6,7 +6,6 @@ import com.flout.server.domain.publicissue.entity.FacilityReview;
 import com.flout.server.domain.publicissue.entity.FacilityReviewStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.repository.FacilityReviewRepository;
-import com.flout.server.domain.publicissue.repository.PublicFacilityRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.global.exception.BaseException;
 import java.time.LocalDateTime;
@@ -25,7 +24,6 @@ public class FacilityReviewService {
           FacilityReviewStatus.UNDER_REVIEW,
           FacilityReviewStatus.INSPECTION_REQUIRED);
   private final PublicIssueAccess access;
-  private final PublicFacilityRepository facilities;
   private final FacilityReviewRepository reviews;
 
   @Transactional
@@ -37,10 +35,6 @@ public class FacilityReviewService {
       throw new BaseException(PublicIssueErrorCode.REVIEW_NOT_ALLOWED);
     if (!SAVABLE_STATUSES.contains(request.reviewStatus()))
       throw new BaseException(PublicIssueErrorCode.INVALID_REVIEW_STATUS);
-    var facility =
-        facilities
-            .findById(request.facilityId())
-            .orElseThrow(() -> new BaseException(PublicIssueErrorCode.FACILITY_NOT_FOUND));
     var reviewedAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
     var review =
         reviews
@@ -49,7 +43,7 @@ public class FacilityReviewService {
                 current -> {
                   current.update(
                       authorized.operator(),
-                      facility,
+                      request.reviewTarget(),
                       request.inspectionNotes(),
                       request.reviewStatus(),
                       request.reviewReason(),
@@ -61,7 +55,7 @@ public class FacilityReviewService {
                     FacilityReview.create(
                         authorized.operator(),
                         issue,
-                        facility,
+                        request.reviewTarget(),
                         request.inspectionNotes(),
                         request.reviewStatus(),
                         request.reviewReason(),
