@@ -1,6 +1,7 @@
 package com.flout.server.domain.publicissue.repository;
 
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueMapResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueType;
@@ -109,5 +110,29 @@ public class AdminPublicIssueListRepository {
                 rs.getLong("pending_or_under_review_count"),
                 rs.getLong("action_in_progress_count"),
                 rs.getLong("completed_count")));
+  }
+
+  public AdminPublicIssueMapResponse markers(
+      String district, String status, String issueType, String keyword) {
+    var params =
+        new MapSqlParameterSource()
+            .addValue(
+                "region", BUCHEON + (district.isEmpty() ? "" : "\\s+" + district) + "(?:\\s|$)")
+            .addValue("status", status)
+            .addValue("issueType", issueType)
+            .addValue("keyword", keyword);
+    var markers =
+        jdbc.query(
+            "SELECT p.public_issue_id, p.latitude, p.longitude, p.status "
+                + FILTER
+                + " ORDER BY p.public_issue_id DESC",
+            params,
+            (rs, rowNum) ->
+                new AdminPublicIssueMapResponse.Marker(
+                    rs.getLong("public_issue_id"),
+                    rs.getBigDecimal("latitude"),
+                    rs.getBigDecimal("longitude"),
+                    PublicIssueStatus.valueOf(rs.getString("status"))));
+    return new AdminPublicIssueMapResponse(markers);
   }
 }

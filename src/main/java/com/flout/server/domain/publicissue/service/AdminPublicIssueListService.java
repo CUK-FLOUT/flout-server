@@ -2,6 +2,7 @@ package com.flout.server.domain.publicissue.service;
 
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueMapResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueType;
@@ -56,6 +57,14 @@ public class AdminPublicIssueListService {
       Long operatorId, String district, String issueType, String keyword) {
     validateCommon(operatorId, district, issueType, keyword);
     return publicIssues.status(district, normalize(issueType, ISSUE_TYPES), keyword.strip());
+  }
+
+  @Transactional(readOnly = true)
+  public AdminPublicIssueMapResponse markers(
+      Long operatorId, String district, String status, String issueType, String keyword) {
+    validateCommon(operatorId, district, issueType, keyword);
+    return publicIssues.markers(
+        district, normalize(status, STATUSES), normalize(issueType, ISSUE_TYPES), keyword.strip());
   }
 
   private void validateCommon(Long operatorId, String district, String issueType, String keyword) {
