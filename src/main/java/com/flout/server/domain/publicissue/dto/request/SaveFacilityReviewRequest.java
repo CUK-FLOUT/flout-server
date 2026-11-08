@@ -4,14 +4,13 @@ import com.flout.server.domain.publicissue.entity.FacilityReviewStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import tools.jackson.databind.annotation.JsonDeserialize;
 
 public record SaveFacilityReviewRequest(
-    @NotNull @Positive @JsonDeserialize(using = CreatePublicIssueRequest.StrictLong.class)
-        @Schema(type = "integer", implementation = Long.class, format = "int64", example = "17")
-        Long facilityId,
+    @NotBlank @Size(max = 100) @JsonDeserialize(using = CreatePublicIssueRequest.StrictString.class)
+        @Schema(type = "string", description = "검토 대상", example = "빗물받이")
+        String reviewTarget,
     @NotNull @Schema(
             allowableValues = {"PENDING", "UNDER_REVIEW", "INSPECTION_REQUIRED"},
             example = "UNDER_REVIEW")
@@ -26,6 +25,7 @@ public record SaveFacilityReviewRequest(
             example = "인근 신청 3건과 침수 이력 2건 확인")
         String reviewReason) {
   public SaveFacilityReviewRequest {
+    reviewTarget = strip(reviewTarget);
     inspectionNotes = strip(inspectionNotes);
     reviewReason = strip(reviewReason);
     if (reviewReason != null && reviewReason.isEmpty()) reviewReason = null;

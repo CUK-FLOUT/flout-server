@@ -1,8 +1,7 @@
 package com.flout.server.domain.publicissue.controller;
 
-import com.flout.server.domain.publicissue.dto.request.ChangePublicIssueActionStatusRequest;
-import com.flout.server.domain.publicissue.dto.request.CreatePublicIssueActionRequest;
-import com.flout.server.domain.publicissue.dto.response.PublicIssueActionResponse;
+import com.flout.server.domain.publicissue.dto.request.CompletePublicIssueActionRequest;
+import com.flout.server.domain.publicissue.dto.response.CompletePublicIssueActionResponse;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.publicissue.service.PublicIssueActionService;
 import com.flout.server.global.response.SuccessResponse;
@@ -27,32 +26,15 @@ public class AdminPublicIssueActionController {
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "공공시설 조치 등록",
+      summary = "공공시설 조치 완료 처리",
       description =
-          "조치 내용을 IN_PROGRESS 상태로 등록하고 현재 운영자를 담당자로 기록합니다. 응답의 actionId로 증빙 사진을 업로드한 뒤 상태 변경 API로 완료할 수 있습니다.")
-  public SuccessResponse<PublicIssueActionResponse> register(
+          "실제 점검·조치 결과를 저장하고 조치, 공공시설 검토, 공공시설 문제를 모두 완료 상태로 변경합니다. 응답의 actionId로 조치 사진을 업로드할 수 있습니다.")
+  public SuccessResponse<CompletePublicIssueActionResponse> complete(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long publicIssueId,
-      @Valid @RequestBody CreatePublicIssueActionRequest request) {
+      @Valid @RequestBody CompletePublicIssueActionRequest request) {
     return SuccessResponse.of(
-        service.register(Long.valueOf(jwt.getSubject()), publicIssueId, request),
-        PublicIssueSuccessCode.ACTION_REGISTERED);
-  }
-
-  @PatchMapping(
-      value = "/{publicIssueId}/actions/{actionId}/status",
-      consumes = MediaType.APPLICATION_JSON_VALUE,
-      produces = MediaType.APPLICATION_JSON_VALUE)
-  @Operation(
-      summary = "공공시설 조치 상태 변경",
-      description = "IN_PROGRESS 조치를 COMPLETED로 변경합니다. 완료 전 조치 내용과 증빙 사진이 1장 이상 등록되어 있어야 합니다.")
-  public SuccessResponse<PublicIssueActionResponse> changeStatus(
-      @AuthenticationPrincipal Jwt jwt,
-      @PathVariable Long publicIssueId,
-      @PathVariable Long actionId,
-      @Valid @RequestBody ChangePublicIssueActionStatusRequest request) {
-    return SuccessResponse.of(
-        service.changeStatus(Long.valueOf(jwt.getSubject()), publicIssueId, actionId, request),
-        PublicIssueSuccessCode.ACTION_STATUS_CHANGED);
+        service.complete(Long.valueOf(jwt.getSubject()), publicIssueId, request),
+        PublicIssueSuccessCode.ACTION_COMPLETED);
   }
 }
