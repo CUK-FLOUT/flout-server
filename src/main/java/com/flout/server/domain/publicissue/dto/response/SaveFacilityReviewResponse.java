@@ -9,8 +9,7 @@ import java.time.ZoneId;
 public record SaveFacilityReviewResponse(
     Long reviewId,
     Long publicIssueId,
-    Long facilityId,
-    String facilityName,
+    String reviewTarget,
     FacilityReviewStatus reviewStatus,
     PublicIssueStatus publicIssueStatus,
     String inspectionNotes,
@@ -21,8 +20,7 @@ public record SaveFacilityReviewResponse(
     return new SaveFacilityReviewResponse(
         review.getId(),
         review.getLocalProblem().getId(),
-        review.getFacility().getId(),
-        review.getFacility().getFacilityName(),
+        review.getReviewTarget(),
         review.getReviewStatus(),
         review.getLocalProblem().getStatus(),
         review.getInspectionNote(),

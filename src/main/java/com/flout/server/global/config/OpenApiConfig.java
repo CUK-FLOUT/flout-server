@@ -121,6 +121,8 @@ public class OpenApiConfig {
                 "운영자-현장점검 관리",
                 "운영자-지원관리",
                 "운영자-시공관리",
+                "운영자-공공인프라",
+                "주민-홈",
                 "주민-AI취약도 분석",
                 "주민-현장점검 신청",
                 "주민-지원신청",
@@ -235,16 +237,11 @@ public class OpenApiConfig {
                             }
                             if (path.equals("/api/admin/public-issues/{publicIssueId}/actions")
                                 && method == PathItem.HttpMethod.POST) {
-                              describePublicIssueActionRegistration(operation);
+                              describePublicIssueActionCompletion(operation);
                             }
                             if (path.equals("/api/admin/public-issues/{publicIssueId}/review")
-                                && method == PathItem.HttpMethod.PUT) {
+                                && method == PathItem.HttpMethod.POST) {
                               describeFacilityReview(operation);
-                            }
-                            if (path.equals(
-                                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status")
-                                && method == PathItem.HttpMethod.PATCH) {
-                              describePublicIssueActionStatusChange(operation);
                             }
                             if (path.equals(
                                     "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images")
@@ -265,6 +262,11 @@ public class OpenApiConfig {
                               describeSupportApplication(operation);
                             }
                             if (path.equals(
+                                    "/api/resident/support-application/{supportApplicationId}/matching")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeSupportProgramMatching(operation);
+                            }
+                            if (path.equals(
                                     "/api/resident/support-applications/{supportApplicationId}/attachments")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportAttachment(operation);
@@ -278,6 +280,33 @@ public class OpenApiConfig {
                             }
                             if (path.equals("/api/resident/addresses/coordinates")) {
                               describeAddressCoordinates(operation);
+                            }
+                            if (path.equals("/api/resident/prevention-guides/{guideId}")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeGuideProgress(
+                                  operation,
+                                  com.flout.server.domain.preventionguide.response.code
+                                      .PreventionGuideSuccessCode.GUIDE_FOUND,
+                                  false,
+                                  false);
+                            }
+                            if (path.equals("/api/resident/guide-items/{itemId}/progress")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeGuideProgress(
+                                  operation,
+                                  com.flout.server.domain.preventionguide.response.code
+                                      .PreventionGuideSuccessCode.ITEM_UPDATED,
+                                  true,
+                                  true);
+                            }
+                            if (path.equals("/api/resident/prevention-guides/{guideId}/resolution")
+                                && method == PathItem.HttpMethod.PATCH) {
+                              describeGuideProgress(
+                                  operation,
+                                  com.flout.server.domain.preventionguide.response.code
+                                      .PreventionGuideSuccessCode.RESOLUTION_UPDATED,
+                                  false,
+                                  true);
                             }
                             if (path.equals("/api/admin/me") && method == PathItem.HttpMethod.GET) {
                               var success =
@@ -304,6 +333,11 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/applications/{applicationId}")
                                 && method == PathItem.HttpMethod.GET) {
                               describeResidentApplicationDetail(operation);
+                            }
+
+                            if (path.equals("/api/resident/applications/{applicationId}/result")
+                                && method == PathItem.HttpMethod.GET) {
+                              describeResidentInspectionResult(operation);
                             }
 
                             if (path.equals(
@@ -477,13 +511,13 @@ public class OpenApiConfig {
     operation.getResponses().get("404").description("원본 점검이 존재하지 않습니다.");
   }
 
-  private void describePublicIssueActionRegistration(Operation operation) {
-    var code = PublicIssueSuccessCode.ACTION_REGISTERED;
+  private void describePublicIssueActionCompletion(Operation operation) {
+    var code = PublicIssueSuccessCode.ACTION_COMPLETED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(code.getMessage());
     addExample(
         success,
-        "publicIssueActionRegistered",
+        "publicIssueActionCompleted",
         envelope(
             true,
             code,
@@ -500,11 +534,13 @@ public class OpenApiConfig {
                 "actionDescription",
                 "빗물받이 퇴적물 제거 및 주변 배수로 정비",
                 "actionStatus",
-                "IN_PROGRESS",
+                "COMPLETED",
                 "reviewStatus",
-                "ACTION_IN_PROGRESS",
+                "COMPLETED",
                 "publicIssueStatus",
-                "ACTION_IN_PROGRESS")));
+                "COMPLETED",
+                "completedAt",
+                "2026-11-05T10:00:00+09:00")));
     if (operation.getRequestBody() != null
         && operation.getRequestBody().getContent() != null
         && operation.getRequestBody().getContent().get(JSON) != null) {
@@ -513,9 +549,9 @@ public class OpenApiConfig {
           .getContent()
           .get(JSON)
           .addExamples(
-              "registerPublicIssueAction",
+              "completePublicIssueAction",
               new Example()
-                  .summary("실제 점검·조치 결과 등록")
+                  .summary("조치 완료 처리")
                   .value(Map.of("actionDescription", "빗물받이 퇴적물 제거 및 주변 배수로 정비")));
     }
     addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
@@ -528,59 +564,6 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
     operation.getResponses().get("404").setDescription("공공시설 문제를 찾을 수 없습니다.");
     operation.getResponses().get("409").setDescription("이미 완료된 문제이거나 검토 내용이 저장되지 않았습니다.");
-  }
-
-  private void describePublicIssueActionStatusChange(Operation operation) {
-    var code = PublicIssueSuccessCode.ACTION_STATUS_CHANGED;
-    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
-    success.setDescription(code.getMessage());
-    addExample(
-        success,
-        "publicIssueActionStatusChanged",
-        envelope(
-            true,
-            code,
-            code.getMessage(),
-            Map.ofEntries(
-                Map.entry("actionId", 1),
-                Map.entry("reviewId", 1),
-                Map.entry("publicIssueId", 1),
-                Map.entry("operatorUserId", 2),
-                Map.entry("actionDescription", "빗물받이 퇴적물 제거 및 주변 배수로 정비"),
-                Map.entry("actionStatus", "COMPLETED"),
-                Map.entry("reviewStatus", "COMPLETED"),
-                Map.entry("publicIssueStatus", "COMPLETED"),
-                Map.entry("completedAt", "2026-11-05T10:00:00+09:00"))));
-    if (operation.getRequestBody() != null
-        && operation.getRequestBody().getContent() != null
-        && operation.getRequestBody().getContent().get(JSON) != null) {
-      operation
-          .getRequestBody()
-          .getContent()
-          .get(JSON)
-          .addExamples(
-              "completePublicIssueAction",
-              new Example().summary("조치 완료 처리").value(Map.of("status", "COMPLETED")));
-    }
-    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
-    addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
-    addError(operation, "actionNotFound", PublicIssueErrorCode.ACTION_NOT_FOUND, null);
-    addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
-    addError(
-        operation,
-        "invalidStatusTransition",
-        PublicIssueErrorCode.ACTION_STATUS_TRANSITION_NOT_ALLOWED,
-        null);
-    addError(
-        operation,
-        "completionRequirementsNotMet",
-        PublicIssueErrorCode.ACTION_COMPLETION_REQUIREMENTS_NOT_MET,
-        null);
-    addError(
-        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
-    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
-    operation.getResponses().get("404").setDescription("공공시설 문제 또는 조치를 찾을 수 없습니다.");
-    operation.getResponses().get("409").setDescription("상태 전이가 허용되지 않거나 조치 완료 조건을 충족하지 않았습니다.");
   }
 
   private void describeFacilityReview(Operation operation) {
@@ -597,8 +580,7 @@ public class OpenApiConfig {
             Map.ofEntries(
                 Map.entry("reviewId", 1),
                 Map.entry("publicIssueId", 1),
-                Map.entry("facilityId", 17),
-                Map.entry("facilityName", "원미구 빗물받이"),
+                Map.entry("reviewTarget", "빗물받이"),
                 Map.entry("reviewStatus", "UNDER_REVIEW"),
                 Map.entry("publicIssueStatus", "UNDER_REVIEW"),
                 Map.entry("inspectionNotes", "빗물받이 막힘 여부와 주변 도로 배수 상태 현장 확인"),
@@ -608,13 +590,12 @@ public class OpenApiConfig {
     addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(operation, "invalidReviewStatus", PublicIssueErrorCode.INVALID_REVIEW_STATUS, null);
     addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
-    addError(operation, "facilityNotFound", PublicIssueErrorCode.FACILITY_NOT_FOUND, null);
     addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
     addError(operation, "reviewNotAllowed", PublicIssueErrorCode.REVIEW_NOT_ALLOWED, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
-    operation.getResponses().get("404").setDescription("공공시설 문제 또는 공공시설을 찾을 수 없습니다.");
+    operation.getResponses().get("404").setDescription("공공시설 문제를 찾을 수 없습니다.");
     operation
         .getResponses()
         .get("409")
@@ -1450,6 +1431,62 @@ public class OpenApiConfig {
   }
 
   // GIS 신청 응답 예시와 ID·관할 오류 문서화
+  private void describeGuideProgress(
+      Operation operation,
+      com.flout.server.domain.preventionguide.response.code.PreventionGuideSuccessCode code,
+      boolean item,
+      boolean hasBody) {
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("guideId", 1);
+    result.put("assessmentId", 1);
+    result.put("source", "AI");
+    result.put("grade", "HIGH");
+    result.put("title", "이것부터 확인하세요");
+    result.put("subtitle", "우리 집 주변을 확인해 주세요.");
+    result.put("completedCount", 1);
+    result.put("totalCount", 1);
+    result.put(
+        "items",
+        List.of(
+            Map.of(
+                "itemId",
+                1,
+                "order",
+                1,
+                "ruleId",
+                "DRAIN",
+                "title",
+                "배수구 확인",
+                "description",
+                "배수구 주변을 확인해 주세요.",
+                "completed",
+                true)));
+    result.put("resolution", "CONFIRMED");
+    result.put("generatedAt", "2026-11-04T10:00:00+09:00");
+    addExample(success, "guideProgress", envelope(true, code, code.getMessage(), result));
+    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "guideAccessDenied",
+        com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+            .GUIDE_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        item ? "itemNotFound" : "guideNotFound",
+        item
+            ? com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+                .ITEM_NOT_FOUND
+            : com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+                .GUIDE_NOT_FOUND,
+        null);
+    if (hasBody) {
+      addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    }
+  }
+
   private void describeResidentApplicationUpdate(Operation operation) {
     var requestExample = new LinkedHashMap<String, Object>();
     requestExample.put("contact", "010-1234-5678");
@@ -1541,6 +1578,51 @@ public class OpenApiConfig {
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
+  private void describeResidentInspectionResult(Operation operation) {
+    var code = InspectionApplicationSuccessCode.RESULT_FOUND;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result =
+        Map.of(
+            "applicationId",
+            101,
+            "summary",
+            "출입구와 배수구의 침수 예방이 필요합니다.",
+            "publishedAt",
+            "2026-11-04T10:00:00+09:00",
+            "vulnerabilities",
+            List.of(
+                Map.of(
+                    "type",
+                    "ENTRANCE",
+                    "title",
+                    "낮은 출입구 높이",
+                    "expertOpinion",
+                    "빗물 유입 가능성이 있습니다.",
+                    "fieldFindings",
+                    "출입구 주변 바닥보다 낮습니다.")),
+            "photos",
+            List.of(Map.of("photoId", 10, "url", "https://example.com/photo?signature=example")));
+    addExample(
+        success, "residentInspectionResult", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", InspectionApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
   private void describeResidentRecommendations(Operation operation) {
     var code = InspectionApplicationSuccessCode.RECOMMENDATIONS_FOUND;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
@@ -1569,6 +1651,45 @@ public class OpenApiConfig {
         InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
         null);
     operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeSupportProgramMatching(Operation operation) {
+    var code = SupportApplicationSuccessCode.PROGRAM_MATCHED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("supportApplicationId", 12);
+    result.put("programId", 3);
+    result.put("programName", "물막이판 설치 지원");
+    result.put("jurisdiction", "부천시");
+    result.put("description", "침수 예방을 위한 출입구 물막이판 설치 비용을 지원합니다.");
+    result.put("targetDescription", "부천시 침수 취약 주택");
+    result.put("operatingStatus", "접수중");
+    result.put("matchedReason", "현장점검에서 출입구 취약지점이 확인됐어요.");
+    result.put("eligibilityConfirmed", false);
+    addExample(success, "supportProgramMatched", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", SupportApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(operation, "programNotFound", SupportApplicationErrorCode.PROGRAM_NOT_FOUND, null);
+    addError(
+        operation,
+        "matchedProgramNotFound",
+        SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없음");
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
@@ -2151,11 +2272,13 @@ public class OpenApiConfig {
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "방문 가능 시간은 MORNING, AFTERNOON, ANY 중 하나여야 합니다.");
     for (var error : SupportApplicationErrorCode.values()) {
-      addError(operation, error.name(), error, null);
+      if (error != SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND) {
+        addError(operation, error.name(), error, null);
+      }
     }
     operation.getResponses().get("403").setDescription("주민 권한이 없거나 본인 소유의 현장점검 신청이 아닙니다.");
     operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없습니다.");
-    operation.getResponses().get("409").setDescription("동일 현장점검 신청과 동일 지원사업으로 이미 신청했습니다.");
+    operation.getResponses().get("409").setDescription("동일 현장점검 신청으로 이미 신청했습니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

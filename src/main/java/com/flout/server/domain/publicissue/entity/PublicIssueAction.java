@@ -41,19 +41,15 @@ public class PublicIssueAction {
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
-  public static PublicIssueAction start(
-      FacilityReview review, User operator, String actionDescription) {
+  public static PublicIssueAction complete(
+      FacilityReview review, User operator, String actionDescription, LocalDateTime completedAt) {
     var action = new PublicIssueAction();
     action.review = review;
     action.operator = operator;
     action.actionDescription = actionDescription;
-    action.status = PublicIssueActionStatus.IN_PROGRESS;
+    action.status = PublicIssueActionStatus.COMPLETED;
+    action.completedAt = completedAt;
     return action;
-  }
-
-  public void complete(LocalDateTime completedAt) {
-    status = PublicIssueActionStatus.COMPLETED;
-    this.completedAt = completedAt;
   }
 
   @PrePersist

@@ -51,7 +51,7 @@ class PublicIssueActionTest {
   @Autowired ObjectMapper mapper;
   @MockitoSpyBean PublicIssueActionRepository actions;
   @MockitoBean AttachmentStorage storage;
-  long publicIssueId, reviewId, facilityId, inspectionId, adminId;
+  long publicIssueId, reviewId, inspectionId, adminId;
   String token, residentToken;
   Map<String, byte[]> storedObjects;
   byte[] png;
@@ -124,14 +124,9 @@ class PublicIssueActionTest {
             Long.class,
             inspectionId);
     jdbc.update(
-        "INSERT INTO public_facility(facility_name,facility_type,address,latitude,longitude) VALUES('원미구 빗물받이','STORM_DRAIN',?,37.5000000,126.7600000)",
-        ADDRESS);
-    facilityId = jdbc.queryForObject("SELECT facility_id FROM public_facility", Long.class);
-    jdbc.update(
-        "INSERT INTO facility_review(user_id,local_problem_id,facility_id,inspection_note,review_status,review_reason,reviewed_at) VALUES(?,?,?,'현장 확인 필요','UNDER_REVIEW','반복 침수 이력 확인',CURRENT_TIMESTAMP)",
+        "INSERT INTO facility_review(user_id,local_problem_id,review_target,inspection_note,review_status,review_reason,reviewed_at) VALUES(?,?,'빗물받이','현장 확인 필요','UNDER_REVIEW','반복 침수 이력 확인',CURRENT_TIMESTAMP)",
         adminId,
-        publicIssueId,
-        facilityId);
+        publicIssueId);
     reviewId = jdbc.queryForObject("SELECT review_id FROM facility_review", Long.class);
     storedObjects = new ConcurrentHashMap<>();
     png = pngBytes();
@@ -165,22 +160,10 @@ class PublicIssueActionTest {
 
   org.springframework.test.web.servlet.ResultActions postReview(Object body) throws Exception {
     return mvc.perform(
-        put("/api/admin/public-issues/{publicIssueId}/review", publicIssueId)
+        post("/api/admin/public-issues/{publicIssueId}/review", publicIssueId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content(mapper.writeValueAsString(body)));
-  }
-
-  org.springframework.test.web.servlet.ResultActions patchActionStatus(
-      long issueId, long actionId, String status) throws Exception {
-    return mvc.perform(
-        patch(
-                "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status",
-                issueId,
-                actionId)
-            .header("Authorization", "Bearer " + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(Map.of("status", status))));
   }
 
   Map<String, Object> body(Object description) {
@@ -210,7 +193,7 @@ class PublicIssueActionTest {
 
   Map<String, Object> reviewBody(Object status) {
     var body = new LinkedHashMap<String, Object>();
-    body.put("facilityId", facilityId);
+    body.put("reviewTarget", " 빗물받이 ");
     body.put("reviewStatus", status);
     body.put("inspectionNotes", " 빗물받이 막힘 여부와 주변 도로 배수 상태 현장 확인 ");
     body.put("reviewReason", " 인근 신청 3건과 침수 이력 2건 확인 ");
@@ -225,8 +208,7 @@ class PublicIssueActionTest {
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_3"))
         .andExpect(jsonPath("$.result.reviewId").isNumber())
         .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
-        .andExpect(jsonPath("$.result.facilityId").value(facilityId))
-        .andExpect(jsonPath("$.result.facilityName").value("원미구 빗물받이"))
+        .andExpect(jsonPath("$.result.reviewTarget").value("빗물받이"))
         .andExpect(jsonPath("$.result.reviewStatus").value("UNDER_REVIEW"))
         .andExpect(jsonPath("$.result.publicIssueStatus").value("UNDER_REVIEW"))
         .andExpect(jsonPath("$.result.inspectionNotes").value("빗물받이 막힘 여부와 주변 도로 배수 상태 현장 확인"))
@@ -249,21 +231,19 @@ class PublicIssueActionTest {
   }
 
   @Test
-  void validatesFacilityReviewRequestAndReferences() throws Exception {
+  void validatesFacilityReviewRequest() throws Exception {
     var request = reviewBody("COMPLETED");
     postReview(request)
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_3"));
     request = reviewBody("UNDER_REVIEW");
-    request.put("facilityId", Long.MAX_VALUE);
-    postReview(request)
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_404_2"));
-    request = reviewBody("UNDER_REVIEW");
     request.put("inspectionNotes", "   ");
     postReview(request).andExpect(status().isBadRequest());
     request = reviewBody("UNDER_REVIEW");
-    request.put("facilityId", "1");
+    request.put("reviewTarget", 1);
+    postReview(request).andExpect(status().isBadRequest());
+    request = reviewBody("UNDER_REVIEW");
+    request.put("reviewTarget", "가".repeat(101));
     postReview(request).andExpect(status().isBadRequest());
     jdbc.update(
         "UPDATE public_issues SET status='COMPLETED' WHERE public_issue_id=?", publicIssueId);
@@ -273,7 +253,7 @@ class PublicIssueActionTest {
   }
 
   @Test
-  void registersThenCompletesActionReviewAndIssueAtomically() throws Exception {
+  void completesActionReviewAndIssueAtomically() throws Exception {
     postAction(publicIssueId, token, body("  빗물받이 퇴적물 제거 및 주변 배수로 정비  "))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.isSuccess").value(true))
@@ -283,35 +263,17 @@ class PublicIssueActionTest {
         .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
         .andExpect(jsonPath("$.result.operatorUserId").value(adminId))
         .andExpect(jsonPath("$.result.actionDescription").value("빗물받이 퇴적물 제거 및 주변 배수로 정비"))
-        .andExpect(jsonPath("$.result.actionStatus").value("IN_PROGRESS"))
-        .andExpect(jsonPath("$.result.reviewStatus").value("ACTION_IN_PROGRESS"))
-        .andExpect(jsonPath("$.result.publicIssueStatus").value("ACTION_IN_PROGRESS"))
-        .andExpect(jsonPath("$.result.completedAt").doesNotExist());
-    var action = jdbc.queryForMap("SELECT * FROM facility_action");
-    assertThat(action.get("ACTION_DESCRIPTION")).isEqualTo("빗물받이 퇴적물 제거 및 주변 배수로 정비");
-    assertThat(action.get("ACTION_STATUS").toString()).isEqualTo("IN_PROGRESS");
-    assertThat(((Number) action.get("REVIEW_ID")).longValue()).isEqualTo(reviewId);
-    assertThat(((Number) action.get("USER_ID")).longValue()).isEqualTo(adminId);
-    assertThat(action.get("COMPLETED_AT")).isNull();
-    long actionId = ((Number) action.get("ACTION_ID")).longValue();
-    jdbc.update(
-        "INSERT INTO facility_action_image(image_url,action_id) VALUES(?,?)",
-        "public-issues/test-evidence",
-        actionId);
-    patchActionStatus(publicIssueId, actionId, "COMPLETED")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_5"))
         .andExpect(jsonPath("$.result.actionStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.reviewStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.publicIssueStatus").value("COMPLETED"))
         .andExpect(
             jsonPath("$.result.completedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT action_status FROM facility_action WHERE action_id=?",
-                String.class,
-                actionId))
-        .isEqualTo("COMPLETED");
+    var action = jdbc.queryForMap("SELECT * FROM facility_action");
+    assertThat(action.get("ACTION_DESCRIPTION")).isEqualTo("빗물받이 퇴적물 제거 및 주변 배수로 정비");
+    assertThat(action.get("ACTION_STATUS").toString()).isEqualTo("COMPLETED");
+    assertThat(((Number) action.get("REVIEW_ID")).longValue()).isEqualTo(reviewId);
+    assertThat(((Number) action.get("USER_ID")).longValue()).isEqualTo(adminId);
+    assertThat(action.get("COMPLETED_AT")).isNotNull();
     assertThat(
             jdbc.queryForObject(
                 "SELECT review_status FROM facility_review WHERE review_id=?",
@@ -328,25 +290,6 @@ class PublicIssueActionTest {
             jdbc.queryForObject(
                 "SELECT status FROM inspections WHERE inspection_id=?", String.class, inspectionId))
         .isEqualTo("COMPLETED");
-  }
-
-  @Test
-  void requiresEvidenceAndRejectsInvalidActionStatusTransitions() throws Exception {
-    long actionId = createAction();
-    patchActionStatus(publicIssueId, actionId, "COMPLETED")
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_5"));
-    patchActionStatus(publicIssueId, actionId, "IN_PROGRESS")
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_4"));
-    jdbc.update(
-        "INSERT INTO facility_action_image(image_url,action_id) VALUES(?,?)",
-        "public-issues/status-evidence",
-        actionId);
-    patchActionStatus(publicIssueId, actionId, "COMPLETED").andExpect(status().isOk());
-    patchActionStatus(publicIssueId, actionId, "IN_PROGRESS")
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_4"));
   }
 
   static Stream<Object> invalidDescriptions() {
@@ -526,26 +469,29 @@ class PublicIssueActionTest {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].put.responses['200'].content['application/json'].examples.facilityReviewSaved.value.code")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['200'].content['application/json'].examples.facilityReviewSaved.value.code")
                 .value("PUBLIC_ISSUE_200_3"))
         .andExpect(
-            jsonPath("$.components.schemas.SaveFacilityReviewRequest.properties.facilityId.type")
-                .value("integer"))
+            jsonPath("$.paths['/api/admin/public-issues/{publicIssueId}/review'].put")
+                .doesNotExist())
+        .andExpect(
+            jsonPath("$.components.schemas.SaveFacilityReviewRequest.properties.reviewTarget.type")
+                .value("string"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].put.responses['404'].description")
-                .value("공공시설 문제 또는 공공시설을 찾을 수 없습니다."))
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['404'].description")
+                .value("공공시설 문제를 찾을 수 없습니다."))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].put.responses['409'].description")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['409'].description")
                 .value("완료된 공공시설 문제의 검토 내용은 변경할 수 없습니다."))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionRegistered.value.code")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionCompleted.value.code")
                 .value("PUBLIC_ISSUE_200_2"))
         .andExpect(
             jsonPath(
-                    "$.components.schemas.CreatePublicIssueActionRequest.properties.actionDescription.maxLength")
+                    "$.components.schemas.CompletePublicIssueActionRequest.properties.actionDescription.maxLength")
                 .value(4000))
         .andExpect(
             jsonPath(
@@ -577,11 +523,7 @@ class PublicIssueActionTest {
                 .value("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다."))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status'].patch.responses['200'].content['application/json'].examples.publicIssueActionStatusChanged.value.code")
-                .value("PUBLIC_ISSUE_200_5"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status'].patch.responses['409']")
-                .exists());
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status']")
+                .doesNotExist());
   }
 }

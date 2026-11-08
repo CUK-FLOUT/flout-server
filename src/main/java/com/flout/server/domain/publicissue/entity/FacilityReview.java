@@ -25,9 +25,8 @@ public class FacilityReview {
   @JoinColumn(name = "local_problem_id", nullable = false, unique = true)
   private PublicIssue localProblem;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "facility_id", nullable = false)
-  private PublicFacility facility;
+  @Column(name = "review_target", nullable = false, length = 100)
+  private String reviewTarget;
 
   @Column(name = "inspection_note", columnDefinition = "TEXT")
   private String inspectionNote;
@@ -51,7 +50,7 @@ public class FacilityReview {
   public static FacilityReview create(
       User reviewer,
       PublicIssue localProblem,
-      PublicFacility facility,
+      String reviewTarget,
       String inspectionNote,
       FacilityReviewStatus reviewStatus,
       String reviewReason,
@@ -59,20 +58,19 @@ public class FacilityReview {
     var review = new FacilityReview();
     review.reviewer = reviewer;
     review.localProblem = localProblem;
-    review.facility = facility;
-    review.update(reviewer, facility, inspectionNote, reviewStatus, reviewReason, reviewedAt);
+    review.update(reviewer, reviewTarget, inspectionNote, reviewStatus, reviewReason, reviewedAt);
     return review;
   }
 
   public void update(
       User reviewer,
-      PublicFacility facility,
+      String reviewTarget,
       String inspectionNote,
       FacilityReviewStatus reviewStatus,
       String reviewReason,
       LocalDateTime reviewedAt) {
     this.reviewer = reviewer;
-    this.facility = facility;
+    this.reviewTarget = reviewTarget;
     this.inspectionNote = inspectionNote;
     this.reviewStatus = reviewStatus;
     this.reviewReason = reviewReason;
@@ -81,10 +79,6 @@ public class FacilityReview {
 
   public void completeAction() {
     reviewStatus = FacilityReviewStatus.COMPLETED;
-  }
-
-  public void startAction() {
-    reviewStatus = FacilityReviewStatus.ACTION_IN_PROGRESS;
   }
 
   @PrePersist

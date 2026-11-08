@@ -244,10 +244,22 @@ class ApplicationConstructionTest {
 
   long anotherSupport(String state, String submitted) {
     jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) SELECT applicant_user_id,address,'fixture','HIGH','COMPLETED' FROM inspection_applications WHERE application_id=?",
+        applicationId);
+    long risk = jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) SELECT applicant_name,applicant_user_id,?, ?,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status FROM inspection_applications WHERE application_id=?",
+        risk,
+        "CONSTRUCTION-" + risk,
+        applicationId);
+    long source =
+        jdbc.queryForObject("SELECT MAX(application_id) FROM inspection_applications", Long.class);
+    jdbc.update(
         "INSERT INTO support_programs(name,created_at) VALUES('Another program',CURRENT_TIMESTAMP)");
     long program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) SELECT application_id,?,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,?,?,landlord_consent_status FROM support_applications WHERE support_application_id=?",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) SELECT ?,?,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,?,?,landlord_consent_status FROM support_applications WHERE support_application_id=?",
+        source,
         program,
         state,
         submitted,
@@ -257,19 +269,28 @@ class ApplicationConstructionTest {
   }
 
   @Test
-  void selectsSameLatestSubmittedSupportAsSupportTab() throws Exception {
-    jdbc.update("UPDATE support_applications SET submitted_at='2030-01-01 10:00:00'");
-    long latest = anotherSupport("SUBMITTED", "2030-01-02 10:00:00");
+  void selectsOnlySupportForRequestedApplicationAndIgnoresDraft() throws Exception {
+    jdbc.update(
+        "UPDATE support_applications SET status='SUBMITTED',submitted_at='2030-01-01 10:00:00' WHERE support_application_id=?",
+        supportId);
+    anotherSupport("SUBMITTED", "2030-01-02 10:00:00");
     anotherSupport("DRAFT", null);
     getInfo()
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.supportApplicationId").value(latest))
+        .andExpect(jsonPath("$.result.supportApplicationId").value(supportId))
         .andExpect(jsonPath("$.result.supportStatus").value("SUBMITTED"))
         .andExpect(jsonPath("$.result.construction").value(org.hamcrest.Matchers.nullValue()));
-    long tie = anotherSupport("REJECTED", "2030-01-02 10:00:00");
+    anotherSupport("REJECTED", "2030-01-02 10:00:00");
     getInfo()
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.supportApplicationId").value(tie));
+        .andExpect(jsonPath("$.result.supportApplicationId").value(supportId));
+    jdbc.update(
+        "UPDATE support_applications SET status='DRAFT',submitted_at=NULL WHERE support_application_id=?",
+        supportId);
+    getInfo()
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.result.supportApplicationId").value(org.hamcrest.Matchers.nullValue()));
   }
 
   @ParameterizedTest

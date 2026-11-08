@@ -44,6 +44,15 @@ public class PreventionGuide {
   @Column(name = "unresolved_detail", columnDefinition = "TEXT")
   private String unresolvedDetail;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "resolution", length = 32)
+  private GuideResolution resolution;
+
+  public void updateResolution(GuideResolution resolution) {
+    this.resolution = Objects.requireNonNull(resolution);
+    this.resolved = resolution == GuideResolution.CONFIRMED;
+  }
+
   public static PreventionGuide generated(
       RiskAssessment assessment, String title, String contentJson, LocalDateTime generatedAt) {
     var guide = new PreventionGuide();

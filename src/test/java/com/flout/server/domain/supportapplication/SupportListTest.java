@@ -115,14 +115,26 @@ class SupportListTest {
   }
 
   long add(String name, String address, String state, String consent) {
+    jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,'address','fixture','HIGH','COMPLETED')",
+        residentId);
+    var risk = jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) SELECT applicant_name,applicant_user_id,?, ?,address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status FROM inspection_applications WHERE application_id=(SELECT application_id FROM support_applications WHERE support_application_id=?)",
+        risk,
+        "LIST-" + risk,
+        supportId);
+    var source =
+        jdbc.queryForObject("SELECT MAX(application_id) FROM inspection_applications", Long.class);
     jdbc.update("INSERT INTO support_programs(name,created_at) VALUES('목록 검증용',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
     jdbc.update(
         """
       INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status)
-      SELECT application_id,?,applicant_user_id,requested_facility,?,contact,?,occupancy_type,preferred_visit_date,preferred_visit_time,?,submitted_at,?
+      SELECT ?,?,applicant_user_id,requested_facility,?,contact,?,occupancy_type,preferred_visit_date,preferred_visit_time,?,submitted_at,?
       FROM support_applications WHERE support_application_id=?
       """,
+        source,
         program,
         name,
         address,
@@ -183,7 +195,7 @@ class SupportListTest {
             Long.class,
             supportId);
     list(token, String.format(Locale.ROOT, "%06d", source), 0, 10)
-        .andExpect(jsonPath("$.result.totalElements").value(2));
+        .andExpect(jsonPath("$.result.totalElements").value(1));
     list(token, "없는주민", 0, 10)
         .andExpect(jsonPath("$.result.supportApplications").isEmpty())
         .andExpect(jsonPath("$.result.totalElements").value(0))

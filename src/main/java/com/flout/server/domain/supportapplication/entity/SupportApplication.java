@@ -13,8 +13,8 @@ import lombok.*;
     name = "support_applications",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uk_support_application_program",
-            columnNames = {"application_id", "program_id"}))
+            name = "uk_support_application_source",
+            columnNames = {"application_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SupportApplication {
