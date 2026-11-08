@@ -9,6 +9,7 @@ import com.flout.server.domain.inspectionapplication.service.InspectionApplicati
 import com.flout.server.domain.inspectionapplication.service.ResidentApplicationUpdateService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,15 @@ public class InspectionApplicationController {
   private final InspectionApplicationService inspectionApplicationService;
   private final ResidentApplicationUpdateService updateService;
 
+  public ResponseEntity<SuccessResponse<CreateInspectionApplicationResponse>> submit(
+      Jwt jwt, CreateInspectionApplicationRequest request) {
+    var response = inspectionApplicationService.submit(Long.valueOf(jwt.getSubject()), request);
+    return ResponseEntity.status(201)
+        .body(
+            SuccessResponse.of(
+                response, InspectionApplicationSuccessCode.INSPECTION_APPLICATION_CREATED));
+  }
+
   @PostMapping
   @Operation(
       summary = "현장점검 신청",
@@ -32,9 +42,12 @@ public class InspectionApplicationController {
           "완료된 본인 침수 위험도 분석 결과를 기반으로 신청 정보를 DRAFT로 저장합니다. 사진 업로드 성공 시 접수 및 점검이 생성됩니다. 동일한 임시 신청 요청은 기존 신청을 반환합니다.")
   public ResponseEntity<SuccessResponse<CreateInspectionApplicationResponse>> submit(
       @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "신규 폼을 제출할 때 PUT에 사용한 draftId. 응답 유실 시 동일 ID와 동일 요청으로 재시도합니다.")
+          @RequestHeader(value = "X-Form-Draft-Id", required = false)
+          java.util.UUID draftId,
       @Valid @RequestBody CreateInspectionApplicationRequest request) {
     CreateInspectionApplicationResponse response =
-        inspectionApplicationService.submit(Long.valueOf(jwt.getSubject()), request);
+        inspectionApplicationService.submit(Long.valueOf(jwt.getSubject()), request, draftId);
     return ResponseEntity.status(201)
         .body(
             SuccessResponse.of(

@@ -1,8 +1,5 @@
 package com.flout.server.domain.supportapplication.service;
 
-import com.flout.server.domain.inspection.entity.ResultStatus;
-import com.flout.server.domain.inspection.repository.InspectionRepository;
-import com.flout.server.domain.inspection.repository.InspectionResultRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.notification.entity.NotificationType;
 import com.flout.server.domain.notification.service.NotificationService;
@@ -34,30 +31,30 @@ public class SupportApplicationService {
   private final InspectionApplicationRepository applications;
   private final SupportProgramRepository programs;
   private final SupportApplicationRepository supports;
-  private final InspectionRepository inspections;
-  private final InspectionResultRepository results;
+  private final SupportResultPublicationValidator publicationValidator;
   private final EntityManager entityManager;
   private final NotificationService notifications;
   private final TransactionTemplate transaction;
+  private final com.flout.server.domain.residentprogress.FormDraftService formDrafts;
 
   public SupportApplicationService(
       UserRepository users,
       InspectionApplicationRepository applications,
       SupportProgramRepository programs,
       SupportApplicationRepository supports,
-      InspectionRepository inspections,
-      InspectionResultRepository results,
+      SupportResultPublicationValidator publicationValidator,
       EntityManager entityManager,
       NotificationService notifications,
-      PlatformTransactionManager manager) {
+      PlatformTransactionManager manager,
+      com.flout.server.domain.residentprogress.FormDraftService formDrafts) {
     this.users = users;
     this.applications = applications;
     this.programs = programs;
     this.supports = supports;
-    this.inspections = inspections;
-    this.results = results;
+    this.publicationValidator = publicationValidator;
     this.entityManager = entityManager;
     this.notifications = notifications;
+    this.formDrafts = formDrafts;
     transaction = new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -65,6 +62,12 @@ public class SupportApplicationService {
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public CreateSupportApplicationResponse submit(
       Long userId, CreateSupportApplicationRequest request) {
+    return submit(userId, request, null);
+  }
+
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public CreateSupportApplicationResponse submit(
+      Long userId, CreateSupportApplicationRequest request, java.util.UUID draftId) {
     try {
       return transaction.execute(
           status -> {
@@ -74,6 +77,16 @@ public class SupportApplicationService {
                     .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
             if (user.getRole() != UserRole.RESIDENT)
               throw new BaseException(SupportApplicationErrorCode.RESIDENT_ONLY);
+            formDrafts.lockSupportSource(request.applicationId());
+            var previous =
+                formDrafts.priorSubmission(
+                    userId,
+                    "SUPPORT",
+                    draftId,
+                    request.applicationId(),
+                    request,
+                    CreateSupportApplicationResponse.class);
+            if (previous != null) return previous;
             var source =
                 applications
                     .findById(request.applicationId())
@@ -81,18 +94,7 @@ public class SupportApplicationService {
                         () -> new BaseException(SupportApplicationErrorCode.APPLICATION_NOT_FOUND));
             if (!source.getApplicant().getId().equals(userId))
               throw new BaseException(SupportApplicationErrorCode.APPLICATION_ACCESS_DENIED);
-            boolean published =
-                inspections
-                    .findByApplicationId(source.getId())
-                    .map(
-                        inspection ->
-                            results
-                                .findByInspectionIdAndResultStatus(
-                                    inspection.getId(), ResultStatus.PUBLISHED)
-                                .isPresent())
-                    .orElse(false);
-            if (!published)
-              throw new BaseException(SupportApplicationErrorCode.RESULT_NOT_PUBLISHED);
+            publicationValidator.requirePublished(source.getId());
             var program =
                 programs
                     .findById(request.programId())
@@ -126,7 +128,20 @@ public class SupportApplicationService {
                   source.getId(),
                   "support-received:" + saved.getId());
             }
-            return CreateSupportApplicationResponse.from(saved);
+            var response = CreateSupportApplicationResponse.from(saved);
+            formDrafts.link(
+                userId,
+                "SUPPORT",
+                draftId,
+                source.getId(),
+                saved.getId(),
+                request,
+                response,
+                saved.getStatus() != SupportApplicationStatus.DRAFT);
+            if (draftId == null)
+              formDrafts.scheduleUniqueLink(
+                  userId, "SUPPORT", source.getId(), saved.getId(), request, response);
+            return response;
           });
     } catch (DataIntegrityViolationException e) {
       if (isDuplicate(e))

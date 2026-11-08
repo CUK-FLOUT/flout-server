@@ -281,6 +281,55 @@ class PreventionGuideGenerationTest {
   }
 
   @Test
+  void completionHistoryUsesPersistedFirstCompletionTime() throws Exception {
+    var generated = guideService.generate(owner.getId(), assessmentId);
+    long guideId = generated.guideId();
+    for (var item : generated.items())
+      progressService.updateProgress(owner.getId(), item.itemId(), true);
+    var recorded =
+        jdbc.queryForObject(
+            "SELECT completed_at FROM prevention_guides WHERE guide_id=?",
+            java.sql.Timestamp.class,
+            guideId);
+    assertThat(recorded).isNotNull();
+    mvc.perform(get("/api/resident/progress").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.result.items[0].stageHistory[*].stage")
+                .value(org.hamcrest.Matchers.hasItem("GUIDE_COMPLETED")));
+    progressService.updateProgress(owner.getId(), generated.items().get(0).itemId(), false);
+    progressService.updateProgress(owner.getId(), generated.items().get(0).itemId(), true);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT completed_at FROM prevention_guides WHERE guide_id=?",
+                java.sql.Timestamp.class,
+                guideId))
+        .isEqualTo(recorded);
+  }
+
+  @Test
+  void doesNotInventHistoricalCompletionTimeForLegacyCompletedGuide() throws Exception {
+    var generated = guideService.generate(owner.getId(), assessmentId);
+    long guideId = generated.guideId();
+    jdbc.update(
+        "UPDATE prevention_guides SET resolution='CONFIRMED',completed_at=NULL WHERE guide_id=?",
+        guideId);
+    progressService.updateResolution(owner.getId(), guideId, GuideResolution.CONFIRMED);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT completed_at FROM prevention_guides WHERE guide_id=?",
+                java.sql.Timestamp.class,
+                guideId))
+        .isNull();
+    mvc.perform(get("/api/resident/progress").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.result.items[0].stageHistory[*].stage")
+                .value(
+                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("GUIDE_COMPLETED"))));
+  }
+
+  @Test
   void persistsProgressAndResolutionAcrossRequestsWithoutCreatingInspectionApplication()
       throws Exception {
     var created =

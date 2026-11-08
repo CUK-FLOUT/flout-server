@@ -54,6 +54,11 @@ public class InspectionApplicationService {
 
   public CreateInspectionApplicationResponse submit(
       Long userId, CreateInspectionApplicationRequest request) {
+    return submit(userId, request, null);
+  }
+
+  public CreateInspectionApplicationResponse submit(
+      Long userId, CreateInspectionApplicationRequest request, java.util.UUID draftId) {
 
     User applicant =
         users
@@ -110,9 +115,11 @@ public class InspectionApplicationService {
             request.applicantName());
 
     if (applications.existsByAssessmentId(assessment.getId())) {
-      return submissionTransaction.reuseDraft(applicant.getId(), normalizedRequest);
+      return draftId == null
+          ? submissionTransaction.reuseDraft(applicant.getId(), normalizedRequest)
+          : submissionTransaction.reuseDraft(applicant.getId(), normalizedRequest, draftId);
     }
-    return submitWithReceiptNumberRetry(applicant, assessment, normalizedRequest);
+    return submitWithReceiptNumberRetry(applicant, assessment, normalizedRequest, draftId);
   }
 
   private void validateJurisdiction(String address) {
@@ -135,16 +142,23 @@ public class InspectionApplicationService {
   }
 
   private CreateInspectionApplicationResponse submitWithReceiptNumberRetry(
-      User applicant, RiskAssessment assessment, CreateInspectionApplicationRequest request) {
+      User applicant,
+      RiskAssessment assessment,
+      CreateInspectionApplicationRequest request,
+      java.util.UUID draftId) {
 
     for (int attempt = 0; attempt < MAX_RECEIPT_NUMBER_ATTEMPTS; attempt++) {
       try {
-        return submissionTransaction.create(applicant, assessment, request);
+        return draftId == null
+            ? submissionTransaction.create(applicant, assessment, request)
+            : submissionTransaction.create(applicant, assessment, request, draftId);
       } catch (ReceiptNumberCollisionException e) {
         // 저장 전 접수번호 중복 감지
       } catch (DataIntegrityViolationException e) {
         if (isUniqueConstraintViolation(e, ASSESSMENT_UNIQUE_CONSTRAINT)) {
-          return submissionTransaction.reuseDraft(applicant.getId(), request);
+          return draftId == null
+              ? submissionTransaction.reuseDraft(applicant.getId(), request)
+              : submissionTransaction.reuseDraft(applicant.getId(), request, draftId);
         }
         if (!isUniqueConstraintViolation(e, RECEIPT_NUMBER_UNIQUE_CONSTRAINT)) {
           throw e;

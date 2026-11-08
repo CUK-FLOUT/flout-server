@@ -34,12 +34,15 @@ public class ResidentGuideProgressService {
             .findGuideIdByItemId(itemId)
             .orElseThrow(() -> new BaseException(PreventionGuideErrorCode.ITEM_NOT_FOUND));
     var guide = ownedGuide(userId, guideId);
+    boolean alreadyComplete = isComplete(guide);
     var item =
         items
             .findLockedById(itemId)
             .orElseThrow(() -> new BaseException(PreventionGuideErrorCode.ITEM_NOT_FOUND));
     item.setCompleted(completed);
+    guide.recordProgressChange();
     items.flush();
+    if (!alreadyComplete && isComplete(guide)) guide.recordCompletion();
     return response(guide);
   }
 
@@ -47,8 +50,16 @@ public class ResidentGuideProgressService {
   public PreventionGuideResponse updateResolution(
       Long userId, Long guideId, GuideResolution resolution) {
     var guide = ownedGuide(userId, guideId);
+    boolean alreadyComplete = isComplete(guide);
     guide.updateResolution(resolution);
+    if (!alreadyComplete && isComplete(guide)) guide.recordCompletion();
     return response(guide);
+  }
+
+  private boolean isComplete(PreventionGuide guide) {
+    if (guide.getResolution() == GuideResolution.CONFIRMED) return true;
+    var states = items.findByGuideIdOrderByItemOrderAsc(guide.getId());
+    return !states.isEmpty() && states.stream().allMatch(item -> item.isCompleted());
   }
 
   private PreventionGuide ownedGuide(Long userId, Long guideId) {

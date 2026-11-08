@@ -11,6 +11,7 @@ import com.flout.server.domain.priorityinspection.response.code.PriorityInspecti
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
+import com.flout.server.domain.residentprogress.FormDraftErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
@@ -31,6 +32,7 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.tags.Tag;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -129,6 +131,9 @@ public class OpenApiConfig {
                 "주민-시공 신청",
                 "주민-내신청");
         var tags = new ArrayList<>(api.getTags());
+        if (tags.stream().noneMatch(tag -> "주민-홈".equals(tag.getName()))) {
+          tags.add(new Tag().name("주민-홈"));
+        }
         tags.sort(
             Comparator.comparingInt(
                 tag -> {
@@ -260,6 +265,29 @@ public class OpenApiConfig {
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
+                            }
+                            if (path.equals("/api/resident/support-form-drafts/{draftId}")
+                                && method == PathItem.HttpMethod.PUT) {
+                              addError(
+                                  operation,
+                                  "resultNotPublished",
+                                  SupportApplicationErrorCode.RESULT_NOT_PUBLISHED,
+                                  null);
+                            }
+                            if (method == PathItem.HttpMethod.PUT
+                                && Set.of(
+                                        "/api/resident/application-form-drafts/{draftId}",
+                                        "/api/resident/support-form-drafts/{draftId}")
+                                    .contains(path)) {
+                              addError(
+                                  operation,
+                                  "editingFormExists",
+                                  FormDraftErrorCode.EDITING_EXISTS,
+                                  null);
+                              operation
+                                  .getResponses()
+                                  .get("409")
+                                  .setDescription("이미 작성 중인 임시저장 폼이 있거나 요청이 충돌함");
                             }
                             if (path.equals(
                                     "/api/resident/support-application/{supportApplicationId}/matching")
