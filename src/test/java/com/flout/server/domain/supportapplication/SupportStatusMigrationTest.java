@@ -41,7 +41,7 @@ class SupportStatusMigrationTest {
     var before =
         jdbc.queryForList(
             "SELECT submitted_at, created_at, rejection_reason FROM support_applications ORDER BY support_application_id");
-    var migration = Flyway.configure().dataSource(url, "sa", "").load();
+    var migration = Flyway.configure().dataSource(url, "sa", "").target("46").load();
     migration.migrate();
     migration.validate();
     assertThat(

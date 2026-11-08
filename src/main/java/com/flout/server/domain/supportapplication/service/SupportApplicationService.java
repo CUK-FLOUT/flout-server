@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class SupportApplicationService {
-  private static final String UNIQUE = "uk_support_application_program";
+  private static final String UNIQUE = "uk_support_application_source";
   private final UserRepository users;
   private final InspectionApplicationRepository applications;
   private final SupportProgramRepository programs;
@@ -98,7 +98,7 @@ public class SupportApplicationService {
                     .findById(request.programId())
                     .orElseThrow(
                         () -> new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_FOUND));
-            if (supports.existsByApplicationIdAndProgramId(source.getId(), program.getId()))
+            if (supports.existsByApplicationId(source.getId()))
               throw new BaseException(SupportApplicationErrorCode.DUPLICATE_APPLICATION);
             if (source.getApplicantName() == null
                 || source.getApplicantName().isBlank()

@@ -218,9 +218,12 @@ class SupportApplicationTest {
         .isEqualTo("김주민");
   }
 
-  @Test
-  void rejectsDuplicateAndAllowsAnotherProgram() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"DRAFT", "SUBMITTED", "REJECTED", "APPROVED"})
+  void rejectsDuplicateRegardlessOfProgramOrStatus(String existingStatus) throws Exception {
     send(body(), token).andExpect(status().isCreated());
+    jdbc.update("UPDATE support_applications SET status=?", existingStatus);
+    var before = jdbc.queryForList("SELECT * FROM support_applications");
     send(body(), token)
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("SUPPORT_409_1"));
@@ -228,8 +231,11 @@ class SupportApplicationTest {
     b.put(
         "programId",
         programs.saveAndFlush(SupportProgram.create("별도 테스트 사업", null, null, "표시용 메타데이터")).getId());
-    send(b, token).andExpect(status().isCreated());
-    assertThat(count()).isEqualTo(2);
+    send(b, token)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("SUPPORT_409_1"));
+    assertThat(count()).isEqualTo(1);
+    assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }
 
   @Test
@@ -323,7 +329,11 @@ class SupportApplicationTest {
 
   @Test
   void databaseUniqueHandlesConcurrentRequestsEvenIfBothPrechecksMiss() throws Exception {
-    doReturn(false).when(supports).existsByApplicationIdAndProgramId(anyLong(), anyLong());
+    doReturn(false).when(supports).existsByApplicationId(anyLong());
+    var other = body();
+    other.put(
+        "programId",
+        programs.saveAndFlush(SupportProgram.create("다른 사업", null, null, null)).getId());
     var pool = Executors.newFixedThreadPool(2);
     var start = new CountDownLatch(1);
     try {
@@ -333,7 +343,12 @@ class SupportApplicationTest {
             return send(body(), token).andReturn().getResponse().getStatus();
           };
       var a = pool.submit(submit);
-      var b = pool.submit(submit);
+      var b =
+          pool.submit(
+              () -> {
+                start.await();
+                return send(other, token).andReturn().getResponse().getStatus();
+              });
       start.countDown();
       assertThat(List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS)))
           .containsExactlyInAnyOrder(201, 409);
@@ -578,7 +593,7 @@ class SupportApplicationTest {
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/support-applications'].post.responses['409'].description")
-                .value("동일 현장점검 신청과 동일 지원사업으로 이미 신청했습니다."))
+                .value("동일 현장점검 신청으로 이미 신청했습니다."))
         .andExpect(jsonPath("$.paths['/api/resident/support-applications'].get").doesNotExist());
     mvc.perform(get("/v3/api-docs"))
         .andExpect(

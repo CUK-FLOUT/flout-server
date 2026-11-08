@@ -432,29 +432,15 @@ class ApplicationHistoriesTest {
   }
 
   @Test
-  void includesAllSubmittedProgramsInsteadOfOnlyTheLatestAndExcludesDrafts() throws Exception {
+  void includesSubmittedSupportAndExcludesDraft() throws Exception {
     jdbc.update("UPDATE support_applications SET submitted_at='2030-01-01 10:00:00'");
-    jdbc.update(
-        "INSERT INTO support_programs(name,created_at) VALUES('Second program',CURRENT_TIMESTAMP)");
-    long program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
-    jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) SELECT application_id,?,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,'SUBMITTED','2030-01-02 10:00:00',landlord_consent_status FROM support_applications WHERE support_application_id=?",
-        program,
-        supportId);
-    long second =
-        jdbc.queryForObject(
-            "SELECT MAX(support_application_id) FROM support_applications", Long.class);
-    history()
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.totalCount").value(2))
-        .andExpect(jsonPath("$.result.histories[0].supportApplicationId").value(second))
-        .andExpect(jsonPath("$.result.histories[1].supportApplicationId").value(supportId));
-    jdbc.update(
-        "UPDATE support_applications SET status='DRAFT',submitted_at=NULL WHERE support_application_id=?",
-        second);
     history()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(1))
         .andExpect(jsonPath("$.result.histories[0].supportApplicationId").value(supportId));
+    jdbc.update(
+        "UPDATE support_applications SET status='DRAFT',submitted_at=NULL WHERE support_application_id=?",
+        supportId);
+    history().andExpect(status().isOk()).andExpect(jsonPath("$.result.totalCount").value(0));
   }
 }

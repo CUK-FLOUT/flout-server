@@ -301,19 +301,16 @@ class ResidentApplicationsQueryTest {
   }
 
   @Test
-  void newestSubmittedSupportTakesPriorityOverOldConstructionWithDeterministicTieBreak()
-      throws Exception {
-    long old = support("APPROVED", "2030-01-05 09:00:00");
-    construction(old, "COMPLETED");
-    long latest = support("SUBMITTED", "2030-01-06 09:00:00");
-    support("DRAFT", null);
+  void supportProgressReflectsCurrentStatus() throws Exception {
+    long id = support("SUBMITTED", "2030-01-06 09:00:00");
     assertStage("SUPPORT_REVIEW", false);
     detail()
-        .andExpect(jsonPath("$.result.progress.supportApplicationId").value(latest))
+        .andExpect(jsonPath("$.result.progress.supportApplicationId").value(id))
         .andExpect(jsonPath("$.result.progress.construction").value(nullValue()));
-    long tied = support("REJECTED", "2030-01-06 09:00:00");
+    jdbc.update(
+        "UPDATE support_applications SET status='REJECTED' WHERE support_application_id=?", id);
     assertStage("SUPPORT_REJECTED", true);
-    detail().andExpect(jsonPath("$.result.progress.supportApplicationId").value(tied));
+    detail().andExpect(jsonPath("$.result.progress.supportApplicationId").value(id));
   }
 
   @Test
