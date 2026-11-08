@@ -269,6 +269,110 @@ class AdminPublicIssueListTest {
   }
 
   @Test
+  void returnsStatusCountsWithScreenGroupingAndSearchFilters() throws Exception {
+    addIssue(
+        "부천시 원미구 중앙로 1",
+        37.5000000,
+        126.7600000,
+        "REPEATED_FLOODING",
+        "중앙 배수로 반복 침수",
+        "검토 대기",
+        "RECEIVED");
+    addIssue(
+        "부천시 원미구 중앙로 2",
+        37.5010000,
+        126.7600000,
+        "REPEATED_FLOODING",
+        "중앙 배수로 반복 침수",
+        "검토 중",
+        "UNDER_REVIEW");
+    addIssue(
+        "부천시 원미구 중앙로 3",
+        37.5020000,
+        126.7600000,
+        "REPEATED_FLOODING",
+        "중앙 배수로 반복 침수",
+        "현장점검 필요",
+        "INSPECTION_REQUIRED");
+    addIssue(
+        "부천시 소사구 남부로 1",
+        37.4700000,
+        126.7900000,
+        "SEWAGE_BACKFLOW",
+        "하수 역류",
+        "조치 진행",
+        "ACTION_IN_PROGRESS");
+    addIssue(
+        "부천시 오정구 북부로 1",
+        37.5200000,
+        126.7800000,
+        "BLOCKED_STORM_DRAIN",
+        "빗물받이 막힘",
+        "조치 완료",
+        "COMPLETED");
+    addIssue(
+        "서울특별시 구로구 중앙로 1",
+        37.5000000,
+        126.7600000,
+        "REPEATED_FLOODING",
+        "중앙 관할 외",
+        "검토 대기",
+        "RECEIVED");
+
+    mvc.perform(get("/api/admin/public-issues/status").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_6"))
+        .andExpect(jsonPath("$.result.length()").value(4))
+        .andExpect(jsonPath("$.result.registeredCount").value(5))
+        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(3))
+        .andExpect(jsonPath("$.result.actionInProgressCount").value(1))
+        .andExpect(jsonPath("$.result.completedCount").value(1));
+
+    mvc.perform(
+            get("/api/admin/public-issues/status")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "원미구")
+                .param("issueType", "REPEATED_FLOODING")
+                .param("keyword", "  중앙  "))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.registeredCount").value(3))
+        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(3))
+        .andExpect(jsonPath("$.result.actionInProgressCount").value(0))
+        .andExpect(jsonPath("$.result.completedCount").value(0));
+
+    mvc.perform(
+            get("/api/admin/public-issues/status")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "없는 문제"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.registeredCount").value(0))
+        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(0))
+        .andExpect(jsonPath("$.result.actionInProgressCount").value(0))
+        .andExpect(jsonPath("$.result.completedCount").value(0));
+  }
+
+  @Test
+  void statusCountsValidateFiltersAndOperatorAccess() throws Exception {
+    mvc.perform(
+            get("/api/admin/public-issues/status")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "중구"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+    mvc.perform(
+            get("/api/admin/public-issues/status")
+                .header("Authorization", "Bearer " + token)
+                .param("issueType", "UNKNOWN"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+    mvc.perform(get("/api/admin/public-issues/status")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/public-issues/status")
+                .header("Authorization", "Bearer " + residentToken))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void swaggerPublishesListSearchContract() throws Exception {
     var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andReturn();
     var operation =
@@ -283,5 +387,17 @@ class AdminPublicIssueListTest {
       parameters.add(parameter.path("name").asString());
     assertThat(parameters)
         .containsExactlyInAnyOrder("district", "status", "issueType", "keyword", "page", "size");
+
+    var statusOperation =
+        mapper
+            .readTree(response.getResponse().getContentAsString())
+            .path("paths")
+            .path("/api/admin/public-issues/status")
+            .path("get");
+    assertThat(statusOperation.path("summary").asString()).isEqualTo("지역·공공 문제 현황 건수 조회");
+    var statusParameters = new ArrayList<String>();
+    for (var parameter : statusOperation.path("parameters"))
+      statusParameters.add(parameter.path("name").asString());
+    assertThat(statusParameters).containsExactlyInAnyOrder("district", "issueType", "keyword");
   }
 }

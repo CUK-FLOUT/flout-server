@@ -2,6 +2,7 @@ package com.flout.server.domain.publicissue.service;
 
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueType;
 import com.flout.server.domain.publicissue.repository.AdminPublicIssueListRepository;
@@ -41,19 +42,30 @@ public class AdminPublicIssueListService {
       String keyword,
       int page,
       int size) {
-    requireOperator(operatorId);
-    if (district == null
-        || keyword == null
-        || keyword.length() > 255
-        || page < 0
-        || size < 1
-        || size > 100
-        || !DISTRICTS.contains(district))
+    validateCommon(operatorId, district, issueType, keyword);
+    if (page < 0 || size < 1 || size > 100)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
 
     var statusValue = normalize(status, STATUSES);
     var issueTypeValue = normalize(issueType, ISSUE_TYPES);
     return publicIssues.search(district, statusValue, issueTypeValue, keyword.strip(), page, size);
+  }
+
+  @Transactional(readOnly = true)
+  public AdminPublicIssueStatusResponse status(
+      Long operatorId, String district, String issueType, String keyword) {
+    validateCommon(operatorId, district, issueType, keyword);
+    return publicIssues.status(district, normalize(issueType, ISSUE_TYPES), keyword.strip());
+  }
+
+  private void validateCommon(Long operatorId, String district, String issueType, String keyword) {
+    requireOperator(operatorId);
+    if (district == null
+        || keyword == null
+        || keyword.length() > 255
+        || !DISTRICTS.contains(district))
+      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    normalize(issueType, ISSUE_TYPES);
   }
 
   private String normalize(String value, Set<String> allowed) {

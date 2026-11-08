@@ -1,6 +1,7 @@
 package com.flout.server.domain.publicissue.repository;
 
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueType;
 import lombok.RequiredArgsConstructor;
@@ -77,5 +78,36 @@ public class AdminPublicIssueListRepository {
                     rs.getLong("flood_history_count"),
                     PublicIssueStatus.valueOf(rs.getString("status"))));
     return new AdminPublicIssueListResponse(items, page, size, total, Math.ceilDiv(total, size));
+  }
+
+  public AdminPublicIssueStatusResponse status(String district, String issueType, String keyword) {
+    var params =
+        new MapSqlParameterSource()
+            .addValue(
+                "region", BUCHEON + (district.isEmpty() ? "" : "\\s+" + district) + "(?:\\s|$)")
+            .addValue("issueType", issueType)
+            .addValue("keyword", keyword);
+    return jdbc.queryForObject(
+        """
+        SELECT COUNT(*) AS registered_count,
+          COUNT(CASE WHEN p.status IN ('RECEIVED','UNDER_REVIEW','INSPECTION_REQUIRED') THEN 1 END)
+            AS pending_or_under_review_count,
+          COUNT(CASE WHEN p.status = 'ACTION_IN_PROGRESS' THEN 1 END)
+            AS action_in_progress_count,
+          COUNT(CASE WHEN p.status = 'COMPLETED' THEN 1 END) AS completed_count
+        FROM public_issues p
+        WHERE REGEXP_LIKE(TRIM(p.address), :region)
+          AND (:issueType = '' OR CONCAT('', p.issue_type) = :issueType)
+          AND (:keyword = '' OR LOCATE(:keyword, p.address) > 0
+            OR LOCATE(:keyword, p.description) > 0
+            OR LOCATE(:keyword, p.field_findings) > 0)
+        """,
+        params,
+        (rs, rowNum) ->
+            new AdminPublicIssueStatusResponse(
+                rs.getLong("registered_count"),
+                rs.getLong("pending_or_under_review_count"),
+                rs.getLong("action_in_progress_count"),
+                rs.getLong("completed_count")));
   }
 }

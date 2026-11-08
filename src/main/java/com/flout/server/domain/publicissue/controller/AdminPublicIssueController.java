@@ -2,6 +2,7 @@ package com.flout.server.domain.publicissue.controller;
 
 import com.flout.server.domain.publicissue.dto.request.CreatePublicIssueRequest;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.dto.response.CreatePublicIssueResponse;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.publicissue.service.AdminPublicIssueListService;
@@ -56,6 +57,29 @@ public class AdminPublicIssueController {
         listService.search(
             Long.valueOf(jwt.getSubject()), district, status, issueType, keyword, page, size),
         PublicIssueSuccessCode.LIST_FOUND);
+  }
+
+  @GetMapping(value = "/status", produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "지역·공공 문제 현황 건수 조회",
+      description =
+          "인증된 부천시 운영자의 지역·공공 문제 현황을 조회합니다. 등록 전체, 검토 대기·검토 중·현장점검 필요, 조치 진행, 조치 완료 건수를 반환하며 지역·문제 유형·검색어 조건을 동일하게 적용합니다.")
+  public SuccessResponse<AdminPublicIssueStatusResponse> status(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "원미구·소사구·오정구. 생략·빈 값이면 관할 전체", example = "원미구")
+          @RequestParam(defaultValue = "")
+          String district,
+      @Parameter(
+              description =
+                  "문제 유형. REPEATED_FLOODING, SEWAGE_BACKFLOW, POOR_ROAD_DRAINAGE, BLOCKED_STORM_DRAIN. 생략·빈 값이면 전체")
+          @RequestParam(required = false)
+          String issueType,
+      @Parameter(description = "지역 주소·문제 상세·현장 확인 내용 부분 검색, 최대 255자")
+          @RequestParam(defaultValue = "")
+          String keyword) {
+    return SuccessResponse.of(
+        listService.status(Long.valueOf(jwt.getSubject()), district, issueType, keyword),
+        PublicIssueSuccessCode.STATUS_FOUND);
   }
 
   @PostMapping(
