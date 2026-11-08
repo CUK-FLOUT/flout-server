@@ -2272,7 +2272,9 @@ public class OpenApiConfig {
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "방문 가능 시간은 MORNING, AFTERNOON, ANY 중 하나여야 합니다.");
     for (var error : SupportApplicationErrorCode.values()) {
-      addError(operation, error.name(), error, null);
+      if (error != SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND) {
+        addError(operation, error.name(), error, null);
+      }
     }
     operation.getResponses().get("403").setDescription("주민 권한이 없거나 본인 소유의 현장점검 신청이 아닙니다.");
     operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없습니다.");

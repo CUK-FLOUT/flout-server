@@ -112,7 +112,11 @@ public class SupportProgramMatchingService {
 
     int score = 0;
     for (var finding : findings) {
-      for (String keyword : TYPE_KEYWORDS.getOrDefault(finding.getType(), List.of())) {
+      var typeKeywords =
+          finding.getType() == null
+              ? List.<String>of()
+              : TYPE_KEYWORDS.getOrDefault(finding.getType(), List.of());
+      for (String keyword : typeKeywords) {
         if (programText.contains(keyword)) score += 10;
       }
       for (String token : tokens(finding.getTitle())) {
@@ -128,13 +132,13 @@ public class SupportProgramMatchingService {
 
   private InspectionVulnerability bestFinding(
       SupportProgram program, List<InspectionVulnerability> findings) {
-    if (findings.isEmpty()) return null;
     return findings.stream()
+        .filter(finding -> score(program, List.of(finding), "") > 0)
         .max(
             Comparator.<InspectionVulnerability>comparingInt(
                     finding -> score(program, List.of(finding), ""))
                 .thenComparingInt(finding -> -finding.getSortOrder()))
-        .orElse(findings.getFirst());
+        .orElse(null);
   }
 
   private List<String> tokens(String value) {

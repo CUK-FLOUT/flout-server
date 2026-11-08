@@ -155,8 +155,11 @@ class SupportProgramMatchingTest {
   }
 
   @Test
-  void matchesByAddressWhenNoVulnerabilityWasRegistered() throws Exception {
-    publishResult("점검 결과");
+  void handlesNullVulnerabilityTypeAndUsesOnlyTheAddressMatchReason() throws Exception {
+    Long resultId = publishResult("점검 결과");
+    jdbc.update(
+        "INSERT INTO inspection_vulnerabilities(result_id,type,title,sort_order) VALUES(?,NULL,'관련 없는 취약점',0)",
+        resultId);
     programs.saveAndFlush(SupportProgram.create("다른 지역 사업", "설명", "서울시 지원 대상", "접수중"));
     var bucheon = programs.saveAndFlush(SupportProgram.create("지역 지원사업", "설명", "부천시 지원 대상", "접수중"));
 
@@ -234,6 +237,10 @@ class SupportProgramMatchingTest {
                     operation
                         + ".responses['404'].content['application/json'].examples.matchedProgramNotFound.value.code")
                 .value("SUPPORT_404_3"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/resident/support-applications'].post.responses['404'].content['application/json'].examples.MATCHED_PROGRAM_NOT_FOUND")
+                .doesNotExist())
         .andExpect(
             jsonPath(
                     "$.components.schemas.SupportProgramMatchingResponse.properties.eligibilityConfirmed")
