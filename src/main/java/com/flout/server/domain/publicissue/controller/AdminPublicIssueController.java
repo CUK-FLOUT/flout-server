@@ -1,11 +1,14 @@
 package com.flout.server.domain.publicissue.controller;
 
 import com.flout.server.domain.publicissue.dto.request.CreatePublicIssueRequest;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
 import com.flout.server.domain.publicissue.dto.response.CreatePublicIssueResponse;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
+import com.flout.server.domain.publicissue.service.AdminPublicIssueListService;
 import com.flout.server.domain.publicissue.service.PublicIssueService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +23,40 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "운영자-현장점검 관리", description = "관할 지역의 현장점검 관리")
 public class AdminPublicIssueController {
   private final PublicIssueService service;
+  private final AdminPublicIssueListService listService;
+
+  @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "지역·공공 문제 목록 조회·검색",
+      description =
+          "인증된 부천시 운영자의 지역·공공 문제를 문제 ID 내림차순으로 조회합니다. 지역·처리 상태·문제 유형·주소와 문제 내용 검색을 조합할 수 있습니다. 관련 신청은 문제 위치에서 직선거리 1km 이하인 부천시 접수 신청이며 임시저장은 제외합니다. 침수 이력은 관련 신청 중 침수 경험 YES 건수입니다.")
+  public SuccessResponse<AdminPublicIssueListResponse> search(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "원미구·소사구·오정구. 생략·빈 값이면 관할 전체", example = "원미구")
+          @RequestParam(defaultValue = "")
+          String district,
+      @Parameter(
+              description =
+                  "처리 상태. RECEIVED, UNDER_REVIEW, INSPECTION_REQUIRED, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
+          @RequestParam(required = false)
+          String status,
+      @Parameter(
+              description =
+                  "문제 유형. REPEATED_FLOODING, SEWAGE_BACKFLOW, POOR_ROAD_DRAINAGE, BLOCKED_STORM_DRAIN. 생략·빈 값이면 전체")
+          @RequestParam(required = false)
+          String issueType,
+      @Parameter(description = "지역 주소·문제 상세·현장 확인 내용 부분 검색, 최대 255자")
+          @RequestParam(defaultValue = "")
+          String keyword,
+      @Parameter(description = "0부터 시작하는 페이지", example = "0") @RequestParam(defaultValue = "0")
+          int page,
+      @Parameter(description = "페이지 크기 1~100", example = "10") @RequestParam(defaultValue = "10")
+          int size) {
+    return SuccessResponse.of(
+        listService.search(
+            Long.valueOf(jwt.getSubject()), district, status, issueType, keyword, page, size),
+        PublicIssueSuccessCode.LIST_FOUND);
+  }
 
   @PostMapping(
       consumes = MediaType.APPLICATION_JSON_VALUE,
