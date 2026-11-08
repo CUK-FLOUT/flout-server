@@ -262,6 +262,11 @@ public class OpenApiConfig {
                               describeSupportApplication(operation);
                             }
                             if (path.equals(
+                                    "/api/resident/support-application/{supportApplicationId}/matching")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeSupportProgramMatching(operation);
+                            }
+                            if (path.equals(
                                     "/api/resident/support-applications/{supportApplicationId}/attachments")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportAttachment(operation);
@@ -1646,6 +1651,45 @@ public class OpenApiConfig {
         InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
         null);
     operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describeSupportProgramMatching(Operation operation) {
+    var code = SupportApplicationSuccessCode.PROGRAM_MATCHED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    var result = new LinkedHashMap<String, Object>();
+    result.put("supportApplicationId", 12);
+    result.put("programId", 3);
+    result.put("programName", "물막이판 설치 지원");
+    result.put("jurisdiction", "부천시");
+    result.put("description", "침수 예방을 위한 출입구 물막이판 설치 비용을 지원합니다.");
+    result.put("targetDescription", "부천시 침수 취약 주택");
+    result.put("operatingStatus", "접수중");
+    result.put("matchedReason", "현장점검에서 출입구 취약지점이 확인됐어요.");
+    result.put("eligibilityConfirmed", false);
+    addExample(success, "supportProgramMatched", envelope(true, code, code.getMessage(), result));
+    addError(
+        operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation, "resultNotPublished", SupportApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "applicationAccessDenied",
+        InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED,
+        null);
+    addError(
+        operation,
+        "applicationNotFound",
+        InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
+        null);
+    addError(operation, "programNotFound", SupportApplicationErrorCode.PROGRAM_NOT_FOUND, null);
+    addError(
+        operation,
+        "matchedProgramNotFound",
+        SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND,
+        null);
+    operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없음");
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 

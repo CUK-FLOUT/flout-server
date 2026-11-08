@@ -12,6 +12,7 @@ public enum SupportApplicationErrorCode implements BaseResponseCode {
   APPLICATION_ACCESS_DENIED(403, "SUPPORT_403_2", "본인의 현장점검 신청만 사용할 수 있습니다."),
   APPLICATION_NOT_FOUND(404, "SUPPORT_404_1", "현장점검 신청을 찾을 수 없습니다."),
   PROGRAM_NOT_FOUND(404, "SUPPORT_404_2", "지원사업을 찾을 수 없습니다."),
+  MATCHED_PROGRAM_NOT_FOUND(404, "SUPPORT_404_3", "분석 결과와 주소에 맞는 지원사업을 찾을 수 없습니다."),
   DUPLICATE_APPLICATION(409, "SUPPORT_409_1", "이미 접수된 지원 신청이 존재합니다.");
   private final int status;
   private final String code;
