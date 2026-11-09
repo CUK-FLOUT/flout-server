@@ -357,8 +357,13 @@ public class FormDraftService {
     String json = mapper.writeValueAsString(request.fields());
     if (json.length() > 16000) throw new BaseException(FormDraftErrorCode.INVALID);
     var rows =
-        jdbc.queryForList(
-            "SELECT * FROM resident_form_drafts WHERE draft_id=? FOR UPDATE", id.toString());
+        jdbc.queryForList("SELECT * FROM resident_form_drafts WHERE draft_id=?", id.toString());
+    if (!rows.isEmpty()) {
+      rows =
+          jdbc.queryForList(
+              "SELECT * FROM resident_form_drafts WHERE draft_id=? FOR UPDATE", id.toString());
+      if (rows.isEmpty()) throw new BaseException(FormDraftErrorCode.NOT_FOUND);
+    }
     if (rows.isEmpty()) {
       if (request.version() != null) throw new BaseException(FormDraftErrorCode.CONFLICT);
       if (type.equals("INSPECTION")) {
@@ -386,7 +391,7 @@ public class FormDraftService {
         publicationValidator.requirePublished(source);
       }
       if (!jdbc.queryForList(
-              "SELECT draft_id FROM resident_form_drafts WHERE user_id=? AND draft_type=? AND source_id=? AND form_state='EDITING' FOR UPDATE",
+              "SELECT draft_id FROM resident_form_drafts WHERE user_id=? AND draft_type=? AND source_id=? AND form_state='EDITING'",
               userId,
               type,
               source)

@@ -80,8 +80,8 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       SELECT s.support_application_id AS supportApplicationId,
         LPAD(CONCAT('', s.application_id), GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0') AS receiptNo,
         s.applicant_name AS applicantName, s.requested_facility AS requestedFacility,
-        (s.occupancy_type = 'TENANT') AS landlordConsentRequired,
-        EXISTS (SELECT 1 FROM support_attachments a WHERE a.support_application_id = s.support_application_id AND a.attachment_type = 'LANDLORD_CONSENT') AS landlordConsentDocumentSubmitted, s.status AS status
+        CASE WHEN s.occupancy_type = 'TENANT' THEN 1 ELSE 0 END AS landlordConsentRequired,
+        CASE WHEN EXISTS (SELECT 1 FROM support_attachments a WHERE a.support_application_id = s.support_application_id AND a.attachment_type = 'LANDLORD_CONSENT') THEN 1 ELSE 0 END AS landlordConsentDocumentSubmitted, s.status AS status
       """
               + ADMIN_SEARCH_FILTER
               + " ORDER BY s.support_application_id DESC LIMIT :limit OFFSET :offset",
@@ -112,9 +112,9 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
 
     String getRequestedFacility();
 
-    boolean getLandlordConsentRequired();
+    Number getLandlordConsentRequired();
 
-    boolean getLandlordConsentDocumentSubmitted();
+    Number getLandlordConsentDocumentSubmitted();
 
     String getStatus();
   }

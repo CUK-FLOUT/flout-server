@@ -59,8 +59,8 @@ public class SupportApplicationListService {
         row.getReceiptNo(),
         row.getApplicantName(),
         row.getRequestedFacility(),
-        row.getLandlordConsentRequired(),
-        row.getLandlordConsentDocumentSubmitted(),
+        row.getLandlordConsentRequired().longValue() != 0,
+        row.getLandlordConsentDocumentSubmitted().longValue() != 0,
         status);
   }
 }
