@@ -2,6 +2,7 @@ package com.flout.server.domain.inspectionapplication.repository;
 
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -53,4 +54,15 @@ public interface InspectionApplicationRepository
   @Modifying
   @Query("update InspectionApplication a set a.internalMemo = :memo where a.id = :applicationId")
   int updateInternalMemo(@Param("applicationId") Long applicationId, @Param("memo") String memo);
+
+  @EntityGraph(attributePaths = {"assessment"})
+  @Query(
+      """
+    SELECT a
+    FROM InspectionApplication a
+    WHERE a.address = :address
+      AND a.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT
+    ORDER BY a.createdAt DESC, a.id DESC
+    """)
+  List<InspectionApplication> findRelatedByAddress(@Param("address") String address);
 }

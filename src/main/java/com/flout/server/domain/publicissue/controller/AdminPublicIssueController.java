@@ -2,7 +2,9 @@ package com.flout.server.domain.publicissue.controller;
 
 import com.flout.server.domain.publicissue.dto.request.CreatePublicIssueRequest;
 import com.flout.server.domain.publicissue.dto.response.CreatePublicIssueResponse;
+import com.flout.server.domain.publicissue.dto.response.RelatedApplicationsResponse;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
+import com.flout.server.domain.publicissue.service.PublicIssueRelatedApplicationService;
 import com.flout.server.domain.publicissue.service.PublicIssueService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,5 +35,18 @@ public class AdminPublicIssueController {
     return SuccessResponse.of(
         service.register(Long.valueOf(jwt.getSubject()), request),
         PublicIssueSuccessCode.REGISTERED);
+  }
+
+  private final PublicIssueRelatedApplicationService relatedApplicationService;
+
+  @GetMapping(
+      value = "/{publicIssueId}/resident-applications",
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(summary = "공공시설 관련 주민 신청 목록 조회", description = "공공시설 문제와 주소가 동일한 주민 신청 목록을 조회합니다.")
+  public SuccessResponse<RelatedApplicationsResponse> getRelatedApplications(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable Long publicIssueId) {
+    return SuccessResponse.of(
+        relatedApplicationService.getRelated(Long.valueOf(jwt.getSubject()), publicIssueId),
+        PublicIssueSuccessCode.RELATED_APPLICATIONS_RETRIEVED);
   }
 }

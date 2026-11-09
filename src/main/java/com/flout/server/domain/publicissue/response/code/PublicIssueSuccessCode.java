@@ -10,6 +10,7 @@ public enum PublicIssueSuccessCode implements BaseResponseCode {
   REGISTERED(200, "PUBLIC_ISSUE_200_1", "지역·공공 문제 등록 성공"),
   ACTION_COMPLETED(200, "PUBLIC_ISSUE_200_2", "공공시설 조치 완료 처리 성공"),
   REVIEW_SAVED(200, "PUBLIC_ISSUE_200_3", "공공시설 검토 내용 저장 성공"),
+  RELATED_APPLICATIONS_RETRIEVED(200, "PUBLIC_ISSUE_200_5", "관련 주민 신청 목록 조회 성공"),
   ACTION_IMAGES_UPLOADED(200, "PUBLIC_ISSUE_200_4", "공공시설 조치 사진 업로드 성공");
   private final int status;
   private final String code;
