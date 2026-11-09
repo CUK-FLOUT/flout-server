@@ -486,6 +486,7 @@ public class FormDraftService {
         type.equals("SUPPORT") ? linked : null,
         rs.getLong("version"),
         mapper.readTree(rs.getString("fields_json")),
-        rs.getTimestamp("updated_at").toLocalDateTime().atOffset(java.time.ZoneOffset.ofHours(9)));
+        rs.getObject("updated_at", java.time.LocalDateTime.class)
+            .atOffset(java.time.ZoneOffset.ofHours(9)));
   }
 }

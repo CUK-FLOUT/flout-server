@@ -69,7 +69,25 @@ public class ResidentProgressService {
       @Schema(description = "연결된 현장점검 신청 ID", nullable = true) Long applicationId,
       @Schema(description = "저장된 분석 결과 JSON. 없으면 null", nullable = true) JsonNode result) {}
 
-  private record Ranked(Flow flow, int rank) {}
+  private record Ranked(
+      Flow flow, int rank, java.util.function.Supplier<List<HistoryEvent>> history) {
+    private Flow withHistory() {
+      return new Flow(
+          flow.assessmentId(),
+          flow.applicationType(),
+          flow.receiptNumber(),
+          flow.title(),
+          flow.address(),
+          flow.detailAddress(),
+          flow.riskLevel(),
+          flow.currentStage(),
+          flow.nextAction(),
+          flow.relatedIds(),
+          history.get(),
+          flow.closed(),
+          flow.updatedAt());
+    }
+  }
 
   private record Cursor(int rank, java.time.OffsetDateTime updatedAt, long assessmentId) {}
 
@@ -151,7 +169,7 @@ public class ResidentProgressService {
             .filter(row -> after == null || ORDER.compare(key(row), after) > 0)
             .limit((long) size + 1)
             .toList();
-    var items = page.stream().limit(size).map(Ranked::flow).toList();
+    var items = page.stream().limit(size).map(Ranked::withHistory).toList();
     return new Progress(items, page.size() > size ? encodeCursor(key(page.get(size - 1))) : null);
   }
 
@@ -386,10 +404,11 @@ public class ResidentProgressService {
                 constructionId,
                 inspectionForm,
                 supportForm),
-            stageHistory(a, guide, app, inspection, published, support, construction),
+            List.of(),
             closed,
             updated == null ? null : updated.atOffset(java.time.ZoneOffset.ofHours(9))),
-        rank);
+        rank,
+        () -> stageHistory(a, guide, app, inspection, published, support, construction));
   }
 
   private String homeTitle(String stage) {

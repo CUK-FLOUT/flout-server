@@ -34,7 +34,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class ResidentProgressTest {
   @Autowired MockMvc mvc;
-  @Autowired JdbcTemplate jdbc;
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean JdbcTemplate jdbc;
   @Autowired UserRepository users;
   @Autowired JwtService jwt;
   @Autowired ObjectMapper mapper;
@@ -105,6 +105,72 @@ class ResidentProgressTest {
         inspection);
     jdbc.update("INSERT INTO support_programs(name,created_at) VALUES('지원',CURRENT_TIMESTAMP)");
     programId = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
+  }
+
+  @Test
+  void draftLookupIndexKeepsExistingIndexAndCoversLinkedForms() {
+    var columns =
+        jdbc.queryForList(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.INDEX_COLUMNS WHERE TABLE_NAME='RESIDENT_FORM_DRAFTS' AND INDEX_NAME='IDX_FORM_DRAFT_LINKED' ORDER BY ORDINAL_POSITION",
+            String.class);
+    assertThat(columns).containsExactly("DRAFT_TYPE", "LINKED_ID", "FORM_STATE");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME='RESIDENT_FORM_DRAFTS' AND INDEX_NAME='IDX_FORM_DRAFT_USER_SOURCE'",
+                Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void draftDatetimeIsIndependentOfJvmTimezone() throws Exception {
+    String id = UUID.randomUUID().toString();
+    insertLegacyDraft(id, "SUPPORT", applicationId, Map.of());
+    jdbc.update(
+        "UPDATE resident_form_drafts SET updated_at=TIMESTAMP '2025-01-01 12:34:56' WHERE draft_id=?",
+        id);
+    var original = java.util.TimeZone.getDefault();
+    try {
+      for (String zone : List.of("UTC", "Asia/Seoul", "America/Los_Angeles")) {
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(zone));
+        mvc.perform(
+                get("/api/resident/support-applications/drafts")
+                    .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result.drafts[0].draftId").value(id))
+            .andExpect(jsonPath("$.result.drafts[0].updatedAt").value("2025-01-01T12:34:56+09:00"));
+      }
+    } finally {
+      java.util.TimeZone.setDefault(original);
+    }
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void loadsFullHistoryOnlyForSelectedPage() throws Exception {
+    for (int i = 0; i < 6; i++) priorityFixture("CONSTRUCTION_IN_PROGRESS", "2040-01-01 00:00:00");
+    org.mockito.Mockito.clearInvocations(jdbc);
+    mvc.perform(
+            get("/api/resident/progress")
+                .header("Authorization", "Bearer " + token)
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.items[0].currentStage").value("CONSTRUCTION_IN_PROGRESS"))
+        .andExpect(
+            jsonPath("$.result.items[0].stageHistory[*].stage")
+                .value(org.hamcrest.Matchers.hasItem("CONSTRUCTION_IN_PROGRESS")));
+    long historyQueries =
+        org.mockito.Mockito.mockingDetails(jdbc).getInvocations().stream()
+            .filter(invocation -> invocation.getMethod().getName().equals("queryForList"))
+            .filter(invocation -> invocation.getArguments().length > 0)
+            .map(invocation -> invocation.getArguments()[0])
+            .filter(String.class::isInstance)
+            .map(String.class::cast)
+            .filter(
+                sql ->
+                    sql.startsWith("SELECT status,changed_at FROM construction_status_histories"))
+            .count();
+    assertThat(historyQueries).isEqualTo(1);
   }
 
   @Test

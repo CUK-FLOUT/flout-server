@@ -111,7 +111,7 @@ class SupportStatusTest {
     return mvc.perform(call);
   }
 
-  void add(String state, String address, String consent) {
+  void add(String state, String address) {
     jdbc.update(
         "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,'address','fixture','HIGH','COMPLETED')",
         residentId);
@@ -158,13 +158,13 @@ class SupportStatusTest {
 
   @Test
   void aggregatesCurrentStatesOnceAndIncludesOtherStatesInTotal() throws Exception {
-    add("SUBMITTED", "경기 부천시 소사구", "PENDING");
-    add("SUBMITTED", "부천시 오정구", "NOT_REQUIRED");
-    add("APPROVED", "  경기도 부천시 원미구 ", "CONFIRMED");
-    add("SUBMITTED", "경기도 부천시 원미구", "CONFIRMED");
-    add("REJECTED", "경기도 부천시 원미구", "PENDING");
-    add("REJECTED", "서울시 중구", "PENDING");
-    add("DRAFT", "부천시 원미구", "PENDING");
+    add("SUBMITTED", "경기 부천시 소사구");
+    add("SUBMITTED", "부천시 오정구");
+    add("APPROVED", "  경기도 부천시 원미구 ");
+    add("SUBMITTED", "경기도 부천시 원미구");
+    add("REJECTED", "경기도 부천시 원미구");
+    add("REJECTED", "서울시 중구");
+    add("DRAFT", "부천시 원미구");
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     statusRequest(token)
         .andExpect(status().isOk())
@@ -186,7 +186,7 @@ class SupportStatusTest {
   @Test
   void excludesOtherJurisdictionsAndLookalikeOrEmbeddedAddresses() throws Exception {
     for (var address : List.of("경기도 서울시", "서울시 부천시", "부천시청", "부천시외", "경기도 부천시청", "부천시흥"))
-      add("APPROVED", address, "CONFIRMED");
+      add("APPROVED", address);
     statusRequest(token)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(1))

@@ -114,7 +114,7 @@ class SupportListTest {
     return mvc.perform(call);
   }
 
-  long add(String name, String address, String state, String consent) {
+  long add(String name, String address, String state) {
     jdbc.update(
         "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,'address','fixture','HIGH','COMPLETED')",
         residentId);
@@ -211,7 +211,7 @@ class SupportListTest {
 
   @Test
   void searchesReceiptAndNameAndReturnsEmptyForNoMatch() throws Exception {
-    long id = add("김목록주민", "부천시 소사구", "APPROVED", "CONFIRMED");
+    long id = add("김목록주민", "부천시 소사구", "APPROVED");
     list(token, "  김목록  ", 0, 10)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(1))
@@ -232,7 +232,7 @@ class SupportListTest {
   /** Treats wildcard characters and SQL-like input as literal search text. */
   @Test
   void literalWildcardsAndSqlInjectionCannotBroadenResults() throws Exception {
-    add("기호%_주민", "부천시 원미구", "SUBMITTED", "PENDING");
+    add("기호%_주민", "부천시 원미구", "SUBMITTED");
     for (var keyword : List.of("%", "_", "%_"))
       list(token, keyword, 0, 10)
           .andExpect(status().isOk())
@@ -247,8 +247,7 @@ class SupportListTest {
   @Test
   void paginatesInStableSupportIdDescendingOrderWithMatchingFilteredTotals() throws Exception {
     var expected = new ArrayList<Long>();
-    for (int i = 0; i < 12; i++)
-      expected.add(add("검색대상" + i, "경기도 부천시 원미구", "SUBMITTED", "NOT_REQUIRED"));
+    for (int i = 0; i < 12; i++) expected.add(add("검색대상" + i, "경기도 부천시 원미구", "SUBMITTED"));
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
@@ -280,13 +279,13 @@ class SupportListTest {
   @Test
   void jurisdictionAppliesToRowsAndCountAndRejectsLookalikeAddresses() throws Exception {
     for (var address : List.of("서울시 부천시", "경기도 수원시", "부천시청", "부천시민로", "경기도 부천시흥"))
-      add("테스트주민", address, "APPROVED", "CONFIRMED");
+      add("테스트주민", address, "APPROVED");
     list(token, "테스트", 0, 10)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(1))
         .andExpect(jsonPath("$.result.supportApplications.length()").value(1));
-    add("유효주소", "  경기 부천시 오정구", "SUBMITTED", "PENDING");
-    add("유효주소", "부천시 원미구", "SUBMITTED", "PENDING");
+    add("유효주소", "  경기 부천시 오정구", "SUBMITTED");
+    add("유효주소", "부천시 원미구", "SUBMITTED");
     list(token, "", 0, 10).andExpect(jsonPath("$.result.totalElements").value(3));
   }
 
@@ -359,7 +358,7 @@ class SupportListTest {
 
   @Test
   void filteredListDoesNotAffectStatusCounts() throws Exception {
-    add("다른주민", "부천시 소사구", "APPROVED", "CONFIRMED");
+    add("다른주민", "부천시 소사구", "APPROVED");
     list(token, "없는주민", 0, 1).andExpect(jsonPath("$.result.totalElements").value(0));
     mvc.perform(
             get("/api/admin/support-applications/status")
@@ -400,12 +399,11 @@ class SupportListTest {
   @Test
   void combinesDistrictStatusConsentAndKeywordWithMatchingPageCounts() throws Exception {
     var expected = new ArrayList<Long>();
-    for (int i = 0; i < 7; i++)
-      expected.add(add("필터주민" + i, "경기도 부천시 소사구 소사로 1", "SUBMITTED", "PENDING"));
-    add("필터주민", "부천시 원미구", "SUBMITTED", "PENDING");
-    add("필터주민", "부천시 소사구", "APPROVED", "PENDING");
-    add("필터주민", "서울시 부천시 소사구", "SUBMITTED", "PENDING");
-    add("필터주민", "부천시 소사구청", "SUBMITTED", "PENDING");
+    for (int i = 0; i < 7; i++) expected.add(add("필터주민" + i, "경기도 부천시 소사구 소사로 1", "SUBMITTED"));
+    add("필터주민", "부천시 원미구", "SUBMITTED");
+    add("필터주민", "부천시 소사구", "APPROVED");
+    add("필터주민", "서울시 부천시 소사구", "SUBMITTED");
+    add("필터주민", "부천시 소사구청", "SUBMITTED");
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
@@ -433,8 +431,8 @@ class SupportListTest {
 
   @Test
   void individualFiltersAndConsentAliasesRespectPersistedValues() throws Exception {
-    add("소사주민", " 경기 부천시 소사구", "APPROVED", "CONFIRMED");
-    add("오정주민", "부천시 오정구", "REJECTED", "PENDING");
+    add("소사주민", " 경기 부천시 소사구", "APPROVED");
+    add("오정주민", "부천시 오정구", "REJECTED");
     for (var filter :
         List.of(
             new String[] {"district", "원미구"},
