@@ -39,18 +39,37 @@ public class FormDraftService {
           Long applicationId,
       @io.swagger.v3.oas.annotations.media.Schema(description = "동시 수정 방지 버전. 최초 저장 시 null")
           Long version,
-      @io.swagger.v3.oas.annotations.media.Schema(description = "신청서 입력 필드. 입력하지 않은 값은 생략 또는 null")
+      @io.swagger.v3.oas.annotations.media.Schema(
+              description = "신청서 입력 필드를 담은 자유 JSON 객체. 최대 16000자. 입력하지 않은 값은 생략 또는 null",
+              type = "object",
+              implementation = Map.class)
           JsonNode fields) {}
 
   public record Draft(
-      String draftId,
-      Long assessmentId,
-      Long applicationId,
-      String formState,
-      Long supportApplicationId,
-      long version,
-      JsonNode fields,
-      java.time.OffsetDateTime updatedAt) {}
+      @io.swagger.v3.oas.annotations.media.Schema(description = "클라이언트가 생성한 임시저장 UUID")
+          String draftId,
+      @io.swagger.v3.oas.annotations.media.Schema(
+              description = "현장점검 폼의 원본 분석 ID. 지원 폼이면 null",
+              nullable = true)
+          Long assessmentId,
+      @io.swagger.v3.oas.annotations.media.Schema(
+              description = "지원 폼의 원본 신청 ID 또는 연결된 현장점검 신청 ID",
+              nullable = true)
+          Long applicationId,
+      @io.swagger.v3.oas.annotations.media.Schema(description = "폼 상태: EDITING 또는 LINKED")
+          String formState,
+      @io.swagger.v3.oas.annotations.media.Schema(
+              description = "연결된 지원 신청 ID. 없으면 null",
+              nullable = true)
+          Long supportApplicationId,
+      @io.swagger.v3.oas.annotations.media.Schema(description = "갱신 시 사용할 버전") long version,
+      @io.swagger.v3.oas.annotations.media.Schema(
+              description = "저장된 자유 JSON 객체",
+              type = "object",
+              implementation = Map.class)
+          JsonNode fields,
+      @io.swagger.v3.oas.annotations.media.Schema(description = "최근 저장 시각, KST")
+          java.time.OffsetDateTime updatedAt) {}
 
   public void resident(Long userId) {
     var user =

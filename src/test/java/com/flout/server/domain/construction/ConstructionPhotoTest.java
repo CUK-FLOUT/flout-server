@@ -93,7 +93,7 @@ class ConstructionPhotoTest {
         "INSERT INTO support_programs(name,created_at) VALUES('물막이판 지원',CURRENT_TIMESTAMP)");
     long program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'물막이판','김주민','010-1234-5678','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','APPROVED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at) VALUES(?,?,?,'물막이판','김주민','010-1234-5678','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','APPROVED',CURRENT_TIMESTAMP)",
         application,
         program,
         resident.getId());

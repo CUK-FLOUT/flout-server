@@ -15,7 +15,6 @@ public record ResidentSupportScheduleResponse(
     String programName,
     @Schema(allowableValues = {"APPROVED"}) SupportApplicationStatus status,
     String requestedFacility,
-    @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"}) String landlordConsentStatus,
     @Schema(nullable = true, description = "확정 시공 일자. 미확정 시 null")
         LocalDate scheduledConstructionDate,
     @Schema(nullable = true, description = "확정 시공 시간. 미확정 시 null")

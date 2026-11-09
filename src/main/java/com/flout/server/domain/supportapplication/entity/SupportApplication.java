@@ -76,13 +76,6 @@ public class SupportApplication {
   @Column(name = "approved_at")
   private LocalDateTime approvedAt;
 
-  @Enumerated(EnumType.STRING)
-  @Column(
-      name = "landlord_consent_status",
-      nullable = false,
-      columnDefinition = "enum('NOT_REQUIRED','PENDING','CONFIRMED')")
-  private LandlordConsentStatus landlordConsentStatus;
-
   @Column(name = "submitted_at")
   private LocalDateTime submittedAt;
 
@@ -111,10 +104,6 @@ public class SupportApplication {
     support.contact = source.getContact().strip();
     support.address = source.getAddress().strip();
     support.occupancyType = source.getOccupancyType();
-    support.landlordConsentStatus =
-        source.getOccupancyType() == OccupancyType.OWNER
-            ? LandlordConsentStatus.NOT_REQUIRED
-            : LandlordConsentStatus.PENDING;
     support.preferredVisitDate = preferredVisitDate;
     support.preferredVisitTime = preferredVisitTime;
     support.status =

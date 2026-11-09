@@ -266,28 +266,15 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportApplication(operation);
                             }
-                            if (path.equals("/api/resident/support-form-drafts/{draftId}")
-                                && method == PathItem.HttpMethod.PUT) {
-                              addError(
-                                  operation,
-                                  "resultNotPublished",
-                                  SupportApplicationErrorCode.RESULT_NOT_PUBLISHED,
-                                  null);
-                            }
-                            if (method == PathItem.HttpMethod.PUT
-                                && Set.of(
-                                        "/api/resident/application-form-drafts/{draftId}",
-                                        "/api/resident/support-form-drafts/{draftId}")
-                                    .contains(path)) {
-                              addError(
-                                  operation,
-                                  "editingFormExists",
-                                  FormDraftErrorCode.EDITING_EXISTS,
-                                  null);
-                              operation
-                                  .getResponses()
-                                  .get("409")
-                                  .setDescription("이미 작성 중인 임시저장 폼이 있거나 요청이 충돌함");
+                            if (Set.of(
+                                    "/api/resident/progress",
+                                    "/api/resident/risk-assessments/{assessmentId}",
+                                    "/api/resident/applications/drafts",
+                                    "/api/resident/support-applications/drafts",
+                                    "/api/resident/application-form-drafts/{draftId}",
+                                    "/api/resident/support-form-drafts/{draftId}")
+                                .contains(path)) {
+                              describeResidentProgress(api, operation, path, method);
                             }
                             if (path.equals(
                                     "/api/resident/support-application/{supportApplicationId}/matching")
@@ -470,6 +457,222 @@ public class OpenApiConfig {
                             addError(operation, "serverError", GeneralErrorCode.SERVER_ERROR, null);
                           }));
     };
+  }
+
+  /**
+   * Documents the six resident progress and form-draft endpoints using their actual response
+   * shapes.
+   */
+  private void describeResidentProgress(
+      OpenAPI api, Operation operation, String path, PathItem.HttpMethod method) {
+    boolean save = method == PathItem.HttpMethod.PUT;
+    boolean inspection =
+        path.contains("application-form-drafts")
+            || path.equals("/api/resident/applications/drafts");
+    boolean supportSave = save && !inspection;
+    var schemas = api.getComponents().getSchemas();
+    for (String name : List.of("SaveRequest", "Draft")) {
+      var schema = schemas.get(name);
+      if (schema != null && schema.getProperties() != null) {
+        schema
+            .getProperties()
+            .put(
+                "fields",
+                new ObjectSchema()
+                    .additionalProperties(true)
+                    .description("신청서 입력 값을 담는 자유 JSON 객체. 저장 시 최대 16000자"));
+      }
+    }
+    var assessmentSchema = schemas.get("AssessmentDetail");
+    if (assessmentSchema != null && assessmentSchema.getProperties() != null) {
+      assessmentSchema
+          .getProperties()
+          .put("result", new Schema<>().description("저장된 분석 결과 JSON. 없으면 null").nullable(true));
+    }
+
+    // Springdoc may reuse generic advice responses: create independent responses for this
+    // operation.
+    var original = operation.getResponses().get("200");
+    var responses = new ApiResponses();
+    responses.addApiResponse("200", original == null ? new ApiResponse() : original);
+    operation.setResponses(responses);
+    var success = responses.get("200");
+    success.setDescription("조회 또는 저장 성공. COMMON_200");
+    Object result;
+    if (path.equals("/api/resident/progress")) {
+      var ids =
+          values(
+              "guideId",
+              12,
+              "applicationId",
+              21,
+              "inspectionId",
+              31,
+              "supportApplicationId",
+              null,
+              "constructionId",
+              null,
+              "inspectionFormDraftId",
+              null,
+              "supportFormDraftId",
+              null);
+      var flow =
+          values(
+              "assessmentId",
+              1,
+              "applicationType",
+              "INSPECTION",
+              "receiptNumber",
+              "000021",
+              "title",
+              "현장점검 신청이 접수됐어요",
+              "address",
+              "경기도 부천시 원미구 길주로 210",
+              "detailAddress",
+              "101호",
+              "riskLevel",
+              "HIGH",
+              "currentStage",
+              "INSPECTION_RECEIVED",
+              "nextAction",
+              Map.of("type", "WAIT_FOR_VISIT_SCHEDULE", "target", Map.of("applicationId", 21)),
+              "relatedIds",
+              ids,
+              "stageHistory",
+              List.of(
+                  Map.of(
+                      "stage",
+                      "RISK_ASSESSMENT_COMPLETED",
+                      "occurredAt",
+                      "2026-10-20T10:00:00+09:00"),
+                  Map.of(
+                      "stage", "INSPECTION_RECEIVED", "occurredAt", "2026-10-21T10:00:00+09:00")),
+              "closed",
+              false,
+              "updatedAt",
+              "2026-10-21T10:00:00+09:00");
+      result = values("items", List.of(flow), "nextCursor", null);
+    } else if (path.equals("/api/resident/risk-assessments/{assessmentId}")) {
+      result =
+          values(
+              "assessmentId",
+              1,
+              "address",
+              "경기도 부천시 원미구 길주로 210",
+              "detailAddress",
+              "101호",
+              "status",
+              "COMPLETED",
+              "riskLevel",
+              "HIGH",
+              "analyzedAt",
+              "2026-10-20T10:00:00+09:00",
+              "guideId",
+              12,
+              "applicationId",
+              null,
+              "result",
+              Map.of("source", "DEMO"));
+    } else {
+      var fields =
+          inspection
+              ? Map.<String, Object>of("applicantName", "김주민", "contact", "010-1234-5678")
+              : Map.<String, Object>of("programId", 3, "requestedFacility", "출입구 물막이판");
+      var draft =
+          values(
+              "draftId",
+              "d3b07384-d9a4-4f18-9b2b-80d1bcf67b29",
+              "assessmentId",
+              inspection ? 1 : null,
+              "applicationId",
+              inspection ? null : 21,
+              "formState",
+              "EDITING",
+              "supportApplicationId",
+              null,
+              "version",
+              1,
+              "fields",
+              fields,
+              "updatedAt",
+              "2026-10-21T10:00:00+09:00");
+      result = save ? draft : Map.of("drafts", List.of(draft));
+      if (save
+          && operation.getRequestBody() != null
+          && operation.getRequestBody().getContent() != null) {
+        var media = operation.getRequestBody().getContent().get(JSON);
+        if (media != null) {
+          var create =
+              values(
+                  inspection ? "assessmentId" : "applicationId",
+                  inspection ? 1 : 21,
+                  "version",
+                  null,
+                  "fields",
+                  fields);
+          var update =
+              values(
+                  inspection ? "assessmentId" : "applicationId",
+                  inspection ? 1 : 21,
+                  "version",
+                  1,
+                  "fields",
+                  fields);
+          media.setExample(null);
+          media.addExamples("create", new Example().summary("최초 저장").value(create));
+          media.addExamples("update", new Example().summary("기존 폼 갱신").value(update));
+        }
+      }
+    }
+    addExample(
+        success,
+        "success",
+        envelope(
+            true,
+            GeneralSuccessCode.SUCCESS_OK,
+            GeneralSuccessCode.SUCCESS_OK.getMessage(),
+            result));
+    addError(operation, "authenticationRequired", GeneralErrorCode.UNAUTHORIZED_ERROR, null);
+    addError(operation, "invalidOrExpiredToken", GeneralErrorCode.INVALID_ACCESS_TOKEN, null);
+    responses.get("401").setDescription("인증 토큰이 없거나 유효하지 않음");
+    addError(operation, "notFound", FormDraftErrorCode.NOT_FOUND, null);
+    responses.get("404").setDescription("주민 계정 또는 본인 소유의 원본·임시저장 폼을 찾을 수 없음");
+    if (save || path.equals("/api/resident/progress") || path.contains("{assessmentId}")) {
+      addError(
+          operation, "invalidParameter", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+      if (save || path.equals("/api/resident/progress"))
+        addError(operation, "invalidDraftOrCursor", FormDraftErrorCode.INVALID, null);
+      if (save)
+        addError(operation, "malformedJson", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+      if (supportSave)
+        addError(
+            operation,
+            "resultNotPublished",
+            SupportApplicationErrorCode.RESULT_NOT_PUBLISHED,
+            null);
+      responses.get("400").setDescription("요청 매개변수·본문 또는 임시저장 조건이 올바르지 않음");
+    }
+    if (save) {
+      addError(operation, "versionConflict", FormDraftErrorCode.CONFLICT, null);
+      addError(operation, "editingFormExists", FormDraftErrorCode.EDITING_EXISTS, null);
+      if (inspection) {
+        addError(
+            operation, "inspectionDraftExists", FormDraftErrorCode.INSPECTION_DRAFT_EXISTS, null);
+        addError(operation, "inspectionExists", FormDraftErrorCode.INSPECTION_EXISTS, null);
+      } else {
+        addError(operation, "supportDraftExists", FormDraftErrorCode.SUPPORT_DRAFT_EXISTS, null);
+        addError(operation, "supportExists", FormDraftErrorCode.SUPPORT_EXISTS, null);
+      }
+      responses.get("409").setDescription("버전·제출 상태 충돌 또는 동일 원본의 신청·작성 중인 폼이 존재함");
+      addError(
+          operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    }
+  }
+
+  private Map<String, Object> values(Object... entries) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    for (int i = 0; i < entries.length; i += 2) result.put((String) entries[i], entries[i + 1]);
+    return result;
   }
 
   private void describePublicIssueRegistration(Operation operation) {
@@ -2374,11 +2577,9 @@ public class OpenApiConfig {
       result.put("occupancyType", "TENANT");
       result.put("preferredConstructionDate", "2026-10-21");
       result.put("preferredTimeSlot", "MORNING");
-      result.put("landlordConsentStatus", "PENDING");
     } else if (view.equals("approval")) {
       result.put("approvedAt", "2026-10-13T14:00:00");
       result.put("supportScope", "출입구 물막이판 1개 설치 지원");
-      result.put("landlordConsentStatus", "VERIFIED");
       result.put("scheduledConstructionDate", null);
       result.put("scheduledConstructionTime", null);
     } else {
@@ -2468,8 +2669,10 @@ public class OpenApiConfig {
                   "김주민",
                   "requestedFacility",
                   "출입구 물막이판",
-                  "landlordConsentStatus",
-                  "VERIFIED",
+                  "landlordConsentRequired",
+                  true,
+                  "landlordConsentDocumentSubmitted",
+                  true,
                   "status",
                   "SUBMITTED")));
       result.put("page", 0);
@@ -2500,6 +2703,7 @@ public class OpenApiConfig {
         result.put("applicationId", 2);
         result.put("vulnerabilityTypes", List.of("ENTRANCE", "DRAIN"));
         result.put("landlordConsentRequired", true);
+        result.put("landlordConsentDocumentSubmitted", false);
         result.put("supportScope", null);
         result.put(
             "program",
@@ -2514,7 +2718,10 @@ public class OpenApiConfig {
                 "부천시 지원 대상 주택",
                 "operatingStatus",
                 "OPEN"));
-      } else result.put("landlordConsentStatus", "VERIFIED");
+      } else {
+        result.put("landlordConsentRequired", true);
+        result.put("landlordConsentDocumentSubmitted", false);
+      }
     }
     addExample(success, "screenData", envelope(true, code, code.getMessage(), result));
   }

@@ -124,7 +124,6 @@ public class ResidentApplicationProgressReader {
                 s.getStatus(),
                 s.getRequestedFacility(),
                 s.getStatus() == SupportApplicationStatus.APPROVED ? s.getSupportScope() : null,
-                s.getLandlordConsentStatus().name(),
                 s.getStatus() == SupportApplicationStatus.REJECTED ? s.getRejectionReason() : null),
         c == null
             ? null

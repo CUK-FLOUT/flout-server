@@ -9,6 +9,7 @@ import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.security.JwtService;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,7 +184,7 @@ class ResidentProgressTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.items[0].currentStage").value("SUPPORT_REVIEW"))
         .andExpect(jsonPath("$.result.items[0].applicationType").value("SUPPORT"))
-        .andExpect(jsonPath("$.result.items[0].title").value("지원 · 물막이판"))
+        .andExpect(jsonPath("$.result.items[0].title").value("지원 신청을 검토하고 있어요"))
         .andExpect(
             jsonPath("$.result.items[0].receiptNumber")
                 .value(String.format(java.util.Locale.ROOT, "%06d", applicationId)));
@@ -810,6 +811,266 @@ class ResidentProgressTest {
   }
 
   @Test
+  @org.springframework.transaction.annotation.Transactional
+  void homeReturnsExactTitleForEveryProgressStage() throws Exception {
+    var titles =
+        Map.ofEntries(
+            Map.entry("RISK_ASSESSMENT_IN_PROGRESS", "침수 취약도를 분석하고 있어요"),
+            Map.entry("RISK_ASSESSMENT_FAILED", "침수 취약도 분석을 완료하지 못했어요"),
+            Map.entry("RISK_ASSESSMENT_COMPLETED", "침수 취약도 분석이 완료됐어요"),
+            Map.entry("GUIDE_AVAILABLE", "침수 예방 가이드가 준비됐어요"),
+            Map.entry("GUIDE_IN_PROGRESS", "침수 예방 가이드를 확인하고 있어요"),
+            Map.entry("GUIDE_COMPLETED", "침수 예방 가이드 확인을 완료했어요"),
+            Map.entry("INSPECTION_FORM_EDITING", "현장점검 신청서를 작성하고 있어요"),
+            Map.entry("INSPECTION_DRAFT", "현장점검 신청 사진을 등록해 주세요"),
+            Map.entry("INSPECTION_RECEIVED", "현장점검 신청이 접수됐어요"),
+            Map.entry("VISIT_SCHEDULED", "현장점검 일정이 확정됐어요"),
+            Map.entry("INSPECTION_IN_PROGRESS", "현장점검이 진행 중이에요"),
+            Map.entry("INSPECTION_RESULT_PENDING", "현장점검이 끝나 결과를 준비하고 있어요"),
+            Map.entry("INSPECTION_RESULT_PUBLISHED", "현장점검 결과가 공개됐어요"),
+            Map.entry("SUPPORT_FORM_EDITING", "지원 신청서를 작성하고 있어요"),
+            Map.entry("SUPPORT_DRAFT", "임대인 동의서를 등록해 주세요"),
+            Map.entry("SUPPORT_REVIEW", "지원 신청을 검토하고 있어요"),
+            Map.entry("SUPPORT_APPROVED", "지원 신청이 승인됐어요"),
+            Map.entry("SUPPORT_REJECTED", "지원 신청이 반려됐어요"),
+            Map.entry("CONSTRUCTION_SCHEDULED", "시공 일정이 확정됐어요"),
+            Map.entry("CONSTRUCTION_IN_PROGRESS", "시공이 진행 중이에요"),
+            Map.entry("CONSTRUCTION_COMPLETED", "시공이 완료됐어요"));
+    var stages = new java.util.HashMap<Long, String>();
+    stages.put(assessmentId, "INSPECTION_RESULT_PUBLISHED");
+    for (String stage :
+        List.of(
+            "INSPECTION_FORM_EDITING",
+            "INSPECTION_DRAFT",
+            "INSPECTION_RECEIVED",
+            "VISIT_SCHEDULED",
+            "INSPECTION_IN_PROGRESS",
+            "INSPECTION_RESULT_PENDING",
+            "SUPPORT_FORM_EDITING",
+            "SUPPORT_DRAFT",
+            "SUPPORT_REVIEW",
+            "SUPPORT_APPROVED",
+            "SUPPORT_REJECTED",
+            "CONSTRUCTION_SCHEDULED",
+            "CONSTRUCTION_IN_PROGRESS",
+            "CONSTRUCTION_COMPLETED"))
+      stages.put(priorityFixture(stage, "2040-01-01 00:00:00"), stage);
+    for (var entry :
+        Map.of(
+                "PENDING",
+                "RISK_ASSESSMENT_IN_PROGRESS",
+                "FAILED",
+                "RISK_ASSESSMENT_FAILED",
+                "COMPLETED",
+                "RISK_ASSESSMENT_COMPLETED")
+            .entrySet()) {
+      jdbc.update(
+          "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status,result_json) VALUES(?,'주소','101호','LOW',?,'{}')",
+          userId,
+          entry.getKey());
+      stages.put(
+          jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class),
+          entry.getValue());
+    }
+    stages.put(guideFixture(null, "2040-01-01 00:00:00", null, null, false), "GUIDE_AVAILABLE");
+    stages.put(guideFixture(null, "2040-01-01 00:00:00", null, null, true), "GUIDE_IN_PROGRESS");
+    stages.put(
+        guideFixture("CONFIRMED", "2040-01-01 00:00:00", null, null, false), "GUIDE_COMPLETED");
+
+    var result =
+        mapper
+            .readTree(
+                mvc.perform(
+                        get("/api/resident/progress")
+                            .header("Authorization", "Bearer " + token)
+                            .param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .path("result");
+    assertThat(result.path("items").size()).isEqualTo(21);
+    assertThat(result.path("nextCursor").isNull()).isTrue();
+    var seen = new java.util.HashSet<String>();
+    for (var item : result.path("items")) {
+      String stage = item.path("currentStage").asText();
+      assertThat(stage).isEqualTo(stages.get(item.path("assessmentId").asLong()));
+      assertThat(item.path("title").asText()).as(stage).isEqualTo(titles.get(stage));
+      assertThat(seen.add(stage)).as(stage).isTrue();
+    }
+    assertThat(seen).containsExactlyInAnyOrderElementsOf(titles.keySet());
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void fourPrioritiesRemainOrderedAcrossCursorPagesWithoutDuplicateFlows() throws Exception {
+    jdbc.update("UPDATE inspection_results SET published_at='2035-01-01 00:00:00'");
+    var expected = new java.util.ArrayList<Long>();
+    var stages = new java.util.HashMap<Long, String>();
+    for (String stage :
+        List.of(
+            "SUPPORT_FORM_EDITING",
+            "INSPECTION_FORM_EDITING",
+            "INSPECTION_DRAFT",
+            "SUPPORT_DRAFT")) {
+      long id = priorityFixture(stage, "2020-01-01 00:00:00");
+      expected.add(id);
+      stages.put(id, stage);
+    }
+    java.util.Collections.reverse(expected);
+    var ongoing = new java.util.ArrayList<Long>();
+    for (String stage :
+        List.of("INSPECTION_IN_PROGRESS", "SUPPORT_REVIEW", "CONSTRUCTION_IN_PROGRESS")) {
+      long id = priorityFixture(stage, "2030-01-01 00:00:00");
+      ongoing.add(id);
+      stages.put(id, stage);
+    }
+    java.util.Collections.reverse(ongoing);
+    expected.addAll(ongoing);
+    var confirmation = new java.util.ArrayList<Long>();
+    for (String stage : List.of("VISIT_SCHEDULED", "SUPPORT_APPROVED", "CONSTRUCTION_SCHEDULED")) {
+      long id = priorityFixture(stage, "2040-01-01 00:00:00");
+      confirmation.add(id);
+      stages.put(id, stage);
+    }
+    long guide = guideFixture("CONFIRMED", "2040-01-01 00:00:00", null, null, false);
+    confirmation.add(guide);
+    stages.put(guide, "GUIDE_COMPLETED");
+    java.util.Collections.reverse(confirmation);
+    expected.addAll(confirmation);
+    expected.add(assessmentId); // Published inspection result is also a confirmation.
+    stages.put(assessmentId, "INSPECTION_RESULT_PUBLISHED");
+    var closed = new java.util.ArrayList<Long>();
+    for (String stage : List.of("SUPPORT_REJECTED", "CONSTRUCTION_COMPLETED")) {
+      long id = priorityFixture(stage, "2050-01-01 00:00:00");
+      closed.add(id);
+      stages.put(id, stage);
+    }
+    java.util.Collections.reverse(closed);
+    expected.addAll(closed);
+
+    var actual = new java.util.ArrayList<Long>();
+    String cursor = null;
+    do {
+      var request =
+          get("/api/resident/progress")
+              .header("Authorization", "Bearer " + token)
+              .param("size", "2");
+      if (cursor != null) request.param("cursor", cursor);
+      var result =
+          mapper
+              .readTree(
+                  mvc.perform(request)
+                      .andExpect(status().isOk())
+                      .andReturn()
+                      .getResponse()
+                      .getContentAsString())
+              .path("result");
+      for (var item : result.path("items")) {
+        long id = item.path("assessmentId").asLong();
+        actual.add(id);
+        assertThat(item.path("currentStage").asText()).isEqualTo(stages.get(id));
+      }
+      cursor = result.path("nextCursor").isNull() ? null : result.path("nextCursor").asText();
+    } while (cursor != null);
+    assertThat(actual).containsExactlyElementsOf(expected).doesNotHaveDuplicates();
+  }
+
+  private long priorityFixture(String stage, String changedAt) {
+    jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status,result_json) VALUES(?,'주소','101호','LOW','COMPLETED','{}')",
+        userId);
+    long assessment =
+        jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    if (stage.equals("INSPECTION_FORM_EDITING")) {
+      insertLegacyDraft(UUID.randomUUID().toString(), "INSPECTION", assessment, Map.of());
+      jdbc.update(
+          "UPDATE resident_form_drafts SET updated_at=? WHERE source_id=? AND draft_type='INSPECTION'",
+          changedAt,
+          assessment);
+      return assessment;
+    }
+    jdbc.update(
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status,created_at) VALUES('주민',?,?,?,'주소','101호',37.5,126.7,'010-1234-5678','OWNER','NO',FALSE,?,?)",
+        userId,
+        assessment,
+        "PRIORITY-" + assessment,
+        stage.equals("INSPECTION_DRAFT") ? "DRAFT" : "RECEIVED",
+        changedAt);
+    long app =
+        jdbc.queryForObject("SELECT MAX(application_id) FROM inspection_applications", Long.class);
+    if (stage.equals("INSPECTION_DRAFT")) return assessment;
+    if (stage.equals("INSPECTION_RECEIVED")) return assessment;
+    if (stage.equals("INSPECTION_RESULT_PENDING")) {
+      jdbc.update("INSERT INTO inspections(application_id,status) VALUES(?,'COMPLETED')", app);
+      return assessment;
+    }
+    if (stage.equals("SUPPORT_FORM_EDITING")) {
+      jdbc.update("INSERT INTO inspections(application_id,status) VALUES(?,'COMPLETED')", app);
+      long inspection =
+          jdbc.queryForObject("SELECT MAX(inspection_id) FROM inspections", Long.class);
+      jdbc.update(
+          "INSERT INTO inspection_results(inspection_id,result_status,summary,published_at) VALUES(?,'PUBLISHED','결과',?)",
+          inspection,
+          changedAt);
+      insertLegacyDraft(UUID.randomUUID().toString(), "SUPPORT", app, Map.of());
+      jdbc.update(
+          "UPDATE resident_form_drafts SET updated_at=? WHERE source_id=? AND draft_type='SUPPORT'",
+          changedAt,
+          app);
+      return assessment;
+    }
+    if (stage.equals("INSPECTION_IN_PROGRESS") || stage.equals("VISIT_SCHEDULED")) {
+      String status = stage.equals("VISIT_SCHEDULED") ? "SCHEDULED" : "IN_PROGRESS";
+      jdbc.update("INSERT INTO inspections(application_id,status) VALUES(?,?)", app, status);
+      long inspection =
+          jdbc.queryForObject("SELECT MAX(inspection_id) FROM inspections", Long.class);
+      jdbc.update(
+          "INSERT INTO inspection_status_histories(inspection_id,previous_status,status,change_source,changed_at) VALUES(?,'RECEIVED',?,'MANUAL',?)",
+          inspection,
+          status,
+          changedAt);
+      return assessment;
+    }
+    String status =
+        switch (stage) {
+          case "SUPPORT_DRAFT" -> "DRAFT";
+          case "SUPPORT_REVIEW" -> "SUBMITTED";
+          case "SUPPORT_REJECTED" -> "REJECTED";
+          default -> "APPROVED";
+        };
+    jdbc.update(
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,created_at,submitted_at,approved_at) VALUES(?,?,?,'물막이판','주민','010-1234-5678','주소','TENANT','2030-02-01','AFTERNOON',?,?,?,?)",
+        app,
+        programId,
+        userId,
+        status,
+        changedAt,
+        changedAt,
+        changedAt);
+    if (stage.startsWith("CONSTRUCTION_")) {
+      long support =
+          jdbc.queryForObject(
+              "SELECT MAX(support_application_id) FROM support_applications", Long.class);
+      String constructionStatus = stage.substring("CONSTRUCTION_".length());
+      jdbc.update(
+          "INSERT INTO constructions(support_application_id,status,created_at,updated_at) VALUES(?,?,?,?)",
+          support,
+          constructionStatus,
+          changedAt,
+          changedAt);
+      long construction =
+          jdbc.queryForObject("SELECT MAX(construction_id) FROM constructions", Long.class);
+      jdbc.update(
+          "INSERT INTO construction_status_histories(construction_id,status,change_source,changed_at) VALUES(?,?,'MANUAL',?)",
+          construction,
+          constructionStatus,
+          changedAt);
+    }
+    return assessment;
+  }
+
+  @Test
   void progressCursorPaginatesAllItemsWithoutDuplicatesAndDefaultsToTwenty() throws Exception {
     for (int i = 0; i < 22; i++) {
       jdbc.update(
@@ -859,6 +1120,162 @@ class ResidentProgressTest {
                 .header("Authorization", "Bearer " + token)
                 .param("size", "0"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void completedAssessmentWithoutGuideLinksToAssessmentWhileAvailableGuideLinksToGuide()
+      throws Exception {
+    jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status,result_json) VALUES(?,'주소','101호','LOW','COMPLETED','{}')",
+        userId);
+    long withoutGuide =
+        jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    long withGuide = guideFixture(null, "2040-01-01 00:00:00", null, null, false);
+    long guideId =
+        jdbc.queryForObject(
+            "SELECT guide_id FROM prevention_guides WHERE assessment_id=?", Long.class, withGuide);
+
+    var result =
+        mapper
+            .readTree(
+                mvc.perform(
+                        get("/api/resident/progress").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .path("result");
+    assertThat(result.has("nextCursor")).isTrue();
+    var found = new java.util.HashSet<Long>();
+    for (var item : result.path("items")) {
+      long id = item.path("assessmentId").asLong();
+      if (id == withoutGuide) {
+        found.add(id);
+        assertThat(item.path("currentStage").asText()).isEqualTo("RISK_ASSESSMENT_COMPLETED");
+        assertThat(item.path("nextAction").path("type").asText()).isEqualTo("VIEW_ASSESSMENT");
+        assertThat(item.path("nextAction").path("target").size()).isEqualTo(1);
+        assertThat(item.path("nextAction").path("target").path("assessmentId").asLong())
+            .isEqualTo(withoutGuide);
+      } else if (id == withGuide) {
+        found.add(id);
+        assertThat(item.path("currentStage").asText()).isEqualTo("GUIDE_AVAILABLE");
+        assertThat(item.path("nextAction").path("type").asText()).isEqualTo("VIEW_GUIDE");
+        assertThat(item.path("nextAction").path("target").size()).isEqualTo(1);
+        assertThat(item.path("nextAction").path("target").path("guideId").asLong())
+            .isEqualTo(guideId);
+      }
+    }
+    assertThat(found).containsExactlyInAnyOrder(withoutGuide, withGuide);
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void guideTimestampsFallBackWithoutInventingHistoryAndPaginateInOrder() throws Exception {
+    long completed =
+        guideFixture(
+            "CONFIRMED",
+            "2045-01-01 00:00:00",
+            "2044-01-01 00:00:00",
+            "2043-01-01 00:00:00",
+            false);
+    long completionProgress =
+        guideFixture("CONFIRMED", "2046-01-01 00:00:00", "2042-01-01 00:00:00", null, false);
+    long completionGenerated = guideFixture("CONFIRMED", "2041-01-01 00:00:00", null, null, false);
+    long inProgress = guideFixture(null, "2047-01-01 00:00:00", "2040-01-01 00:00:00", null, true);
+    long inProgressGenerated = guideFixture(null, "2039-01-01 00:00:00", null, null, true);
+    long tied = guideFixture("CONFIRMED", "2041-01-01 00:00:00", null, null, false);
+    long missing = guideFixture("CONFIRMED", null, null, null, false);
+
+    var rows = new java.util.ArrayList<Long>();
+    String cursor = null;
+    do {
+      var request =
+          get("/api/resident/progress")
+              .header("Authorization", "Bearer " + token)
+              .param("size", "2");
+      if (cursor != null) request.param("cursor", cursor);
+      var result =
+          mapper
+              .readTree(
+                  mvc.perform(request)
+                      .andExpect(status().isOk())
+                      .andReturn()
+                      .getResponse()
+                      .getContentAsString())
+              .path("result");
+      for (var item : result.path("items")) {
+        long id = item.path("assessmentId").asLong();
+        rows.add(id);
+        if (id == assessmentId) continue;
+        String expected =
+            id == completed
+                ? "2043-01-01T00:00:00+09:00"
+                : id == completionProgress
+                    ? "2042-01-01T00:00:00+09:00"
+                    : id == completionGenerated || id == tied
+                        ? "2041-01-01T00:00:00+09:00"
+                        : id == inProgress
+                            ? "2040-01-01T00:00:00+09:00"
+                            : id == inProgressGenerated ? "2039-01-01T00:00:00+09:00" : null;
+        if (expected == null) assertThat(item.path("updatedAt").isNull()).isTrue();
+        else
+          assertThat(item.path("updatedAt").asText()).as("assessment %s", id).isEqualTo(expected);
+        assertThat(item.path("currentStage").asText())
+            .isEqualTo(
+                id == inProgress || id == inProgressGenerated
+                    ? "GUIDE_IN_PROGRESS"
+                    : "GUIDE_COMPLETED");
+        var completionEvents = new java.util.ArrayList<String>();
+        for (var event : item.path("stageHistory")) {
+          if ("GUIDE_COMPLETED".equals(event.path("stage").asText()))
+            completionEvents.add(event.path("occurredAt").asText());
+        }
+        if (id == completed)
+          assertThat(completionEvents).containsExactly("2043-01-01T00:00:00+09:00");
+        else assertThat(completionEvents).isEmpty();
+      }
+      cursor = result.path("nextCursor").isNull() ? null : result.path("nextCursor").asText();
+    } while (cursor != null);
+    assertThat(rows)
+        .containsExactly(
+            inProgress,
+            inProgressGenerated,
+            completed,
+            completionProgress,
+            tied,
+            completionGenerated,
+            assessmentId,
+            missing)
+        .doesNotHaveDuplicates();
+  }
+
+  private long guideFixture(
+      String resolution,
+      String generated,
+      String progress,
+      String completed,
+      boolean addIncompleteItem) {
+    jdbc.update(
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status,result_json) VALUES(?,'주소','101호','LOW','COMPLETED','{}')",
+        userId);
+    long id = jdbc.queryForObject("SELECT MAX(assessment_id) FROM risk_assessments", Long.class);
+    jdbc.update(
+        "INSERT INTO prevention_guides(assessment_id,title,status,resolution,generated_at,progress_updated_at,completed_at) VALUES(?,'가이드','COMPLETED',?,?,?,?)",
+        id,
+        resolution,
+        generated == null ? null : java.sql.Timestamp.valueOf(generated),
+        progress == null ? null : java.sql.Timestamp.valueOf(progress),
+        completed == null ? null : java.sql.Timestamp.valueOf(completed));
+    if (addIncompleteItem) {
+      long guideId =
+          jdbc.queryForObject(
+              "SELECT guide_id FROM prevention_guides WHERE assessment_id=?", Long.class, id);
+      jdbc.update(
+          "INSERT INTO prevention_guide_items(guide_id,item_order,completed,progress_recorded) VALUES(?,1,FALSE,TRUE)",
+          guideId);
+    }
+    return id;
   }
 
   @Test
@@ -1497,6 +1914,136 @@ class ResidentProgressTest {
   }
 
   @Test
+  void swaggerDocumentsSixResidentApisWithIndependentExamples() throws Exception {
+    var doc =
+        mapper.readTree(
+            mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    var paths = doc.path("paths");
+    for (var route :
+        new String[][] {
+          {"/api/resident/progress", "get"},
+          {"/api/resident/risk-assessments/{assessmentId}", "get"},
+          {"/api/resident/applications/drafts", "get"},
+          {"/api/resident/application-form-drafts/{draftId}", "put"},
+          {"/api/resident/support-applications/drafts", "get"},
+          {"/api/resident/support-form-drafts/{draftId}", "put"}
+        }) {
+      var responses = paths.path(route[0]).path(route[1]).path("responses");
+      var success = responses.path("200").path("content");
+      assertThat(success.has("*/*")).as(route[0]).isFalse();
+      var example = success.path("application/json").path("examples").path("success").path("value");
+      assertThat(example.path("status").asInt()).as(route[0]).isEqualTo(200);
+      assertThat(example.path("code").asText()).as(route[0]).isEqualTo("COMMON_200");
+      assertThat(example.path("result").isObject()).as(route[0]).isTrue();
+      assertThat(
+              responses
+                  .path("401")
+                  .path("content")
+                  .path("application/json")
+                  .path("examples")
+                  .size())
+          .isEqualTo(2);
+      assertThat(
+              responses
+                  .path("404")
+                  .path("content")
+                  .path("application/json")
+                  .path("examples")
+                  .path("notFound")
+                  .path("value")
+                  .path("code")
+                  .asText())
+          .isEqualTo("FORM_DRAFT_404_1");
+      assertThat(
+              responses
+                  .path("500")
+                  .path("content")
+                  .path("application/json")
+                  .path("examples")
+                  .path("serverError")
+                  .path("value")
+                  .path("code")
+                  .asText())
+          .isEqualTo("COMMON_500_1");
+      assertThat(responses.has("403")).isFalse();
+    }
+    for (String name : List.of("SaveRequest", "Draft")) {
+      var fields =
+          doc.path("components").path("schemas").path(name).path("properties").path("fields");
+      assertThat(fields.path("type").asText()).isEqualTo("object");
+      assertThat(fields.path("additionalProperties").asBoolean()).isTrue();
+      assertThat(fields.has("$ref")).isFalse();
+      assertThat(fields.path("properties").isMissingNode()).isTrue();
+    }
+    for (String route :
+        List.of(
+            "/api/resident/application-form-drafts/{draftId}",
+            "/api/resident/support-form-drafts/{draftId}")) {
+      var operation = paths.path(route).path("put");
+      var request =
+          operation.path("requestBody").path("content").path("application/json").path("examples");
+      assertThat(request.path("create").path("value").path("fields").isObject()).isTrue();
+      assertThat(request.path("create").path("value").path("version").isNull()).isTrue();
+      assertThat(request.path("update").path("value").path("version").asInt()).isEqualTo(1);
+      var errors =
+          operation
+              .path("responses")
+              .path("409")
+              .path("content")
+              .path("application/json")
+              .path("examples");
+      assertThat(errors.size()).isEqualTo(4);
+      assertThat(errors.path("versionConflict").path("value").path("code").asText())
+          .isEqualTo("FORM_DRAFT_409_1");
+      assertThat(errors.path("editingFormExists").path("value").path("code").asText())
+          .isEqualTo("FORM_DRAFT_409_6");
+    }
+    var inspection =
+        paths.path("/api/resident/application-form-drafts/{draftId}").path("put").path("responses");
+    var support =
+        paths.path("/api/resident/support-form-drafts/{draftId}").path("put").path("responses");
+    assertThat(
+            inspection
+                .path("409")
+                .path("content")
+                .path("application/json")
+                .path("examples")
+                .has("supportExists"))
+        .isFalse();
+    assertThat(
+            support
+                .path("409")
+                .path("content")
+                .path("application/json")
+                .path("examples")
+                .has("inspectionExists"))
+        .isFalse();
+    assertThat(
+            support
+                .path("400")
+                .path("content")
+                .path("application/json")
+                .path("examples")
+                .path("resultNotPublished")
+                .path("value")
+                .path("code")
+                .asText())
+        .isEqualTo("SUPPORT_400_2");
+    assertThat(
+            inspection
+                .path("400")
+                .path("content")
+                .path("application/json")
+                .path("examples")
+                .has("resultNotPublished"))
+        .isFalse();
+  }
+
+  @Test
   void rejectsAnotherUserAndStaleDraftUpdates() throws Exception {
     String id = UUID.randomUUID().toString();
     String initial =
@@ -1628,6 +2175,27 @@ class ResidentProgressTest {
             jdbc.queryForObject(
                 "SELECT form_state FROM resident_form_drafts WHERE draft_id=?", String.class, id))
         .isEqualTo("COMPLETED");
+    var progressAfterPhoto =
+        mapper
+            .readTree(
+                mvc.perform(
+                        get("/api/resident/progress").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .path("result")
+            .path("items");
+    assertThat(progressAfterPhoto.size()).isEqualTo(2);
+    int matches = 0;
+    for (var item : progressAfterPhoto) {
+      if (item.path("assessmentId").asLong() == other) {
+        matches++;
+        assertThat(item.path("currentStage").asText()).isEqualTo("INSPECTION_RECEIVED");
+        assertThat(item.path("relatedIds").path("inspectionFormDraftId").isNull()).isTrue();
+      }
+    }
+    assertThat(matches).isEqualTo(1);
     if (useHeader) {
       mvc.perform(create)
           .andExpect(status().isCreated())
@@ -1754,8 +2322,22 @@ class ResidentProgressTest {
             jdbc.queryForObject(
                 "SELECT form_state FROM resident_form_drafts WHERE draft_id=?", String.class, id))
         .isEqualTo("COMPLETED");
+    mvc.perform(get("/api/resident/progress").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.items.length()").value(1))
+        .andExpect(jsonPath("$.result.items[0].currentStage").value("SUPPORT_REVIEW"))
+        .andExpect(jsonPath("$.result.items[0].nextAction.type").value("VIEW_SUPPORT_PROGRESS"))
+        .andExpect(
+            jsonPath("$.result.items[0].relatedIds.supportFormDraftId")
+                .value(org.hamcrest.Matchers.nullValue()));
     mvc.perform(create)
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.result.supportApplicationId").value(supportId));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM support_applications WHERE application_id=?",
+                Integer.class,
+                applicationId))
+        .isEqualTo(1);
   }
 }

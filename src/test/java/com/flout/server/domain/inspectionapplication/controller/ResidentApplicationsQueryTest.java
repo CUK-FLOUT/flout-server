@@ -92,7 +92,7 @@ class ResidentApplicationsQueryTest {
         "INSERT INTO support_programs(name,created_at) VALUES('물막이판 지원',CURRENT_TIMESTAMP)");
     long program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status,support_scope) VALUES(?,?,?,'출입구 물막이판','김주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER','2030-02-01','AFTERNOON','APPROVED',CURRENT_TIMESTAMP,'NOT_REQUIRED','출입구 물막이판 설치')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,support_scope) VALUES(?,?,?,'출입구 물막이판','김주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER','2030-02-01','AFTERNOON','APPROVED',CURRENT_TIMESTAMP,'출입구 물막이판 설치')",
         applicationId,
         program,
         residentId);
@@ -146,7 +146,7 @@ class ResidentApplicationsQueryTest {
     jdbc.update("INSERT INTO support_programs(name,created_at) VALUES('추가 지원',CURRENT_TIMESTAMP)");
     long program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,approved_at,landlord_consent_status,support_scope,rejection_reason) VALUES(?,?,?,'물막이판','김주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER','2030-02-01','AFTERNOON',?,?,'2030-01-05 10:00:00','NOT_REQUIRED','승인 범위','미승인 사유')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,approved_at,support_scope,rejection_reason) VALUES(?,?,?,'물막이판','김주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER','2030-02-01','AFTERNOON',?,?,'2030-01-05 10:00:00','승인 범위','미승인 사유')",
         applicationId,
         program,
         residentId,

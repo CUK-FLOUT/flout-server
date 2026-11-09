@@ -6,7 +6,6 @@ import com.flout.server.domain.construction.repository.ConstructionPhotoReposito
 import com.flout.server.domain.construction.repository.ConstructionRepository;
 import com.flout.server.domain.construction.response.code.ConstructionErrorCode;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
-import com.flout.server.domain.supportapplication.entity.LandlordConsentStatus;
 import com.flout.server.domain.supportapplication.service.SupportDecisionAccess;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
@@ -46,7 +45,6 @@ public class AdminConstructionDetailService {
     var source = support.getApplication();
     var scheduledAt = construction.getScheduledAt();
     var manager = construction.getManager();
-    var consent = support.getLandlordConsentStatus();
     boolean published = construction.getStatus() == ConstructionStatus.COMPLETED;
     return new AdminConstructionDetailResponse(
         construction.getId(),
@@ -55,7 +53,6 @@ public class AdminConstructionDetailService {
         String.format(Locale.ROOT, "%06d", source.getId()),
         support.getApplicantName(),
         support.getStatus(),
-        consent == LandlordConsentStatus.CONFIRMED ? "VERIFIED" : consent.name(),
         support.getRequestedFacility(),
         support.getSupportScope(),
         support.getPreferredVisitDate(),

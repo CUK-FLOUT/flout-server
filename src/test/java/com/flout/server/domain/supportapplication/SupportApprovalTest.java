@@ -102,7 +102,7 @@ class SupportApprovalTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP)",
         source,
         program,
         residentId);
@@ -193,12 +193,9 @@ class SupportApprovalTest {
         .isEqualTo(supportId);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"CONFIRMED", "PENDING", "NOT_REQUIRED"})
-  void tenantRequiresDocumentRegardlessOfConfirmation(String consent) throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET occupancy_type='TENANT',landlord_consent_status=?",
-        consent);
+  @Test
+  void tenantRequiresDocument() throws Exception {
+    jdbc.update("UPDATE support_applications SET occupancy_type='TENANT'");
     send(supportId, body(), token)
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SUPPORT_APPROVAL_400_1"));
@@ -207,15 +204,13 @@ class SupportApprovalTest {
 
   @Test
   void approvesEtcWithoutDocument() throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET occupancy_type='ETC',landlord_consent_status='CONFIRMED'");
+    jdbc.update("UPDATE support_applications SET occupancy_type='ETC'");
     send(supportId, body(), token).andExpect(status().isOk());
   }
 
   @Test
   void documentAllowsApprovalWithoutConsentConfirmation() throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET occupancy_type='TENANT',landlord_consent_status='PENDING'");
+    jdbc.update("UPDATE support_applications SET occupancy_type='TENANT'");
     jdbc.update(
         "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'LANDLORD_CONSENT','isolated-fixture/no-s3-object','fixture.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
         supportId);

@@ -2,6 +2,7 @@ package com.flout.server.domain.residentprogress;
 
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,8 @@ public class ResidentFormDraftController {
   @Operation(
       tags = "주민-현장점검 신청",
       summary = "현장점검 신청서 임시 저장 목록 조회",
-      description = "실제 신청과 중복되는 미연결 폼 및 같은 분석의 중복 폼을 제외하고 조회합니다.")
+      description =
+          "로그인한 주민의 작성 중 또는 연결된 현장점검 신청서 폼을 최근 수정순으로 조회합니다. 완료된 폼과 실제 신청에 중복되는 미연결 폼, 같은 분석의 중복 폼은 제외합니다.")
   public SuccessResponse<DraftList> inspectionDrafts(@AuthenticationPrincipal Jwt jwt) {
     return SuccessResponse.ok(
         new DraftList(drafts.list(Long.valueOf(jwt.getSubject()), "INSPECTION")));
@@ -35,7 +37,12 @@ public class ResidentFormDraftController {
           "클라이언트가 생성한 UUID로 최초 저장합니다. 기존 신청 또는 작성 중인 폼이 있으면 신규 생성은 409입니다. 기존 폼 갱신은 마지막 version을 전달합니다.")
   public SuccessResponse<FormDraftService.Draft> saveInspection(
       @AuthenticationPrincipal Jwt jwt,
-      @PathVariable UUID draftId,
+      @Parameter(
+              description = "클라이언트가 생성한 임시저장 UUID",
+              required = true,
+              example = "d3b07384-d9a4-4f18-9b2b-80d1bcf67b29")
+          @PathVariable
+          UUID draftId,
       @RequestBody FormDraftService.SaveRequest request) {
     return SuccessResponse.ok(
         drafts.save(Long.valueOf(jwt.getSubject()), "INSPECTION", draftId, request));
@@ -45,7 +52,8 @@ public class ResidentFormDraftController {
   @Operation(
       tags = "주민-지원신청",
       summary = "지원 신청서 임시 저장 목록 조회",
-      description = "실제 지원 신청과 중복되는 미연결 폼 및 같은 현장점검 신청의 중복 폼을 제외하고 조회합니다.")
+      description =
+          "로그인한 주민의 작성 중 또는 연결된 지원 신청서 폼을 최근 수정순으로 조회합니다. 완료된 폼과 실제 신청에 중복되는 미연결 폼, 같은 현장점검 신청의 중복 폼은 제외합니다.")
   public SuccessResponse<DraftList> supportDrafts(@AuthenticationPrincipal Jwt jwt) {
     return SuccessResponse.ok(
         new DraftList(drafts.list(Long.valueOf(jwt.getSubject()), "SUPPORT")));
@@ -59,7 +67,12 @@ public class ResidentFormDraftController {
           "클라이언트가 생성한 UUID로 최초 저장합니다. 신규 저장은 공개된 현장점검 결과가 필요하며, 기존 지원 신청 또는 작성 중인 폼이 있으면 409입니다. 기존 폼 갱신은 마지막 version을 전달합니다.")
   public SuccessResponse<FormDraftService.Draft> saveSupport(
       @AuthenticationPrincipal Jwt jwt,
-      @PathVariable UUID draftId,
+      @Parameter(
+              description = "클라이언트가 생성한 임시저장 UUID",
+              required = true,
+              example = "d3b07384-d9a4-4f18-9b2b-80d1bcf67b29")
+          @PathVariable
+          UUID draftId,
       @RequestBody FormDraftService.SaveRequest request) {
     return SuccessResponse.ok(
         drafts.save(Long.valueOf(jwt.getSubject()), "SUPPORT", draftId, request));

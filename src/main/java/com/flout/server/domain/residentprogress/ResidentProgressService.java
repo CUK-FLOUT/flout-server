@@ -1,6 +1,5 @@
 package com.flout.server.domain.residentprogress;
 
-import com.flout.server.domain.inspectionapplication.service.ResidentApplicationProgressReader;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.flout.server.global.exception.BaseException;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,49 +21,53 @@ public class ResidentProgressService {
   private final RiskAssessmentRepository assessments;
   private final ObjectMapper mapper;
 
-  public record Action(String type, Map<String, Object> target) {}
+  public record Action(
+      @Schema(description = "주민이 수행할 다음 행동 유형") String type,
+      @Schema(description = "행동에 필요한 대상 ID") Map<String, Object> target) {}
 
-  public record HistoryEvent(String stage, java.time.OffsetDateTime occurredAt) {}
+  public record HistoryEvent(
+      @Schema(description = "실제로 기록된 진행 단계") String stage,
+      @Schema(description = "단계 발생 시각, KST") java.time.OffsetDateTime occurredAt) {}
 
   public record RelatedIds(
-      Long guideId,
-      Long applicationId,
-      Long inspectionId,
-      Long supportApplicationId,
-      Long constructionId,
-      String inspectionFormDraftId,
-      String supportFormDraftId) {}
+      @Schema(description = "연결된 가이드 ID", nullable = true) Long guideId,
+      @Schema(description = "현장점검 신청 ID", nullable = true) Long applicationId,
+      @Schema(description = "점검 ID", nullable = true) Long inspectionId,
+      @Schema(description = "지원 신청 ID", nullable = true) Long supportApplicationId,
+      @Schema(description = "시공 ID", nullable = true) Long constructionId,
+      @Schema(description = "작성 중인 현장점검 폼 UUID", nullable = true) String inspectionFormDraftId,
+      @Schema(description = "작성 중인 지원 폼 UUID", nullable = true) String supportFormDraftId) {}
 
   public record Flow(
-      Long assessmentId,
+      @Schema(description = "취약도 분석 ID") Long assessmentId,
       @Schema(description = "신청 종류: RISK_ASSESSMENT, INSPECTION, SUPPORT") String applicationType,
       @Schema(description = "내 신청과 같은 현장점검 신청 ID 기반 6자리 표시 번호. 입력 중인 폼은 null", nullable = true)
           String receiptNumber,
       @Schema(description = "홈 카드 제목") String title,
-      String address,
-      String detailAddress,
-      String riskLevel,
-      String currentStage,
-      Action nextAction,
-      RelatedIds relatedIds,
-      List<HistoryEvent> stageHistory,
-      boolean closed,
-      java.time.OffsetDateTime updatedAt) {}
+      @Schema(description = "분석 주소") String address,
+      @Schema(description = "상세 주소", nullable = true) String detailAddress,
+      @Schema(description = "분석 위험 등급") String riskLevel,
+      @Schema(description = "현재 진행 단계") String currentStage,
+      @Schema(description = "화면에서 안내할 다음 행동") Action nextAction,
+      @Schema(description = "진행 과정의 연결 ID. 없는 ID는 null") RelatedIds relatedIds,
+      @Schema(description = "실제로 기록된 단계 이력의 시간순 목록") List<HistoryEvent> stageHistory,
+      @Schema(description = "종료된 진행 항목이면 true") boolean closed,
+      @Schema(description = "최근 변경 시각, KST", nullable = true) java.time.OffsetDateTime updatedAt) {}
 
   public record Progress(
-      List<Flow> items,
+      @Schema(description = "행동 필요·진행 중·일정 및 결과 확인·종료 순의 진행 항목") List<Flow> items,
       @Schema(description = "다음 페이지 커서. 마지막 페이지에서는 null", nullable = true) String nextCursor) {}
 
   public record AssessmentDetail(
-      Long assessmentId,
-      String address,
-      String detailAddress,
-      String status,
-      String riskLevel,
-      java.time.OffsetDateTime analyzedAt,
-      Long guideId,
-      Long applicationId,
-      JsonNode result) {}
+      @Schema(description = "취약도 분석 ID") Long assessmentId,
+      @Schema(description = "분석 주소") String address,
+      @Schema(description = "상세 주소", nullable = true) String detailAddress,
+      @Schema(description = "분석 상태") String status,
+      @Schema(description = "분석 위험 등급") String riskLevel,
+      @Schema(description = "분석 생성 시각, KST") java.time.OffsetDateTime analyzedAt,
+      @Schema(description = "연결된 가이드 ID", nullable = true) Long guideId,
+      @Schema(description = "연결된 현장점검 신청 ID", nullable = true) Long applicationId,
+      @Schema(description = "저장된 분석 결과 JSON. 없으면 null", nullable = true) JsonNode result) {}
 
   private record Ranked(Flow flow, int rank) {}
 
@@ -86,7 +89,7 @@ public class ResidentProgressService {
       if (parts.length != 3) throw new IllegalArgumentException();
       int rank = Integer.parseInt(parts[0]);
       long id = Long.parseLong(parts[2]);
-      if (rank < 0 || rank > 2 || id <= 0) throw new IllegalArgumentException();
+      if (rank < 0 || rank > 3 || id <= 0) throw new IllegalArgumentException();
       return new Cursor(
           rank, parts[1].isEmpty() ? null : java.time.OffsetDateTime.parse(parts[1]), id);
     } catch (IllegalArgumentException | java.time.DateTimeException ex) {
@@ -222,7 +225,7 @@ public class ResidentProgressService {
       action = "VIEW_CONSTRUCTION_SCHEDULE";
       targetKey = "constructionId";
       target = constructionId;
-      rank = 1;
+      rank = 2;
     } else if (support != null) {
       targetKey = "supportApplicationId";
       target = supportId;
@@ -240,7 +243,7 @@ public class ResidentProgressService {
         case "APPROVED" -> {
           stage = "SUPPORT_APPROVED";
           action = "VIEW_CONSTRUCTION_SCHEDULE";
-          rank = 1;
+          rank = 2;
         }
         case "REJECTED" -> {
           stage = "SUPPORT_REJECTED";
@@ -279,7 +282,7 @@ public class ResidentProgressService {
       action = "VIEW_VISIT_SCHEDULE";
       targetKey = "applicationId";
       target = applicationId;
-      rank = 1;
+      rank = 2;
     } else if (app != null && "DRAFT".equals(str(app, "status"))) {
       stage = "INSPECTION_DRAFT";
       action = "UPLOAD_INSPECTION_PHOTO";
@@ -327,10 +330,10 @@ public class ResidentProgressService {
       action = done ? "CONSIDER_INSPECTION" : "VIEW_GUIDE";
       targetKey = done ? "assessmentId" : "guideId";
       target = done ? assessmentId : guideId;
-      rank = 2;
+      rank = "GUIDE_IN_PROGRESS".equals(stage) ? 1 : 2;
     } else {
       stage = "RISK_ASSESSMENT_COMPLETED";
-      action = "VIEW_GUIDE";
+      action = "VIEW_ASSESSMENT";
       targetKey = "assessmentId";
       target = assessmentId;
       rank = 2;
@@ -349,8 +352,9 @@ public class ResidentProgressService {
           case "INSPECTION_RECEIVED" -> receivedAt(app);
           case "INSPECTION_DRAFT" -> time(app, "created_at");
           case "INSPECTION_FORM_EDITING" -> time(inspectionDraft, "updated_at");
-          case "GUIDE_COMPLETED" -> time(guide, "completed_at");
-          case "GUIDE_IN_PROGRESS" -> time(guide, "progress_updated_at");
+          case "GUIDE_COMPLETED" ->
+              firstTime(guide, "completed_at", "progress_updated_at", "generated_at");
+          case "GUIDE_IN_PROGRESS" -> firstTime(guide, "progress_updated_at", "generated_at");
           case "GUIDE_AVAILABLE" -> time(guide, "generated_at");
           default -> time(a, "created_at");
         };
@@ -363,21 +367,12 @@ public class ResidentProgressService {
         app == null || stage.endsWith("FORM_EDITING")
             ? null
             : String.format(Locale.ROOT, "%06d", applicationId);
-    String title =
-        "SUPPORT_FORM_EDITING".equals(stage)
-            ? "지원 · 신청서 작성"
-            : app == null
-                ? (inspectionDraft != null ? "현장점검 · 신청서 작성" : "침수 취약도 분석")
-                : ResidentApplicationProgressReader.title(
-                    str(support, "requested_facility"),
-                    published != null,
-                    construction != null && !"PENDING".equals(str(construction, "status")));
     return new Ranked(
         new Flow(
             assessmentId,
             applicationType,
             receiptNumber,
-            title,
+            homeTitle(stage),
             str(a, "address"),
             str(a, "detail_address"),
             str(a, "risk_level"),
@@ -394,7 +389,34 @@ public class ResidentProgressService {
             stageHistory(a, guide, app, inspection, published, support, construction),
             closed,
             updated == null ? null : updated.atOffset(java.time.ZoneOffset.ofHours(9))),
-        rank == 3 ? 2 : Math.min(rank, 1));
+        rank);
+  }
+
+  private String homeTitle(String stage) {
+    return switch (stage) {
+      case "RISK_ASSESSMENT_IN_PROGRESS" -> "침수 취약도를 분석하고 있어요";
+      case "RISK_ASSESSMENT_FAILED" -> "침수 취약도 분석을 완료하지 못했어요";
+      case "RISK_ASSESSMENT_COMPLETED" -> "침수 취약도 분석이 완료됐어요";
+      case "GUIDE_AVAILABLE" -> "침수 예방 가이드가 준비됐어요";
+      case "GUIDE_IN_PROGRESS" -> "침수 예방 가이드를 확인하고 있어요";
+      case "GUIDE_COMPLETED" -> "침수 예방 가이드 확인을 완료했어요";
+      case "INSPECTION_FORM_EDITING" -> "현장점검 신청서를 작성하고 있어요";
+      case "INSPECTION_DRAFT" -> "현장점검 신청 사진을 등록해 주세요";
+      case "INSPECTION_RECEIVED" -> "현장점검 신청이 접수됐어요";
+      case "VISIT_SCHEDULED" -> "현장점검 일정이 확정됐어요";
+      case "INSPECTION_IN_PROGRESS" -> "현장점검이 진행 중이에요";
+      case "INSPECTION_RESULT_PENDING" -> "현장점검이 끝나 결과를 준비하고 있어요";
+      case "INSPECTION_RESULT_PUBLISHED" -> "현장점검 결과가 공개됐어요";
+      case "SUPPORT_FORM_EDITING" -> "지원 신청서를 작성하고 있어요";
+      case "SUPPORT_DRAFT" -> "임대인 동의서를 등록해 주세요";
+      case "SUPPORT_REVIEW" -> "지원 신청을 검토하고 있어요";
+      case "SUPPORT_APPROVED" -> "지원 신청이 승인됐어요";
+      case "SUPPORT_REJECTED" -> "지원 신청이 반려됐어요";
+      case "CONSTRUCTION_SCHEDULED" -> "시공 일정이 확정됐어요";
+      case "CONSTRUCTION_IN_PROGRESS" -> "시공이 진행 중이에요";
+      case "CONSTRUCTION_COMPLETED" -> "시공이 완료됐어요";
+      default -> throw new IllegalStateException("Unexpected resident progress stage: " + stage);
+    };
   }
 
   private List<HistoryEvent> stageHistory(
@@ -495,5 +517,13 @@ public class ResidentProgressService {
     if (row == null || row.get(key) == null) return null;
     Object value = row.get(key);
     return value instanceof java.sql.Timestamp t ? t.toLocalDateTime() : (LocalDateTime) value;
+  }
+
+  private LocalDateTime firstTime(Map<String, Object> row, String... keys) {
+    for (var key : keys) {
+      var value = time(row, key);
+      if (value != null) return value;
+    }
+    return null;
   }
 }

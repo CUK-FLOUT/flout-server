@@ -98,7 +98,7 @@ class AdminConstructionListTest {
     long programId =
         jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status,support_scope) VALUES(?,?,?,'출입구 물막이판',?,'010-1234-5678',?,'OWNER','2030-02-01','MORNING','APPROVED',CURRENT_TIMESTAMP,'NOT_REQUIRED','물막이판 설치')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,support_scope) VALUES(?,?,?,'출입구 물막이판',?,'010-1234-5678',?,'OWNER','2030-02-01','MORNING','APPROVED',CURRENT_TIMESTAMP,'물막이판 설치')",
         applicationId,
         programId,
         residentId,

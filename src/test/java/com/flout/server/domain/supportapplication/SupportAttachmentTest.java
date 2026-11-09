@@ -258,12 +258,6 @@ class SupportAttachmentTest {
     assertThat(updatedApplication.remove("STATUS")).isEqualTo("SUBMITTED");
     assertThat(updatedApplication.remove("SUBMITTED_AT")).isNotNull();
     assertThat(updatedApplication).isEqualTo(previousApplication);
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=?",
-                String.class,
-                support))
-        .isEqualTo("PENDING");
     verify(storage, never()).readUrl(anyString());
   }
 
@@ -410,12 +404,6 @@ class SupportAttachmentTest {
         .enqueue(
             new PushNotificationRequested(
                 uid, NotificationType.SUPPORT_RECEIVED, app, "support-received:" + ownerSupport));
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT landlord_consent_status FROM support_applications WHERE support_application_id=?",
-                String.class,
-                ownerSupport))
-        .isEqualTo("NOT_REQUIRED");
     var operator =
         users.saveAndFlush(User.resident("proof-admin@example.test", "unused-test-hash", "검증운영자"));
     jdbc.update(

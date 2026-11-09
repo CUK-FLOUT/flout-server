@@ -69,7 +69,6 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       WHERE s.status <> 'DRAFT' AND REGEXP_LIKE(TRIM(s.address), :addressPattern)
         AND REGEXP_LIKE(TRIM(s.address), :districtPattern)
         AND (:status = '' OR CONCAT('', s.status) = :status OR (:status = 'REVIEWING' AND s.status = 'SUBMITTED'))
-        AND (:consent = '' OR s.landlord_consent_status = :consent)
         AND (:keyword = '' OR LOCATE(:keyword, s.applicant_name) > 0
           OR LOCATE(:keyword, LPAD(CONCAT('', s.application_id),
             GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0')) > 0)
@@ -81,7 +80,8 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       SELECT s.support_application_id AS supportApplicationId,
         LPAD(CONCAT('', s.application_id), GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0') AS receiptNo,
         s.applicant_name AS applicantName, s.requested_facility AS requestedFacility,
-        s.landlord_consent_status AS landlordConsentStatus, s.status AS status
+        (s.occupancy_type = 'TENANT') AS landlordConsentRequired,
+        EXISTS (SELECT 1 FROM support_attachments a WHERE a.support_application_id = s.support_application_id AND a.attachment_type = 'LANDLORD_CONSENT') AS landlordConsentDocumentSubmitted, s.status AS status
       """
               + ADMIN_SEARCH_FILTER
               + " ORDER BY s.support_application_id DESC LIMIT :limit OFFSET :offset",
@@ -91,7 +91,6 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       @org.springframework.data.repository.query.Param("keyword") String keyword,
       @org.springframework.data.repository.query.Param("districtPattern") String districtPattern,
       @org.springframework.data.repository.query.Param("status") String status,
-      @org.springframework.data.repository.query.Param("consent") String consent,
       @org.springframework.data.repository.query.Param("limit") int limit,
       @org.springframework.data.repository.query.Param("offset") long offset);
 
@@ -102,8 +101,7 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
       @org.springframework.data.repository.query.Param("addressPattern") String addressPattern,
       @org.springframework.data.repository.query.Param("keyword") String keyword,
       @org.springframework.data.repository.query.Param("districtPattern") String districtPattern,
-      @org.springframework.data.repository.query.Param("status") String status,
-      @org.springframework.data.repository.query.Param("consent") String consent);
+      @org.springframework.data.repository.query.Param("status") String status);
 
   interface AdminListItem {
     Long getSupportApplicationId();
@@ -114,7 +112,9 @@ public interface SupportApplicationRepository extends JpaRepository<SupportAppli
 
     String getRequestedFacility();
 
-    String getLandlordConsentStatus();
+    boolean getLandlordConsentRequired();
+
+    boolean getLandlordConsentDocumentSubmitted();
 
     String getStatus();
   }

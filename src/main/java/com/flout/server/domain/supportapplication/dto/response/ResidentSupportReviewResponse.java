@@ -19,6 +19,4 @@ public record ResidentSupportReviewResponse(
     String requestedFacility,
     OccupancyType occupancyType,
     @Schema(description = "설치 희망 방문일. 확정 시공 일정이 아닙니다.") LocalDate preferredConstructionDate,
-    PreferredTimeSlot preferredTimeSlot,
-    @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"})
-        String landlordConsentStatus) {}
+    PreferredTimeSlot preferredTimeSlot) {}

@@ -1,0 +1,1 @@
+ALTER TABLE support_applications DROP COLUMN landlord_consent_status;
