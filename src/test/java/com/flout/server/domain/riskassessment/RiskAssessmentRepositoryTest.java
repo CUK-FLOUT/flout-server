@@ -76,7 +76,7 @@ class RiskAssessmentRepositoryTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(
                 """
-                {"address":"경기도 부천시 원미구 지봉로 43","detailAddress":"101호"}
+                {"address":"경기도 부천시 원미구 지봉로 43","detailAddress":"101호","housingType":"SEMI_BASEMENT"}
                 """);
     mvc.perform(request).andExpect(status().isUnauthorized());
     assertThat(riskAssessments.count()).isZero();
@@ -102,6 +102,7 @@ class RiskAssessmentRepositoryTest {
     assertThat(assessment.getAddress()).isEqualTo("경기도 부천시 원미구 지봉로 43");
     assertThat(assessment.getDetailAddress()).isEqualTo("101호");
     assertThat(assessment.getRiskLevel()).isEqualTo(RiskLevel.HIGH);
+    assertThat(assessment.getHousingType().name()).isEqualTo("SEMI_BASEMENT");
     assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.COMPLETED);
     assertThat(assessment.getResultJson())
         .contains("REGIONAL_RELATIVE_VULNERABILITY", "r605c713", "0.2841", "floodRecord");

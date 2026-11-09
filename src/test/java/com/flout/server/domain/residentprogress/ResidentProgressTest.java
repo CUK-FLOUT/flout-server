@@ -1479,6 +1479,36 @@ class ResidentProgressTest {
   }
 
   @Test
+  void assessmentDetailReturnsPersistedHousingTypeAndDocumentsItInOpenApi() throws Exception {
+    jdbc.update(
+        "UPDATE risk_assessments SET housing_type='SECOND_FLOOR_OR_ABOVE' WHERE assessment_id=?",
+        assessmentId);
+
+    mvc.perform(
+            get("/api/resident/risk-assessments/{id}", assessmentId)
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.housingType").value("SECOND_FLOOR_OR_ABOVE"));
+
+    var openApi =
+        mapper.readTree(
+            mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    var housingTypeSchema =
+        openApi
+            .path("components")
+            .path("schemas")
+            .path("AssessmentDetail")
+            .path("properties")
+            .path("housingType");
+    assertThat(housingTypeSchema.toString())
+        .containsAnyOf("\"type\":\"null\"", "\"type\":[\"string\",\"null\"]");
+  }
+
+  @Test
   void prioritizesDirectActionAndKeepsOtherActiveFlowsSeparateFromClosed() throws Exception {
     jdbc.update(
         "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status,result_json) VALUES(?,'부천시 소사구','202호','CAUTION','COMPLETED','{}')",
