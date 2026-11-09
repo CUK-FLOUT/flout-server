@@ -18,8 +18,11 @@ public class PublicIssueRelatedApplicationService {
   public RelatedApplicationsResponse getRelated(Long operatorId, Long publicIssueId) {
     var issue = access.read(operatorId, publicIssueId);
 
+    String normalizedAddress =
+        issue.getAddress().strip().replaceAll("\\s+", " ").replaceFirst("^경기 ", "경기도 ");
+
     var items =
-        applications.findRelatedByAddress(issue.getAddress()).stream()
+        applications.findRelatedByNormalizedAddress(normalizedAddress).stream()
             .map(
                 app ->
                     new ApplicationItem(

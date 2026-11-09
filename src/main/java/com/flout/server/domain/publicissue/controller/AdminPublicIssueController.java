@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "운영자-현장점검 관리", description = "관할 지역의 현장점검 관리")
 public class AdminPublicIssueController {
   private final PublicIssueService service;
+  private final PublicIssueRelatedApplicationService relatedApplicationService;
 
   @PostMapping(
       consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -36,8 +37,6 @@ public class AdminPublicIssueController {
         service.register(Long.valueOf(jwt.getSubject()), request),
         PublicIssueSuccessCode.REGISTERED);
   }
-
-  private final PublicIssueRelatedApplicationService relatedApplicationService;
 
   @GetMapping(
       value = "/{publicIssueId}/resident-applications",

@@ -57,12 +57,20 @@ public interface InspectionApplicationRepository
 
   @EntityGraph(attributePaths = {"assessment"})
   @Query(
-      """
-    SELECT a
-    FROM InspectionApplication a
-    WHERE a.address = :address
-      AND a.status <> com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus.DRAFT
-    ORDER BY a.createdAt DESC, a.id DESC
-    """)
-  List<InspectionApplication> findRelatedByAddress(@Param("address") String address);
+      value =
+          """
+                    SELECT a.*
+                    FROM inspection_applications a
+                    WHERE REGEXP_REPLACE(
+                            REGEXP_REPLACE(
+                                TRIM(a.address), '[[:space:]]+', ' '
+                            ),
+                            '^경기 ', '경기도 '
+                          ) = :normalizedAddress
+                      AND a.status <> 'DRAFT'
+                    ORDER BY a.created_at DESC, a.application_id DESC
+                    """,
+      nativeQuery = true)
+  List<InspectionApplication> findRelatedByNormalizedAddress(
+      @Param("normalizedAddress") String normalizedAddress);
 }
