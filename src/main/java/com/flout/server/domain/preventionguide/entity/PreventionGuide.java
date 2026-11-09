@@ -48,9 +48,24 @@ public class PreventionGuide {
   @Column(name = "resolution", length = 32)
   private GuideResolution resolution;
 
+  @Column(name = "progress_updated_at")
+  private LocalDateTime progressUpdatedAt;
+
+  @Column(name = "completed_at")
+  private LocalDateTime completedAt;
+
+  public void recordCompletion() {
+    if (completedAt == null) completedAt = LocalDateTime.now();
+  }
+
   public void updateResolution(GuideResolution resolution) {
     this.resolution = Objects.requireNonNull(resolution);
     this.resolved = resolution == GuideResolution.CONFIRMED;
+    this.progressUpdatedAt = LocalDateTime.now();
+  }
+
+  public void recordProgressChange() {
+    progressUpdatedAt = LocalDateTime.now();
   }
 
   public static PreventionGuide generated(

@@ -26,7 +26,7 @@ public class AdminSupportListController {
   @Operation(
       summary = "지원 신청 목록 조회·검색",
       description =
-          "인증된 운영자의 관할 내 지원 신청을 검색합니다. DRAFT는 제외하며 신청 ID 내림차순으로 정렬합니다. 지역(district)·지원 상태(status)·동의 확인 상태(landlordConsentStatus)·검색어를 조합할 수 있으며 건수와 페이지에도 동일하게 적용합니다. REVIEWING 필터는 SUBMITTED와 REVIEWING을 포함합니다. VERIFIED 필터는 DB CONFIRMED와 매칭합니다.")
+          "인증된 운영자의 관할 내 지원 신청을 검색합니다. DRAFT는 제외하며 신청 ID 내림차순으로 정렬합니다. 지역(district)·지원 상태(status)·검색어를 조합할 수 있으며 건수와 페이지에도 동일하게 적용합니다. REVIEWING 필터는 SUBMITTED를 포함합니다.")
   @ApiResponse(responseCode = "200", description = "조회 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",
@@ -55,28 +55,13 @@ public class AdminSupportListController {
                       allowableValues = {
                         "SUBMITTED",
                         "REVIEWING",
-                        "CONSENT_PENDING",
                         "SCHEDULING",
                         "APPROVED",
                         "REJECTED"
                       }))
           @RequestParam(required = false)
-          String status,
-      @Parameter(
-              description =
-                  "동의 확인 상태. NOT_REQUIRED=불필요, PENDING=필요·확인 중, VERIFIED=필요·확인 완료. CONFIRMED도 VERIFIED와 동일하게 허용",
-              schema =
-                  @Schema(allowableValues = {"NOT_REQUIRED", "PENDING", "VERIFIED", "CONFIRMED"}))
-          @RequestParam(required = false)
-          String landlordConsentStatus) {
+          String status) {
     return SuccessResponse.ok(
-        service.search(
-            Long.valueOf(jwt.getSubject()),
-            keyword,
-            page,
-            size,
-            district,
-            status,
-            landlordConsentStatus));
+        service.search(Long.valueOf(jwt.getSubject()), keyword, page, size, district, status));
   }
 }

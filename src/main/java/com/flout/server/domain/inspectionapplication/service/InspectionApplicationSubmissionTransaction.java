@@ -21,20 +21,50 @@ public class InspectionApplicationSubmissionTransaction {
   private final InspectionApplicationRepository applications;
   private final ApplicationInflowLocationRepository inflowLocations;
   private final ReceiptNumberGenerator receiptNumbers;
+  private final com.flout.server.domain.residentprogress.FormDraftService formDrafts;
 
   public InspectionApplicationSubmissionTransaction(
       InspectionApplicationRepository applications,
       ApplicationInflowLocationRepository inflowLocations,
-      ReceiptNumberGenerator receiptNumbers) {
+      ReceiptNumberGenerator receiptNumbers,
+      com.flout.server.domain.residentprogress.FormDraftService formDrafts) {
     this.applications = applications;
     this.inflowLocations = inflowLocations;
     this.receiptNumbers = receiptNumbers;
+    this.formDrafts = formDrafts;
   }
 
   // 접수번호 충돌 시 새 트랜잭션으로 재시도
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public CreateInspectionApplicationResponse create(
       User applicant, RiskAssessment assessment, CreateInspectionApplicationRequest request) {
+    return create(applicant, assessment, request, null);
+  }
+
+  @Transactional
+  public CreateInspectionApplicationResponse reuseDraft(
+      Long userId, CreateInspectionApplicationRequest request) {
+    return reuseDraft(userId, request, null);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public CreateInspectionApplicationResponse create(
+      User applicant,
+      RiskAssessment assessment,
+      CreateInspectionApplicationRequest request,
+      java.util.UUID draftId) {
+    if (formDrafts != null) formDrafts.lockInspectionSource(assessment.getId(), applicant.getId());
+    var previous =
+        draftId == null
+            ? null
+            : formDrafts.priorSubmission(
+                applicant.getId(),
+                "INSPECTION",
+                draftId,
+                assessment.getId(),
+                request,
+                CreateInspectionApplicationResponse.class);
+    if (previous != null) return previous;
     String receiptNo = receiptNumbers.next();
     if (applications.existsByReceiptNo(receiptNo)) {
       throw new ReceiptNumberCollisionException();
@@ -44,12 +74,45 @@ public class InspectionApplicationSubmissionTransaction {
         applications.saveAndFlush(
             InspectionApplication.draft(applicant, assessment, request, receiptNo));
     saveInflowLocations(application, request.inflowLocations());
-    return CreateInspectionApplicationResponse.from(application, null);
+    var response = CreateInspectionApplicationResponse.from(application, null);
+    if (draftId != null) {
+      formDrafts.link(
+          applicant.getId(),
+          "INSPECTION",
+          draftId,
+          assessment.getId(),
+          application.getId(),
+          request,
+          response,
+          false);
+      formDrafts.syncInspection(
+          application, inflowLocations.findLocationsByApplicationId(application.getId()));
+    } else if (formDrafts != null) {
+      formDrafts.scheduleUniqueLink(
+          applicant.getId(),
+          "INSPECTION",
+          assessment.getId(),
+          application.getId(),
+          request,
+          response);
+    }
+    return response;
   }
 
-  @Transactional(readOnly = true)
+  @Transactional
   public CreateInspectionApplicationResponse reuseDraft(
-      Long userId, CreateInspectionApplicationRequest request) {
+      Long userId, CreateInspectionApplicationRequest request, java.util.UUID draftId) {
+    var previous =
+        draftId == null
+            ? null
+            : formDrafts.priorSubmission(
+                userId,
+                "INSPECTION",
+                draftId,
+                request.assessmentId(),
+                request,
+                CreateInspectionApplicationResponse.class);
+    if (previous != null) return previous;
     var application =
         applications
             .findByAssessmentId(request.assessmentId())
@@ -86,7 +149,24 @@ public class InspectionApplicationSubmissionTransaction {
             && new HashSet<>(inflowLocations.findLocationsByApplicationId(application.getId()))
                 .equals(new HashSet<>(requestedLocations));
     if (!same) throw new BaseException(InspectionApplicationErrorCode.DRAFT_REQUEST_MISMATCH);
-    return CreateInspectionApplicationResponse.from(application, null);
+    var response = CreateInspectionApplicationResponse.from(application, null);
+    if (draftId != null) {
+      formDrafts.link(
+          userId,
+          "INSPECTION",
+          draftId,
+          request.assessmentId(),
+          application.getId(),
+          request,
+          response,
+          false);
+      formDrafts.syncInspection(
+          application, inflowLocations.findLocationsByApplicationId(application.getId()));
+    } else if (formDrafts != null) {
+      formDrafts.scheduleUniqueLink(
+          userId, "INSPECTION", request.assessmentId(), application.getId(), request, response);
+    }
+    return response;
   }
 
   // 유입 위치 중복 제거

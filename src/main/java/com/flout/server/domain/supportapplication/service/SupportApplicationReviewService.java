@@ -4,7 +4,6 @@ import com.flout.server.domain.inspection.entity.InspectionVulnerability;
 import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.InspectionResultRepository;
 import com.flout.server.domain.inspection.repository.InspectionVulnerabilityRepository;
-import com.flout.server.domain.inspectionapplication.entity.OccupancyType;
 import com.flout.server.domain.supportapplication.dto.response.SupportApplicationReviewResponse;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationRepository;
 import com.flout.server.domain.supportapplication.response.code.SupportDetailErrorCode;
@@ -64,7 +63,8 @@ public class SupportApplicationReviewService {
         detail.residentRequest(),
         detail.preferredConstructionDate(),
         detail.preferredTimeSlot(),
-        detail.occupancyType() == OccupancyType.TENANT,
+        detail.landlordConsentRequired(),
+        detail.landlordConsentDocumentSubmitted(),
         new SupportApplicationReviewResponse.Program(
             program.getId(),
             program.getName(),

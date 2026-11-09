@@ -96,7 +96,7 @@ class SupportDetailTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP)",
         source,
         program,
         residentId);
@@ -134,7 +134,7 @@ class SupportDetailTest {
     jdbc.update(
         "UPDATE inspection_applications SET applicant_name='변경된 원본',contact='010-9999-9999',address='서울특별시',detail_address='101호',occupancy_type='TENANT',request_reason='점검 전용 요청 사유'");
     jdbc.update(
-        "UPDATE support_applications SET applicant_name='김주민',contact='010-1234-0002',occupancy_type='TENANT',preferred_visit_date='2026-10-21',preferred_visit_time='MORNING',landlord_consent_status='PENDING'");
+        "UPDATE support_applications SET applicant_name='김주민',contact='010-1234-0002',occupancy_type='TENANT',preferred_visit_date='2026-10-21',preferred_visit_time='MORNING'");
     long sourceId =
         jdbc.queryForObject("SELECT application_id FROM inspection_applications", Long.class);
     detail()
@@ -143,7 +143,7 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.isSuccess").value(true))
         .andExpect(jsonPath("$.status").value(200))
         .andExpect(jsonPath("$.timeStamp").isString())
-        .andExpect(jsonPath("$.result.length()").value(19))
+        .andExpect(jsonPath("$.result.length()").value(20))
         .andExpect(jsonPath("$.result.supportApplicationId").value(supportId))
         .andExpect(
             jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", sourceId)))
@@ -160,7 +160,9 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.result.inspectionId").value(inspectionId()))
         .andExpect(jsonPath("$.result.inspectionStatus").value("IN_PROGRESS"))
         .andExpect(jsonPath("$.result.inspectionResultPublished").value(false))
-        .andExpect(jsonPath("$.result.landlordConsentStatus").value("PENDING"))
+        .andExpect(jsonPath("$.result.landlordConsentRequired").value(true))
+        .andExpect(jsonPath("$.result.landlordConsentDocumentSubmitted").value(false))
+        .andExpect(jsonPath("$.result.landlordConsentStatus").doesNotExist())
         .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
   }
 
@@ -230,6 +232,7 @@ class SupportDetailTest {
     detail()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.attachments.length()").value(1))
+        .andExpect(jsonPath("$.result.landlordConsentDocumentSubmitted").value(true))
         .andExpect(jsonPath("$.result.attachments[0].length()").value(2))
         .andExpect(jsonPath("$.result.attachments[0].originalName").value("임대인 동의서.pdf"))
         .andExpect(
@@ -296,13 +299,12 @@ class SupportDetailTest {
 
   @Test
   void responseOnlyStateMappingsNeverChangeStoredValues() throws Exception {
-    jdbc.update(
-        "UPDATE support_applications SET status='SUBMITTED',landlord_consent_status='CONFIRMED'");
+    jdbc.update("UPDATE support_applications SET status='SUBMITTED'");
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     detail()
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.status").value("SUBMITTED"))
-        .andExpect(jsonPath("$.result.landlordConsentStatus").value("VERIFIED"));
+        .andExpect(jsonPath("$.result.landlordConsentStatus").doesNotExist());
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }
 
@@ -420,6 +422,7 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.result.preferredConstructionDate").value("2026-11-10"))
         .andExpect(jsonPath("$.result.preferredTimeSlot").value("MORNING"))
         .andExpect(jsonPath("$.result.landlordConsentRequired").value(true))
+        .andExpect(jsonPath("$.result.landlordConsentDocumentSubmitted").value(true))
         .andExpect(jsonPath("$.result.program.name").value("검증용 지원사업"))
         .andExpect(jsonPath("$.result.program.targetDescription").value("부천시 침수 취약 주택"))
         .andExpect(jsonPath("$.result.supportScope").value("물막이판 설치"))
@@ -442,6 +445,7 @@ class SupportDetailTest {
         .andExpect(jsonPath("$.result.recommendedActions").isEmpty())
         .andExpect(jsonPath("$.result.attachments").isEmpty())
         .andExpect(jsonPath("$.result.landlordConsentRequired").value(false))
+        .andExpect(jsonPath("$.result.landlordConsentDocumentSubmitted").value(false))
         .andExpect(jsonPath("$.result.inspectionResultPublished").value(false));
     verifyNoInteractions(storage);
   }

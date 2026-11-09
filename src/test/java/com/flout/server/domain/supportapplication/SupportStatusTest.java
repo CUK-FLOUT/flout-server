@@ -97,7 +97,7 @@ class SupportStatusTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP)",
         source,
         program,
         residentId);
@@ -111,7 +111,7 @@ class SupportStatusTest {
     return mvc.perform(call);
   }
 
-  void add(String state, String address, String consent) {
+  void add(String state, String address) {
     jdbc.update(
         "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,'address','fixture','HIGH','COMPLETED')",
         residentId);
@@ -127,15 +127,14 @@ class SupportStatusTest {
     var program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
     jdbc.update(
         """
-      INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status)
-      SELECT ?,?,applicant_user_id,requested_facility,applicant_name,contact,?,occupancy_type,preferred_visit_date,preferred_visit_time,?,submitted_at,?
+      INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at)
+      SELECT ?,?,applicant_user_id,requested_facility,applicant_name,contact,?,occupancy_type,preferred_visit_date,preferred_visit_time,?,submitted_at
       FROM support_applications WHERE support_application_id=?
       """,
         source,
         program,
         address,
         state,
-        consent,
         supportId);
   }
 
@@ -159,13 +158,13 @@ class SupportStatusTest {
 
   @Test
   void aggregatesCurrentStatesOnceAndIncludesOtherStatesInTotal() throws Exception {
-    add("SUBMITTED", "경기 부천시 소사구", "PENDING");
-    add("SUBMITTED", "부천시 오정구", "NOT_REQUIRED");
-    add("APPROVED", "  경기도 부천시 원미구 ", "CONFIRMED");
-    add("SUBMITTED", "경기도 부천시 원미구", "CONFIRMED");
-    add("REJECTED", "경기도 부천시 원미구", "PENDING");
-    add("REJECTED", "서울시 중구", "PENDING");
-    add("DRAFT", "부천시 원미구", "PENDING");
+    add("SUBMITTED", "경기 부천시 소사구");
+    add("SUBMITTED", "부천시 오정구");
+    add("APPROVED", "  경기도 부천시 원미구 ");
+    add("SUBMITTED", "경기도 부천시 원미구");
+    add("REJECTED", "경기도 부천시 원미구");
+    add("REJECTED", "서울시 중구");
+    add("DRAFT", "부천시 원미구");
     var before = jdbc.queryForList("SELECT * FROM support_applications");
     statusRequest(token)
         .andExpect(status().isOk())
@@ -187,7 +186,7 @@ class SupportStatusTest {
   @Test
   void excludesOtherJurisdictionsAndLookalikeOrEmbeddedAddresses() throws Exception {
     for (var address : List.of("경기도 서울시", "서울시 부천시", "부천시청", "부천시외", "경기도 부천시청", "부천시흥"))
-      add("APPROVED", address, "CONFIRMED");
+      add("APPROVED", address);
     statusRequest(token)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalCount").value(1))

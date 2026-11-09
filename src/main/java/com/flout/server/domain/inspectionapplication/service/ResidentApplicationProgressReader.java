@@ -87,11 +87,10 @@ public class ResidentApplicationProgressReader {
     }
     var stage = stage(a, i, r, s, c);
     String title =
-        c != null && c.getStatus() != ConstructionStatus.PENDING
-            ? "시공 · " + s.getRequestedFacility()
-            : s != null
-                ? "지원 · " + s.getRequestedFacility()
-                : r != null ? "현장점검 · 공개된 결과 확인" : "현장점검 · 침수 위험 점검 신청";
+        title(
+            s == null ? null : s.getRequestedFacility(),
+            r != null,
+            c != null && c.getStatus() != ConstructionStatus.PENDING);
     LocalDateTime updated =
         max(
             a.getCreatedAt(),
@@ -125,7 +124,6 @@ public class ResidentApplicationProgressReader {
                 s.getStatus(),
                 s.getRequestedFacility(),
                 s.getStatus() == SupportApplicationStatus.APPROVED ? s.getSupportScope() : null,
-                s.getLandlordConsentStatus().name(),
                 s.getStatus() == SupportApplicationStatus.REJECTED ? s.getRejectionReason() : null),
         c == null
             ? null
@@ -137,6 +135,15 @@ public class ResidentApplicationProgressReader {
                 c.getStatus() == ConstructionStatus.COMPLETED
                     ? c.getFinalInstallationResult()
                     : null));
+  }
+
+  public static String title(
+      String requestedFacility, boolean resultPublished, boolean constructionStarted) {
+    return constructionStarted
+        ? "시공 · " + requestedFacility
+        : requestedFacility != null
+            ? "지원 · " + requestedFacility
+            : resultPublished ? "현장점검 · 공개된 결과 확인" : "현장점검 · 침수 위험 점검 신청";
   }
 
   /**

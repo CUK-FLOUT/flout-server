@@ -212,11 +212,11 @@ class InspectionApplicationDetailTest {
         """
         INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,
           applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,
-          status,submitted_at,landlord_consent_status)
+          status,submitted_at)
         SELECT a.application_id,p.program_id,a.applicant_user_id,'물막이판',
           a.applicant_name,a.contact,a.address,'OWNER',CURRENT_DATE,'ANY',
           CASE WHEN p.name='지원사업' THEN 'APPROVED' ELSE 'DRAFT' END,
-          CASE WHEN p.name='지원사업' THEN CURRENT_TIMESTAMP ELSE NULL END,'NOT_REQUIRED'
+          CASE WHEN p.name='지원사업' THEN CURRENT_TIMESTAMP ELSE NULL END
         FROM inspection_applications a CROSS JOIN support_programs p WHERE a.application_id=?
         """,
         applicationId);

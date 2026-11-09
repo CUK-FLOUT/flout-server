@@ -87,7 +87,7 @@ class AdminConstructionDetailTest {
         "INSERT INTO support_programs(name,created_at) VALUES('물막이판 지원',CURRENT_TIMESTAMP)");
     long programId = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,support_scope,approved_by_user_id,approved_at,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','김주민','010-1234-5678','경기도 부천시 원미구 길주로 210','TENANT','2030-02-01','MORNING','APPROVED','승인된 시설 설치',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'CONFIRMED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,support_scope,approved_by_user_id,approved_at,submitted_at) VALUES(?,?,?,'출입구 물막이판','김주민','010-1234-5678','경기도 부천시 원미구 길주로 210','TENANT','2030-02-01','MORNING','APPROVED','승인된 시설 설치',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
         applicationId,
         programId,
         residentId,
@@ -120,7 +120,7 @@ class AdminConstructionDetailTest {
     detail(Long.toString(CONSTRUCTION_ID), token)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("COMMON_200"))
-        .andExpect(jsonPath("$.result.length()").value(20))
+        .andExpect(jsonPath("$.result.length()").value(19))
         .andExpect(jsonPath("$.result.constructionId").value(CONSTRUCTION_ID))
         .andExpect(jsonPath("$.result.supportApplicationId").value(supportId))
         .andExpect(jsonPath("$.result.applicationId").value(applicationId))
@@ -128,7 +128,7 @@ class AdminConstructionDetailTest {
             jsonPath("$.result.receiptNo").value(String.format(Locale.ROOT, "%06d", applicationId)))
         .andExpect(jsonPath("$.result.applicantName").value("김주민"))
         .andExpect(jsonPath("$.result.supportStatus").value("APPROVED"))
-        .andExpect(jsonPath("$.result.landlordConsentStatus").value("VERIFIED"))
+        .andExpect(jsonPath("$.result.landlordConsentStatus").doesNotExist())
         .andExpect(jsonPath("$.result.requestedFacility").value("출입구 물막이판"))
         .andExpect(jsonPath("$.result.supportScope").value("승인된 시설 설치"))
         .andExpect(jsonPath("$.result.preferredConstructionDate").value("2030-02-01"))

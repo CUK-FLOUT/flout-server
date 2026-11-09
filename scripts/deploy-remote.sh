@@ -74,18 +74,6 @@ fi
 echo "Deployment health check failed. Rolling back." >&2
 journalctl -u "$service_name" -n 100 --no-pager >&2 || true
 
-if [[ ! -f "$backup_jar" ]]; then
-  echo "No previous JAR is available for rollback." >&2
-  exit 1
-fi
-
-install -m 644 "$backup_jar" "$staged_jar"
-mv -f "$staged_jar" "$target_jar"
-
-if systemctl restart "$service_name" && wait_for_health; then
-  echo "Rollback succeeded and the previous release is healthy." >&2
-else
-  echo "Rollback failed. Manual recovery is required." >&2
-fi
-
+echo "Automatic rollback is disabled because Flyway may have applied an irreversible schema migration." >&2
+echo "The deployed JAR was kept at $target_jar. Verify the Flyway schema history and recover manually." >&2
 exit 1

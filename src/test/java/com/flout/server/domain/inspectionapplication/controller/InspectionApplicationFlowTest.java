@@ -55,6 +55,7 @@ class InspectionApplicationFlowTest {
   @Autowired ObjectMapper mapper;
   @MockitoSpyBean InspectionRepository inspections;
   @MockitoSpyBean ReceiptNumberGenerator receiptNumbers;
+  @MockitoSpyBean com.flout.server.domain.residentprogress.FormDraftService formDraftService;
   @MockitoBean AttachmentStorage storage;
   @MockitoBean AddressCoordinatesService coordinatesService;
   @MockitoBean RiskPredictionClient predictionClient;
@@ -1009,8 +1010,8 @@ class InspectionApplicationFlowTest {
               checked.await(10, java.util.concurrent.TimeUnit.SECONDS);
               return invocation.callRealMethod();
             })
-        .when(receiptNumbers)
-        .next();
+        .when(formDraftService)
+        .lockInspectionSource(any(), any());
     var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
     var ready = new java.util.concurrent.CountDownLatch(2);
     var start = new java.util.concurrent.CountDownLatch(1);

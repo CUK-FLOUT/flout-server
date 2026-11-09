@@ -26,6 +26,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @Slf4j
 public class SupportAttachmentService {
+  private com.flout.server.domain.residentprogress.FormDraftService formDrafts;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  void setFormDrafts(com.flout.server.domain.residentprogress.FormDraftService formDrafts) {
+    this.formDrafts = formDrafts;
+  }
+
   private static final String UNIQUE = "uk_support_attachment_type";
   private final UserRepository users;
   private final SupportApplicationRepository applications;
@@ -97,6 +104,7 @@ public class SupportAttachmentService {
                             document.bytes().length,
                             document.contentType()));
                 application.submitDraft();
+                formDrafts.complete("SUPPORT", applicationId);
                 cleanup.completed(key);
                 notifications.send(
                     userId,

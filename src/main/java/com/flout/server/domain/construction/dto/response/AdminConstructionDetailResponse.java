@@ -17,10 +17,6 @@ public record AdminConstructionDetailResponse(
     @Schema(description = "현장점검 신청 ID를 최소 6자리로 표시한 접수번호", example = "000003") String receiptNo,
     String applicantName,
     SupportApplicationStatus supportStatus,
-    @Schema(
-            description = "DB CONFIRMED는 VERIFIED로 반환",
-            allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"})
-        String landlordConsentStatus,
     String requestedFacility,
     @Schema(nullable = true, description = "운영자가 승인한 지원 범위. 화면의 재료·설치 형태로 사용") String supportScope,
     LocalDate preferredConstructionDate,

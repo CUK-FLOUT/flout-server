@@ -36,6 +36,7 @@ public record SupportApplicationReviewResponse(
     PreferredTimeSlot preferredTimeSlot,
     @Schema(description = "세입자(TENANT)이면 true. 서류 확인 완료 상태와 별개입니다.")
         boolean landlordConsentRequired,
+    @Schema(description = "LANDLORD_CONSENT 첨부파일 존재 여부") boolean landlordConsentDocumentSubmitted,
     Program program,
     @Schema(description = "운영자가 승인 시 저장한 지원 범위. 미확정이면 null", nullable = true) String supportScope,
     List<SupportApplicationDetailResponse.Attachment> attachments,

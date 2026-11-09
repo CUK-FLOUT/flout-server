@@ -37,7 +37,7 @@ public class SupportApprovalService {
     if (application.getOccupancyType() == OccupancyType.TENANT
         && !attachments.existsByApplicationIdAndAttachmentType(
             id, SupportAttachmentType.LANDLORD_CONSENT))
-      throw new BaseException(SupportApprovalErrorCode.CONSENT_NOT_CONFIRMED);
+      throw new BaseException(SupportApprovalErrorCode.CONSENT_DOCUMENT_REQUIRED);
     var previousStatus = application.getStatus();
     application.approve(
         request.supportScope(), operator, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
