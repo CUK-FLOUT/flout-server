@@ -65,7 +65,11 @@ public class ResidentProgressService {
       @Schema(description = "상세 주소", nullable = true) String detailAddress,
       @Schema(description = "분석 상태") String status,
       @Schema(description = "분석 위험 등급") String riskLevel,
-      @Schema(description = "거주층, 미입력은 null", nullable = true) HousingType housingType,
+      @Schema(
+              description = "거주층, 미입력은 null",
+              types = {"string", "null"},
+              allowableValues = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+          HousingType housingType,
       @Schema(description = "분석 생성 시각, KST") java.time.OffsetDateTime analyzedAt,
       @Schema(description = "연결된 가이드 ID", nullable = true) Long guideId,
       @Schema(description = "연결된 현장점검 신청 ID", nullable = true) Long applicationId,

@@ -1490,9 +1490,22 @@ class ResidentProgressTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.housingType").value("SECOND_FLOOR_OR_ABOVE"));
 
-    mvc.perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.components.schemas.*.properties.housingType").exists());
+    var openApi =
+        mapper.readTree(
+            mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    var housingTypeSchema =
+        openApi
+            .path("components")
+            .path("schemas")
+            .path("AssessmentDetail")
+            .path("properties")
+            .path("housingType");
+    assertThat(housingTypeSchema.toString())
+        .containsAnyOf("\"type\":\"null\"", "\"type\":[\"string\",\"null\"]");
   }
 
   @Test
