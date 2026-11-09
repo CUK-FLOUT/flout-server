@@ -8,4 +8,6 @@ public interface ConstructionPhotoRepository extends JpaRepository<ConstructionP
   boolean existsByConstructionId(Long constructionId);
 
   List<ConstructionPhoto> findByConstructionIdOrderByIdAsc(Long constructionId);
+
+  List<ConstructionPhoto> findByUploadIdOrderByIdAsc(Long uploadId);
 }

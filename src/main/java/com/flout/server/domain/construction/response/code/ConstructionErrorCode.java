@@ -7,6 +7,10 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum ConstructionErrorCode implements BaseResponseCode {
+  INVALID_IDEMPOTENCY_KEY(
+      400, "CONSTRUCTION_400_5", "Idempotency-Key는 영문·숫자와 . _ : -를 사용한 1~128자여야 합니다."),
+  IDEMPOTENCY_CONFLICT(409, "CONSTRUCTION_409_6", "같은 Idempotency-Key에 다른 업로드 요청을 사용할 수 없습니다."),
+  UPLOAD_IN_PROGRESS(409, "CONSTRUCTION_409_7", "같은 업로드 요청이 처리 중입니다. 잠시 후 동일한 키로 재시도해주세요."),
   PHOTO_READ_FAILED(500, "CONSTRUCTION_500_2", "시공 사진을 불러오지 못했습니다."),
   PAST_SCHEDULE(400, "CONSTRUCTION_400_1", "확정 시공 일정은 현재 시각 이후로 입력해주세요."),
   JURISDICTION_ACCESS_DENIED(403, "CONSTRUCTION_403_1", "관할 지역의 시공 건만 변경할 수 있습니다."),
