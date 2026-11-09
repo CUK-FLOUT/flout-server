@@ -1,10 +1,12 @@
 package com.flout.server.domain.publicissue.controller;
 
 import com.flout.server.domain.publicissue.dto.request.CreatePublicIssueRequest;
+import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueDetailResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.dto.response.CreatePublicIssueResponse;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
+import com.flout.server.domain.publicissue.service.AdminPublicIssueDetailService;
 import com.flout.server.domain.publicissue.service.AdminPublicIssueListService;
 import com.flout.server.domain.publicissue.service.PublicIssueService;
 import com.flout.server.global.response.SuccessResponse;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminPublicIssueController {
   private final PublicIssueService service;
   private final AdminPublicIssueListService listService;
+  private final AdminPublicIssueDetailService detailService;
 
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
@@ -80,6 +83,19 @@ public class AdminPublicIssueController {
     return SuccessResponse.of(
         listService.status(Long.valueOf(jwt.getSubject()), district, issueType, keyword),
         PublicIssueSuccessCode.STATUS_FOUND);
+  }
+
+  @GetMapping(value = "/{publicIssueId}", produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(
+      summary = "지역 문제·참고 정보 상세 조회",
+      description =
+          "인증된 부천시 운영자에게 문제 기본정보와 등록 출처, 반경 1km 관련 주민 신청·침수 경험·유입 위치·배수 참고정보, 저장된 검토·연결 공공시설, 조치 및 사진을 반환합니다. 데이터를 변경하지 않습니다.")
+  public SuccessResponse<AdminPublicIssueDetailResponse> detail(
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "지역·공공 문제 ID", example = "1") @PathVariable Long publicIssueId) {
+    return SuccessResponse.of(
+        detailService.detail(Long.valueOf(jwt.getSubject()), publicIssueId),
+        PublicIssueSuccessCode.DETAIL_FOUND);
   }
 
   @PostMapping(

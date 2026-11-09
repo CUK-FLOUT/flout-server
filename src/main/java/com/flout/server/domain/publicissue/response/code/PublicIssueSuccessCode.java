@@ -13,7 +13,8 @@ public enum PublicIssueSuccessCode implements BaseResponseCode {
   ACTION_IMAGES_UPLOADED(200, "PUBLIC_ISSUE_200_4", "공공시설 조치 사진 업로드 성공"),
   LIST_FOUND(200, "PUBLIC_ISSUE_200_5", "지역·공공 문제 목록 조회 성공"),
   STATUS_FOUND(200, "PUBLIC_ISSUE_200_6", "지역·공공 문제 현황 건수 조회 성공"),
-  MAP_FOUND(200, "PUBLIC_ISSUE_200_7", "지역·공공 문제 지도 조회 성공");
+  MAP_FOUND(200, "PUBLIC_ISSUE_200_7", "지역·공공 문제 지도 조회 성공"),
+  DETAIL_FOUND(200, "PUBLIC_ISSUE_200_8", "지역 문제·참고 정보 상세 조회 성공");
   private final int status;
   private final String code;
   private final String message;

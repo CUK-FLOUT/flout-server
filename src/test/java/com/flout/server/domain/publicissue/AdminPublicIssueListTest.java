@@ -373,6 +373,83 @@ class AdminPublicIssueListTest {
   }
 
   @Test
+  void returnsMapMarkersWithListFiltersInStableOrder() throws Exception {
+    long first =
+        addIssue(
+            "부천시 원미구 중앙로 1",
+            37.5000000,
+            126.7600000,
+            "REPEATED_FLOODING",
+            "중앙 배수로 반복 침수",
+            "현장 확인",
+            "UNDER_REVIEW");
+    long second =
+        addIssue(
+            "부천시 원미구 중앙로 2",
+            37.5010000,
+            126.7610000,
+            "REPEATED_FLOODING",
+            "중앙 배수로 반복 침수",
+            "현장 확인",
+            "UNDER_REVIEW");
+    addIssue(
+        "부천시 소사구 남부로 1", 37.4700000, 126.7900000, "SEWAGE_BACKFLOW", "하수 역류", "조치 완료", "COMPLETED");
+    addIssue(
+        "서울특별시 구로구 중앙로 1",
+        37.5000000,
+        126.7600000,
+        "REPEATED_FLOODING",
+        "중앙 관할 외",
+        "현장 확인",
+        "UNDER_REVIEW");
+
+    mvc.perform(
+            get("/api/admin/map/public-issues")
+                .header("Authorization", "Bearer " + token)
+                .param("district", "원미구")
+                .param("status", "UNDER_REVIEW")
+                .param("issueType", "REPEATED_FLOODING")
+                .param("keyword", "  중앙  "))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_7"))
+        .andExpect(jsonPath("$.result.length()").value(1))
+        .andExpect(jsonPath("$.result.markers.length()").value(2))
+        .andExpect(jsonPath("$.result.markers[0].length()").value(4))
+        .andExpect(jsonPath("$.result.markers[0].publicIssueId").value(second))
+        .andExpect(jsonPath("$.result.markers[0].latitude").value(37.5010000))
+        .andExpect(jsonPath("$.result.markers[0].longitude").value(126.7610000))
+        .andExpect(jsonPath("$.result.markers[0].status").value("UNDER_REVIEW"))
+        .andExpect(jsonPath("$.result.markers[1].publicIssueId").value(first));
+
+    mvc.perform(
+            get("/api/admin/map/public-issues")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", "없는 문제"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.markers").isEmpty());
+  }
+
+  @Test
+  void mapMarkersValidateFiltersAndOperatorAccess() throws Exception {
+    for (var values :
+        List.of(
+            new String[] {"district", "중구"},
+            new String[] {"status", "UNKNOWN"},
+            new String[] {"issueType", "UNKNOWN"},
+            new String[] {"keyword", "가".repeat(256)}))
+      mvc.perform(
+              get("/api/admin/map/public-issues")
+                  .header("Authorization", "Bearer " + token)
+                  .param(values[0], values[1]))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("COMMON_400_3"));
+    mvc.perform(get("/api/admin/map/public-issues")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/admin/map/public-issues").header("Authorization", "Bearer " + residentToken))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void swaggerPublishesListSearchContract() throws Exception {
     var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andReturn();
     var operation =
@@ -399,5 +476,18 @@ class AdminPublicIssueListTest {
     for (var parameter : statusOperation.path("parameters"))
       statusParameters.add(parameter.path("name").asString());
     assertThat(statusParameters).containsExactlyInAnyOrder("district", "issueType", "keyword");
+
+    var mapOperation =
+        mapper
+            .readTree(response.getResponse().getContentAsString())
+            .path("paths")
+            .path("/api/admin/map/public-issues")
+            .path("get");
+    assertThat(mapOperation.path("summary").asString()).isEqualTo("지역·공공 문제 지도 조회");
+    var mapParameters = new ArrayList<String>();
+    for (var parameter : mapOperation.path("parameters"))
+      mapParameters.add(parameter.path("name").asString());
+    assertThat(mapParameters)
+        .containsExactlyInAnyOrder("district", "status", "issueType", "keyword");
   }
 }
