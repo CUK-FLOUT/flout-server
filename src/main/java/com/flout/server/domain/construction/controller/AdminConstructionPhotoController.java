@@ -31,7 +31,7 @@ public class AdminConstructionPhotoController {
   @Operation(
       summary = "시공 사진 업로드",
       description =
-          "부천시 관할 ADMIN이 지원 승인된 시공 건에 사진을 추가합니다. files는 최소 1장 필수이며 JPG/JPEG/PNG, 파일당 최대 10MiB, 요청 전체 최대 80MiB입니다. 확장자뿐 아니라 실제 이미지 내용을 검증합니다. 기존 사진과 시공·지원 상태는 유지하며 전체 완료된 시공은 업로드할 수 없습니다. 응답은 이번 요청으로 추가한 사진만 포함하고 URL은 15분 유효한 비공개 조회 URL입니다.")
+          "부천시 관할 ADMIN이 지원 승인된 시공 건에 사진을 추가합니다. files는 최소 1장 필수이며 JPG/JPEG/PNG, 파일당 최대 10MiB, 요청 전체 최대 80MiB입니다. 실제 이미지 내용을 검증합니다. Idempotency-Key는 선택값이며 같은 운영자·시공 건·키의 재시도는 기존 사진 ID와 새 조회 URL을 반환합니다. 키는 대소문자를 구분하고 성공 기록은 자동 만료하지 않습니다. 파일 내용·이름·순서가 달라지면 409이며 처리 중인 요청도 409입니다. 실패 시 같은 키로 재시도할 수 있고 서버 중단으로 남은 선점은 15분 후 회수됩니다. 새 업로드에는 새 키를 사용합니다. 전체 완료 후 신규 업로드는 금지하지만 성공했던 요청의 재조회는 가능합니다. URL은 15분 유효합니다.")
   @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true)
   @ApiResponse(
       responseCode = "200",
@@ -40,7 +40,7 @@ public class AdminConstructionPhotoController {
   @ApiResponse(
       responseCode = "400",
       description =
-          "COMMON_400_3: files 누락 또는 잘못된 ID, CONSTRUCTION_400_2: 빈 사진 목록/빈 파일, CONSTRUCTION_400_3: 사진 형식·내용·파일명 오류",
+          "COMMON_400_3: files 누락 또는 잘못된 ID, CONSTRUCTION_400_2: 빈 사진 목록/빈 파일, CONSTRUCTION_400_3: 사진 형식·내용·파일명 오류, CONSTRUCTION_400_5: 잘못된 Idempotency-Key",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   @ApiResponse(
       responseCode = "403",
@@ -52,7 +52,8 @@ public class AdminConstructionPhotoController {
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   @ApiResponse(
       responseCode = "409",
-      description = "CONSTRUCTION_409_1: 지원 미승인, CONSTRUCTION_409_3: 전체 완료된 시공",
+      description =
+          "CONSTRUCTION_409_1: 지원 미승인, CONSTRUCTION_409_3: 전체 완료된 시공, CONSTRUCTION_409_6: 같은 키의 요청 내용 불일치, CONSTRUCTION_409_7: 같은 키 처리 중",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   @ApiResponse(
       responseCode = "413",
@@ -66,6 +67,11 @@ public class AdminConstructionPhotoController {
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "시공 ID. 지원 신청 ID·점검 ID와 구분합니다.") @PathVariable Long constructionId,
       @Parameter(
+              description = "선택값. 동일 업로드 재시도에는 같은 키, 새 업로드에는 새 키. 영문·숫자 및 . _ : - 사용, 1~128자",
+              example = "550e8400-e29b-41d4-a716-446655440000")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String requestKey,
+      @Parameter(
               description = "최소 1장 필수. JPG/JPEG/PNG, 파일당 최대 10MiB",
               required = true,
               array =
@@ -76,7 +82,7 @@ public class AdminConstructionPhotoController {
         .cacheControl(CacheControl.noStore())
         .body(
             SuccessResponse.of(
-                service.upload(Long.valueOf(jwt.getSubject()), constructionId, files),
+                service.upload(Long.valueOf(jwt.getSubject()), constructionId, files, requestKey),
                 ConstructionSuccessCode.PHOTOS_UPLOADED));
   }
 }
