@@ -37,8 +37,6 @@ public record ResidentApplicationProgressResponse(
       SupportApplicationStatus status,
       String requestedFacility,
       @Schema(nullable = true, description = "APPROVED일 때만 공개") String supportScope,
-      @Schema(description = "실제 저장된 NOT_REQUIRED/PENDING/CONFIRMED. 이 값만으로 별도 검토 단계를 추정하지 않습니다.")
-          String landlordConsentStatus,
       @Schema(nullable = true, description = "REJECTED일 때만 공개") String rejectionReason) {}
 
   @Schema(name = "ResidentApplicationConstructionSummary")

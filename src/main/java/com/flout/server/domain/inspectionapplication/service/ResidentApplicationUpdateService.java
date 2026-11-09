@@ -19,6 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResidentApplicationUpdateService {
   private final InspectionApplicationRepository applications;
   private final ApplicationInflowLocationRepository locations;
+  private com.flout.server.domain.residentprogress.FormDraftService formDrafts;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  void setFormDrafts(com.flout.server.domain.residentprogress.FormDraftService formDrafts) {
+    this.formDrafts = formDrafts;
+  }
 
   @Transactional
   public UpdateInspectionApplicationResponse update(
@@ -47,6 +53,8 @@ public class ResidentApplicationUpdateService {
               .map(location -> ApplicationInflowLocation.of(application, location))
               .toList());
     }
+    if (formDrafts != null)
+      formDrafts.syncInspection(application, locations.findLocationsByApplicationId(applicationId));
     return new UpdateInspectionApplicationResponse(application.getId(), application.getStatus());
   }
 }

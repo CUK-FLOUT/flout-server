@@ -7,7 +7,6 @@ import java.util.List;
 
 public record ResidentSupportAttachmentsResponse(
     Long supportApplicationId,
-    @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"}) String landlordConsentStatus,
     @Schema(description = "실제로 제출된 증빙서류. 없으면 빈 배열") List<Attachment> attachments) {
   public record Attachment(
       Long attachmentId,

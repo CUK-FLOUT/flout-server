@@ -47,7 +47,7 @@ public class SupportApplicationDetailService {
                         .map(PreventionRecommendation::getDescription)
                         .toList())
             .orElseGet(List::of);
-    var consent = application.getLandlordConsentStatus();
+    var documents = attachments.findByApplicationIdOrderByIdAsc(id);
     return new SupportApplicationDetailResponse(
         application.getId(),
         String.format(Locale.ROOT, "%06d", source.getId()),
@@ -65,13 +65,16 @@ public class SupportApplicationDetailService {
         inspection.map(Inspection::getId).orElse(null),
         inspection.map(Inspection::getStatus).orElse(null),
         published.isPresent(),
-        readAttachments(application.getId()),
-        consent == LandlordConsentStatus.CONFIRMED ? "VERIFIED" : consent.name(),
+        readAttachments(documents),
+        application.getOccupancyType()
+            == com.flout.server.domain.inspectionapplication.entity.OccupancyType.TENANT,
+        documents.stream()
+            .anyMatch(d -> d.getAttachmentType() == SupportAttachmentType.LANDLORD_CONSENT),
         application.getStatus());
   }
 
-  private List<SupportApplicationDetailResponse.Attachment> readAttachments(Long id) {
-    var documents = attachments.findByApplicationIdOrderByIdAsc(id);
+  private List<SupportApplicationDetailResponse.Attachment> readAttachments(
+      List<SupportAttachment> documents) {
     try {
       return documents.stream()
           .map(

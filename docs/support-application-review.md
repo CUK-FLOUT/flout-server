@@ -28,6 +28,7 @@
   "preferredConstructionDate": "2026-11-10",
   "preferredTimeSlot": "MORNING",
   "landlordConsentRequired": true,
+  "landlordConsentDocumentSubmitted": true,
   "program": {
     "programId": 1,
     "name": "침수 예방시설 설치 지원",
@@ -49,6 +50,7 @@
 - 이름·연락처·주소·거주 형태는 지원 신청 당시 저장값입니다. 연락처는 전체 번호를 저장 형식 그대로 반환합니다. 상세주소와 `residentRequest`는 연결된 현장점검 신청에서 조회하며 요청 사유가 없으면 null입니다. 기존 상세 조회도 같은 연락처와 요청 사유를 반환합니다. 반지하 등 주택 유형은 새 검토 응답에 포함하지 않습니다.
 - 취약지점과 권장조치는 PUBLISHED 결과만 사용하며 초안을 노출하지 않습니다. 배열은 저장 순서를 유지하고 취약지점의 중복 유형은 제외합니다. 점검이나 공개 결과가 없으면 빈 배열입니다.
 - `landlordConsentRequired`는 세입자이면 true입니다. 동의서 확인 완료 여부를 뜻하지 않습니다.
+- `landlordConsentDocumentSubmitted`는 해당 신청에 동의서 첨부 레코드가 있으면 true입니다.
 - 희망 방문일·시간은 지원 신청에 입력한 설치 희망 일정이며 확정 일정이 아닙니다.
 - 첨부파일은 실제 저장된 서류만 조회합니다. 파일명과 15분 유효 비공개 서명 URL을 반환하며, 첨부가 없으면 빈 배열입니다. 신청서 PDF를 임의로 만들지 않습니다.
 - 승인된 지원 범위가 없으면 `supportScope`는 null입니다. 접수된 신청은 SUBMITTED를 반환합니다.
@@ -61,4 +63,4 @@
 - 404 `SUPPORT_404_1`: 없는 신청 또는 다른 관할 신청
 - 500 `SUPPORT_DETAIL_500_1`: 첨부파일 조회 URL 발급 실패
 
-기존 공통 응답 형식을 사용하며 성공 코드는 `COMMON_200`입니다. 기존 상세 조회와 승인·미승인·임대인 동의 처리 API는 변경하지 않습니다.
+기존 공통 응답 형식을 사용하며 성공 코드는 `COMMON_200`입니다. 임대인 동의 확인 API는 제공하지 않습니다. 목록·상세의 동의서 제출 필드와 주민 API 변경은 [임대인 동의서 API 변경](landlord-consent-api-change.md)을 참고하세요.

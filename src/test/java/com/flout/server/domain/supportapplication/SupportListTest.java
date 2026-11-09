@@ -96,7 +96,7 @@ class SupportListTest {
         "INSERT INTO support_programs(name,created_at) VALUES('검증용 지원사업',CURRENT_TIMESTAMP)");
     var program = jdbc.queryForObject("SELECT program_id FROM support_programs", Long.class);
     jdbc.update(
-        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP,'NOT_REQUIRED')",
+        "INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at) VALUES(?,?,?,'출입구 물막이판','테스트주민','010-0000-0000','경기도 부천시 원미구 길주로 210','OWNER',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP)",
         source,
         program,
         residentId);
@@ -114,7 +114,7 @@ class SupportListTest {
     return mvc.perform(call);
   }
 
-  long add(String name, String address, String state, String consent) {
+  long add(String name, String address, String state) {
     jdbc.update(
         "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,'address','fixture','HIGH','COMPLETED')",
         residentId);
@@ -130,8 +130,8 @@ class SupportListTest {
     var program = jdbc.queryForObject("SELECT MAX(program_id) FROM support_programs", Long.class);
     jdbc.update(
         """
-      INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at,landlord_consent_status)
-      SELECT ?,?,applicant_user_id,requested_facility,?,contact,?,occupancy_type,preferred_visit_date,preferred_visit_time,?,submitted_at,?
+      INSERT INTO support_applications(application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at)
+      SELECT ?,?,applicant_user_id,requested_facility,?,contact,?,occupancy_type,preferred_visit_date,preferred_visit_time,?,submitted_at
       FROM support_applications WHERE support_application_id=?
       """,
         source,
@@ -139,7 +139,6 @@ class SupportListTest {
         name,
         address,
         state,
-        consent,
         supportId);
     return jdbc.queryForObject(
         "SELECT MAX(support_application_id) FROM support_applications", Long.class);
@@ -168,7 +167,7 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.totalElements").value(1))
         .andExpect(jsonPath("$.result.totalPages").value(1))
         .andExpect(jsonPath("$.result.supportApplications.length()").value(1))
-        .andExpect(jsonPath("$.result.supportApplications[0].length()").value(6))
+        .andExpect(jsonPath("$.result.supportApplications[0].length()").value(7))
         .andExpect(
             jsonPath("$.result.supportApplications[0].supportApplicationId").value(supportId))
         .andExpect(
@@ -176,15 +175,43 @@ class SupportListTest {
                 .value(String.format(Locale.ROOT, "%06d", applicationId)))
         .andExpect(jsonPath("$.result.supportApplications[0].applicantName").value("테스트주민"))
         .andExpect(jsonPath("$.result.supportApplications[0].requestedFacility").value("출입구 물막이판"))
+        .andExpect(jsonPath("$.result.supportApplications[0].landlordConsentRequired").value(false))
         .andExpect(
-            jsonPath("$.result.supportApplications[0].landlordConsentStatus").value("NOT_REQUIRED"))
+            jsonPath("$.result.supportApplications[0].landlordConsentDocumentSubmitted")
+                .value(false))
+        .andExpect(jsonPath("$.result.supportApplications[0].landlordConsentStatus").doesNotExist())
         .andExpect(jsonPath("$.result.supportApplications[0].status").value("SUBMITTED"));
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"TENANT", "OWNER", "ETC"})
+  void derivesConsentFlagsFromOccupancyAndAttachment(String occupancy) throws Exception {
+    jdbc.update("UPDATE support_applications SET occupancy_type=?", occupancy);
+    list(token, "", 0, 10)
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.result.supportApplications[0].landlordConsentRequired")
+                .value(occupancy.equals("TENANT")))
+        .andExpect(
+            jsonPath("$.result.supportApplications[0].landlordConsentDocumentSubmitted")
+                .value(false));
+    jdbc.update(
+        "INSERT INTO support_attachments(support_application_id,attachment_type,object_key,original_filename,file_size,content_type,submitted_at) VALUES(?,'LANDLORD_CONSENT','fixture/key','consent.pdf',1,'application/pdf',CURRENT_TIMESTAMP)",
+        supportId);
+    list(token, "", 0, 10)
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.result.supportApplications[0].landlordConsentRequired")
+                .value(occupancy.equals("TENANT")))
+        .andExpect(
+            jsonPath("$.result.supportApplications[0].landlordConsentDocumentSubmitted")
+                .value(true));
+  }
+
   @Test
   void searchesReceiptAndNameAndReturnsEmptyForNoMatch() throws Exception {
-    long id = add("김목록주민", "부천시 소사구", "APPROVED", "CONFIRMED");
+    long id = add("김목록주민", "부천시 소사구", "APPROVED");
     list(token, "  김목록  ", 0, 10)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(1))
@@ -205,7 +232,7 @@ class SupportListTest {
   /** Treats wildcard characters and SQL-like input as literal search text. */
   @Test
   void literalWildcardsAndSqlInjectionCannotBroadenResults() throws Exception {
-    add("기호%_주민", "부천시 원미구", "SUBMITTED", "PENDING");
+    add("기호%_주민", "부천시 원미구", "SUBMITTED");
     for (var keyword : List.of("%", "_", "%_"))
       list(token, keyword, 0, 10)
           .andExpect(status().isOk())
@@ -220,8 +247,7 @@ class SupportListTest {
   @Test
   void paginatesInStableSupportIdDescendingOrderWithMatchingFilteredTotals() throws Exception {
     var expected = new ArrayList<Long>();
-    for (int i = 0; i < 12; i++)
-      expected.add(add("검색대상" + i, "경기도 부천시 원미구", "SUBMITTED", "NOT_REQUIRED"));
+    for (int i = 0; i < 12; i++) expected.add(add("검색대상" + i, "경기도 부천시 원미구", "SUBMITTED"));
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
@@ -253,13 +279,13 @@ class SupportListTest {
   @Test
   void jurisdictionAppliesToRowsAndCountAndRejectsLookalikeAddresses() throws Exception {
     for (var address : List.of("서울시 부천시", "경기도 수원시", "부천시청", "부천시민로", "경기도 부천시흥"))
-      add("테스트주민", address, "APPROVED", "CONFIRMED");
+      add("테스트주민", address, "APPROVED");
     list(token, "테스트", 0, 10)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(1))
         .andExpect(jsonPath("$.result.supportApplications.length()").value(1));
-    add("유효주소", "  경기 부천시 오정구", "SUBMITTED", "PENDING");
-    add("유효주소", "부천시 원미구", "SUBMITTED", "PENDING");
+    add("유효주소", "  경기 부천시 오정구", "SUBMITTED");
+    add("유효주소", "부천시 원미구", "SUBMITTED");
     list(token, "", 0, 10).andExpect(jsonPath("$.result.totalElements").value(3));
   }
 
@@ -272,21 +298,6 @@ class SupportListTest {
         .andExpect(jsonPath("$.result.supportApplications[0].status").value(state));
     assertThat(jdbc.queryForObject("SELECT status FROM support_applications", String.class))
         .isEqualTo(state);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"PENDING", "CONFIRMED", "NOT_REQUIRED"})
-  void confirmedIsVerifiedOnlyInListResponse(String consent) throws Exception {
-    jdbc.update("UPDATE support_applications SET landlord_consent_status=?", consent);
-    list(token, "", 0, 10)
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.result.supportApplications[0].landlordConsentStatus")
-                .value("CONFIRMED".equals(consent) ? "VERIFIED" : consent));
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT landlord_consent_status FROM support_applications", String.class))
-        .isEqualTo(consent);
   }
 
   @Test
@@ -347,7 +358,7 @@ class SupportListTest {
 
   @Test
   void filteredListDoesNotAffectStatusCounts() throws Exception {
-    add("다른주민", "부천시 소사구", "APPROVED", "CONFIRMED");
+    add("다른주민", "부천시 소사구", "APPROVED");
     list(token, "없는주민", 0, 1).andExpect(jsonPath("$.result.totalElements").value(0));
     mvc.perform(
             get("/api/admin/support-applications/status")
@@ -368,8 +379,7 @@ class SupportListTest {
     for (var parameter : operation.path("parameters"))
       parameters.add(parameter.path("name").asString());
     assertThat(parameters)
-        .containsExactlyInAnyOrder(
-            "keyword", "page", "size", "district", "status", "landlordConsentStatus");
+        .containsExactlyInAnyOrder("keyword", "page", "size", "district", "status");
     assertThat(operation.path("responses").has("400")).isTrue();
     assertThat(
             operation
@@ -389,13 +399,11 @@ class SupportListTest {
   @Test
   void combinesDistrictStatusConsentAndKeywordWithMatchingPageCounts() throws Exception {
     var expected = new ArrayList<Long>();
-    for (int i = 0; i < 7; i++)
-      expected.add(add("필터주민" + i, "경기도 부천시 소사구 소사로 1", "SUBMITTED", "PENDING"));
-    add("필터주민", "부천시 원미구", "SUBMITTED", "PENDING");
-    add("필터주민", "부천시 소사구", "APPROVED", "PENDING");
-    add("필터주민", "부천시 소사구", "SUBMITTED", "CONFIRMED");
-    add("필터주민", "서울시 부천시 소사구", "SUBMITTED", "PENDING");
-    add("필터주민", "부천시 소사구청", "SUBMITTED", "PENDING");
+    for (int i = 0; i < 7; i++) expected.add(add("필터주민" + i, "경기도 부천시 소사구 소사로 1", "SUBMITTED"));
+    add("필터주민", "부천시 원미구", "SUBMITTED");
+    add("필터주민", "부천시 소사구", "APPROVED");
+    add("필터주민", "서울시 부천시 소사구", "SUBMITTED");
+    add("필터주민", "부천시 소사구청", "SUBMITTED");
     Collections.reverse(expected);
     var actual = new ArrayList<Long>();
     for (int page = 0; page < 3; page++) {
@@ -406,7 +414,6 @@ class SupportListTest {
                       .param("keyword", "필터주민")
                       .param("district", "소사구")
                       .param("status", "REVIEWING")
-                      .param("landlordConsentStatus", "PENDING")
                       .param("page", String.valueOf(page))
                       .param("size", "3"))
               .andExpect(status().isOk())
@@ -424,24 +431,13 @@ class SupportListTest {
 
   @Test
   void individualFiltersAndConsentAliasesRespectPersistedValues() throws Exception {
-    long approved = add("소사주민", " 경기 부천시 소사구", "APPROVED", "CONFIRMED");
-    add("오정주민", "부천시 오정구", "REJECTED", "PENDING");
-    for (var consent : List.of("VERIFIED", "CONFIRMED")) {
-      mvc.perform(
-              get("/api/admin/support-applications")
-                  .header("Authorization", "Bearer " + token)
-                  .param("landlordConsentStatus", consent))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.result.totalElements").value(1))
-          .andExpect(
-              jsonPath("$.result.supportApplications[0].supportApplicationId").value(approved));
-    }
+    add("소사주민", " 경기 부천시 소사구", "APPROVED");
+    add("오정주민", "부천시 오정구", "REJECTED");
     for (var filter :
         List.of(
             new String[] {"district", "원미구"},
             new String[] {"district", "오정구"},
-            new String[] {"status", "APPROVED"},
-            new String[] {"landlordConsentStatus", "NOT_REQUIRED"}))
+            new String[] {"status", "APPROVED"}))
       mvc.perform(
               get("/api/admin/support-applications")
                   .header("Authorization", "Bearer " + token)
@@ -452,8 +448,7 @@ class SupportListTest {
             get("/api/admin/support-applications")
                 .header("Authorization", "Bearer " + token)
                 .param("district", " ")
-                .param("status", "")
-                .param("landlordConsentStatus", " "))
+                .param("status", ""))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.totalElements").value(3));
   }
@@ -465,8 +460,7 @@ class SupportListTest {
             new String[] {"district", "서울"},
             new String[] {"district", "소사구|.*"},
             new String[] {"status", "DRAFT"},
-            new String[] {"status", "unknown"},
-            new String[] {"landlordConsentStatus", "UNKNOWN"}))
+            new String[] {"status", "unknown"}))
       mvc.perform(
               get("/api/admin/support-applications")
                   .header("Authorization", "Bearer " + token)

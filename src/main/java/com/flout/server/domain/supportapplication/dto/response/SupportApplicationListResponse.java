@@ -16,10 +16,8 @@ public record SupportApplicationListResponse(
           String receiptNo,
       String applicantName,
       String requestedFacility,
-      @Schema(
-              description = "DB CONFIRMED는 VERIFIED로 반환",
-              allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"})
-          String landlordConsentStatus,
+      @Schema(description = "세입자에게 동의서가 필요한지 여부") boolean landlordConsentRequired,
+      @Schema(description = "LANDLORD_CONSENT 첨부파일 존재 여부") boolean landlordConsentDocumentSubmitted,
       @Schema(allowableValues = {"SUBMITTED", "APPROVED", "REJECTED"})
           SupportApplicationStatus status) {}
 }

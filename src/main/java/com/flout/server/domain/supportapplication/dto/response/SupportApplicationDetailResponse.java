@@ -29,7 +29,8 @@ public record SupportApplicationDetailResponse(
     InspectionStatus inspectionStatus,
     boolean inspectionResultPublished,
     List<Attachment> attachments,
-    @Schema(allowableValues = {"PENDING", "VERIFIED", "NOT_REQUIRED"}) String landlordConsentStatus,
+    @Schema(description = "세입자에게 동의서가 필요한지 여부") boolean landlordConsentRequired,
+    @Schema(description = "LANDLORD_CONSENT 첨부파일 존재 여부") boolean landlordConsentDocumentSubmitted,
     @Schema(allowableValues = {"SUBMITTED", "APPROVED", "REJECTED"})
         SupportApplicationStatus status) {
   public record Attachment(

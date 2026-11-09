@@ -44,6 +44,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @Slf4j
 public class AttachmentService {
+  private com.flout.server.domain.residentprogress.FormDraftService formDrafts;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  void setFormDrafts(com.flout.server.domain.residentprogress.FormDraftService formDrafts) {
+    this.formDrafts = formDrafts;
+  }
+
   private static final long MAX_FILE_SIZE = 15L * 1024 * 1024;
   private static final long MAX_DECODED_PIXELS = 1_000_000L;
   private static final long MAX_SOURCE_PIXELS = 100_000_000L;
@@ -173,6 +180,7 @@ public class AttachmentService {
                 }
                 if (application.getStatus() == InspectionApplicationStatus.DRAFT) {
                   application.receive();
+                  if (formDrafts != null) formDrafts.complete("INSPECTION", applicationId);
                   histories.save(ApplicationStatusHistory.received(application));
                   inspections.saveAndFlush(Inspection.received(application));
                   notifications.send(

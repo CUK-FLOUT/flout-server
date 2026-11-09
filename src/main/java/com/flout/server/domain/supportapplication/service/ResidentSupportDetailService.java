@@ -51,8 +51,7 @@ public class ResidentSupportDetailService {
         a.getRequestedFacility(),
         a.getOccupancyType(),
         a.getPreferredVisitDate(),
-        a.getPreferredVisitTime(),
-        consent(a));
+        a.getPreferredVisitTime());
   }
 
   public ResidentSupportApprovalResponse approval(Long userId, Long id) {
@@ -75,7 +74,6 @@ public class ResidentSupportDetailService {
         a.getApprovedAt(),
         a.getRequestedFacility(),
         a.getSupportScope(),
-        consent(a),
         scheduledAt.map(java.time.LocalDateTime::toLocalDate).orElse(null),
         scheduledAt.map(java.time.LocalDateTime::toLocalTime).orElse(null));
   }
@@ -122,7 +120,6 @@ public class ResidentSupportDetailService {
         approval.programName(),
         approval.status(),
         approval.requestedFacility(),
-        approval.landlordConsentStatus(),
         approval.scheduledConstructionDate(),
         approval.scheduledConstructionTime());
   }
@@ -153,7 +150,7 @@ public class ResidentSupportDetailService {
           Arrays.toString(e.getStackTrace()));
       throw new BaseException(SupportDetailErrorCode.ATTACHMENT_READ_FAILED);
     }
-    return new ResidentSupportAttachmentsResponse(a.getId(), consent(a), files);
+    return new ResidentSupportAttachmentsResponse(a.getId(), files);
   }
 
   private SupportApplication owned(Long userId, Long id) {
@@ -184,11 +181,5 @@ public class ResidentSupportDetailService {
 
   private SupportApplicationStatus displayStatus(SupportApplication a) {
     return a.getStatus();
-  }
-
-  private String consent(SupportApplication a) {
-    return a.getLandlordConsentStatus() == LandlordConsentStatus.CONFIRMED
-        ? "VERIFIED"
-        : a.getLandlordConsentStatus().name();
   }
 }

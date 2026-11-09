@@ -18,29 +18,78 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class PublicIssueAccess {
+
   private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
+
   private final UserRepository users;
   private final PublicIssueRepository issues;
 
+  // 조치/검토용: 비관적 락 사용
   @Transactional(propagation = Propagation.MANDATORY)
   public Access lock(Long operatorId, Long publicIssueId) {
-    if (publicIssueId == null || publicIssueId <= 0)
-      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN)
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    var issue =
+
+    validatePublicIssueId(publicIssueId);
+
+    User operator = authorize(operatorId);
+
+    PublicIssue issue =
         issues
             .findForAction(publicIssueId)
             .orElseThrow(() -> new BaseException(PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND));
-    if (!BUCHEON.matcher(issue.getAddress().strip()).find())
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+
+    validateJurisdiction(issue);
+
     return new Access(operator, issue);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public PublicIssue read(Long operatorId, Long publicIssueId) {
+
+    validatePublicIssueId(publicIssueId);
+
+    authorize(operatorId);
+
+    PublicIssue issue =
+        issues
+            .findById(publicIssueId)
+            .orElseThrow(() -> new BaseException(PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND));
+
+    validateJurisdiction(issue);
+
+    return issue;
+  }
+
+  private void validatePublicIssueId(Long publicIssueId) {
+    if (publicIssueId == null || publicIssueId <= 0) {
+      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    }
+  }
+
+  private User authorize(Long operatorId) {
+    if (operatorId == null || operatorId <= 0) {
+      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    }
+
+    User operator =
+        users
+            .findById(operatorId)
+            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
+
+    if (operator.getRole() != UserRole.ADMIN) {
+      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
+    }
+
+    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName())) {
+      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    }
+
+    return operator;
+  }
+
+  private void validateJurisdiction(PublicIssue issue) {
+    if (!BUCHEON.matcher(issue.getAddress().strip()).find()) {
+      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    }
   }
 
   public record Access(User operator, PublicIssue issue) {}
