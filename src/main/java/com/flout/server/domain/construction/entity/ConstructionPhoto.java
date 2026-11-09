@@ -20,6 +20,9 @@ public class ConstructionPhoto {
   @JoinColumn(name = "construction_id", nullable = false)
   private Construction construction;
 
+  @Column(name = "upload_id")
+  private Long uploadId;
+
   @Column(name = "object_key", nullable = false, unique = true, length = 255)
   private String objectKey;
 
@@ -49,5 +52,9 @@ public class ConstructionPhoto {
     photo.fileSize = size;
     photo.contentType = contentType;
     return photo;
+  }
+
+  public void attachUpload(Long uploadId) {
+    this.uploadId = uploadId;
   }
 }

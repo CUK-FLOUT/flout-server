@@ -565,6 +565,8 @@ public class OpenApiConfig {
               "COMPLETED",
               "riskLevel",
               "HIGH",
+              "housingType",
+              "SEMI_BASEMENT",
               "analyzedAt",
               "2026-10-20T10:00:00+09:00",
               "guideId",

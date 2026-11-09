@@ -149,6 +149,176 @@ class ConstructionPhotoTest {
     return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
   }
 
+  ResultActions uploadWithKey(String key, MockMultipartFile... files) throws Exception {
+    var request =
+        multipart("/api/admin/constructions/{constructionId}/photos", constructionId)
+            .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", key);
+    for (var file : files) request.file(file);
+    return mvc.perform(request);
+  }
+
+  @Test
+  void retryReturnsSamePhotosWithFreshUrlsEvenAfterCompletion() throws Exception {
+    var signatures = new AtomicInteger();
+    when(storage.readUrl(anyString()))
+        .thenAnswer(
+            a ->
+                "https://private.example.test/"
+                    + a.getArgument(0)
+                    + "?signature="
+                    + signatures.incrementAndGet());
+    var first =
+        uploadWithKey("retry-key", file("a.png", png), file("b.jpg", jpeg))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    var initial = mapper.readTree(first.getContentAsString()).get("result").get("photos");
+    jdbc.update("UPDATE constructions SET status='COMPLETED'");
+    var replay =
+        uploadWithKey("retry-key", file("a.png", png), file("b.jpg", jpeg))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    var repeated = mapper.readTree(replay.getContentAsString()).get("result").get("photos");
+    assertThat(repeated.get(0).get("photoId")).isEqualTo(initial.get(0).get("photoId"));
+    assertThat(repeated.get(1).get("photoId")).isEqualTo(initial.get(1).get("photoId"));
+    assertThat(repeated.get(0).get("url")).isNotEqualTo(initial.get(0).get("url"));
+    assertThat(count("construction_photos")).isEqualTo(2);
+    assertThat(objects).hasSize(2);
+    verify(storage, times(2)).upload(anyString(), any(), anyString());
+    uploadWithKey("new-key", file("a.png", png)).andExpect(status().isConflict());
+    jdbc.update("UPDATE support_applications SET address='서울특별시'");
+    uploadWithKey("retry-key", file("a.png", png), file("b.jpg", jpeg))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void sameKeyRejectsChangedContentsNamesAndOrderButNewKeysAppend() throws Exception {
+    uploadWithKey("same", file("a.png", png), file("b.png", png)).andExpect(status().isOk());
+    uploadWithKey("same", file("b.png", png), file("a.png", png))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_6"));
+    var bytes = new ByteArrayOutputStream();
+    ImageIO.write(new BufferedImage(3, 3, BufferedImage.TYPE_INT_RGB), "png", bytes);
+    uploadWithKey("same", file("a.png", bytes.toByteArray()), file("b.png", png))
+        .andExpect(status().isConflict());
+    uploadWithKey("same", file("renamed.png", png), file("b.png", png))
+        .andExpect(status().isConflict());
+    uploadWithKey("SAME", file("a.png", png)).andExpect(status().isOk());
+    assertThat(count("construction_photos")).isEqualTo(3);
+    verify(storage, times(3)).upload(anyString(), any(), anyString());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "bad key", "키"})
+  void rejectsMalformedIdempotencyKeys(String key) throws Exception {
+    uploadWithKey(key, file("a.png", png))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_400_5"));
+    verify(storage, never()).upload(anyString(), any(), anyString());
+  }
+
+  @Test
+  void failedAttemptCanRetrySameKeyWithoutDuplicateMetadata() throws Exception {
+    doThrow(new IllegalStateException("storage unavailable"))
+        .doAnswer(
+            a -> {
+              objects.put(a.getArgument(0), a.getArgument(1));
+              return null;
+            })
+        .when(storage)
+        .upload(anyString(), any(), anyString());
+    uploadWithKey("retry-failure", file("a.png", png)).andExpect(status().isInternalServerError());
+    assertThat(count("construction_photos")).isZero();
+    assertThat(jdbc.queryForObject("SELECT status FROM construction_photo_uploads", String.class))
+        .isEqualTo("FAILED");
+    uploadWithKey("retry-failure", file("a.png", png)).andExpect(status().isOk());
+    uploadWithKey("retry-failure", file("a.png", png)).andExpect(status().isOk());
+    assertThat(count("construction_photos")).isEqualTo(1);
+    assertThat(objects).hasSize(1);
+    verify(storage, times(2)).upload(anyString(), any(), anyString());
+  }
+
+  @Test
+  void concurrentRetryIsRejectedWhileFirstRequestOwnsUpload() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    doAnswer(
+            a -> {
+              entered.countDown();
+              if (!release.await(15, TimeUnit.SECONDS))
+                throw new IllegalStateException("upload timeout");
+              objects.put(a.getArgument(0), a.getArgument(1));
+              return null;
+            })
+        .when(storage)
+        .upload(anyString(), any(), anyString());
+    var pool = Executors.newSingleThreadExecutor();
+    try {
+      var first =
+          pool.submit(
+              () ->
+                  uploadWithKey("concurrent", file("a.png", png))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+      uploadWithKey("concurrent", file("a.png", png))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_7"));
+      release.countDown();
+      assertThat(first.get(20, TimeUnit.SECONDS)).isEqualTo(200);
+      uploadWithKey("concurrent", file("a.png", png)).andExpect(status().isOk());
+      assertThat(count("construction_photos")).isEqualTo(1);
+      verify(storage, times(1)).upload(anyString(), any(), anyString());
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
+  void expiredLeaseIsReclaimedAndOldAttemptCannotCommit() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var attempts = new AtomicInteger();
+    doAnswer(
+            a -> {
+              if (attempts.incrementAndGet() == 1) {
+                entered.countDown();
+                if (!release.await(15, TimeUnit.SECONDS))
+                  throw new IllegalStateException("upload timeout");
+              }
+              objects.put(a.getArgument(0), a.getArgument(1));
+              return null;
+            })
+        .when(storage)
+        .upload(anyString(), any(), anyString());
+    var pool = Executors.newSingleThreadExecutor();
+    try {
+      var old =
+          pool.submit(
+              () ->
+                  uploadWithKey("expired", file("a.png", png))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+      jdbc.update("UPDATE construction_photo_uploads SET lease_until='2000-01-01 00:00:00'");
+      uploadWithKey("expired", file("a.png", png)).andExpect(status().isOk());
+      release.countDown();
+      assertThat(old.get(20, TimeUnit.SECONDS)).isEqualTo(409);
+      assertThat(count("construction_photos")).isEqualTo(1);
+      assertThat(objects).hasSize(1);
+      assertThat(jdbc.queryForObject("SELECT status FROM construction_photo_uploads", String.class))
+          .isEqualTo("SUCCEEDED");
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
   @Test
   void requiresAtLeastOneFileAndRejectsEmptyParts() throws Exception {
     upload().andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON_400_3"));
@@ -384,6 +554,7 @@ class ConstructionPhotoTest {
     var doc = mapper.readTree(response.getContentAsString());
     var op = doc.get("paths").get("/api/admin/constructions/{constructionId}/photos").get("post");
     assertThat(op.get("summary").asString()).isEqualTo("시공 사진 업로드");
+    assertThat(op.get("parameters").toString()).contains("Idempotency-Key");
     var body = op.get("requestBody");
     assertThat(body.get("required").asBoolean()).isTrue();
     var schema = body.get("content").get("multipart/form-data").get("schema");

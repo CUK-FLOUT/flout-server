@@ -1,5 +1,6 @@
 package com.flout.server.domain.residentprogress;
 
+import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.flout.server.global.exception.BaseException;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -64,6 +65,11 @@ public class ResidentProgressService {
       @Schema(description = "상세 주소", nullable = true) String detailAddress,
       @Schema(description = "분석 상태") String status,
       @Schema(description = "분석 위험 등급") String riskLevel,
+      @Schema(
+              description = "거주층, 미입력은 null",
+              types = {"string", "null"},
+              allowableValues = {"SEMI_BASEMENT", "FIRST_FLOOR", "SECOND_FLOOR_OR_ABOVE"})
+          HousingType housingType,
       @Schema(description = "분석 생성 시각, KST") java.time.OffsetDateTime analyzedAt,
       @Schema(description = "연결된 가이드 ID", nullable = true) Long guideId,
       @Schema(description = "연결된 현장점검 신청 ID", nullable = true) Long applicationId,
@@ -145,6 +151,7 @@ public class ResidentProgressService {
         a.getDetailAddress(),
         a.getStatus().name(),
         a.getRiskLevel().name(),
+        a.getHousingType(),
         a.getCreatedAt().atOffset(java.time.ZoneOffset.ofHours(9)),
         num(guide, "guide_id"),
         num(app, "application_id"),
