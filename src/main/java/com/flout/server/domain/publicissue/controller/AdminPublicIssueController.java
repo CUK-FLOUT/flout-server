@@ -5,9 +5,11 @@ import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueDetailRe
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.dto.response.CreatePublicIssueResponse;
+import com.flout.server.domain.publicissue.dto.response.RelatedApplicationsResponse;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.publicissue.service.AdminPublicIssueDetailService;
 import com.flout.server.domain.publicissue.service.AdminPublicIssueListService;
+import com.flout.server.domain.publicissue.service.PublicIssueRelatedApplicationService;
 import com.flout.server.domain.publicissue.service.PublicIssueService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,10 +27,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/admin/public-issues")
 @Tag(name = "운영자-현장점검 관리", description = "관할 지역의 현장점검 관리")
 public class AdminPublicIssueController {
+
   private final PublicIssueService service;
   private final AdminPublicIssueListService listService;
   private final AdminPublicIssueDetailService detailService;
+  private final PublicIssueRelatedApplicationService relatedApplicationService;
 
+  // 지역·공공 문제 목록 조회
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역·공공 문제 목록 조회·검색",
@@ -56,12 +61,14 @@ public class AdminPublicIssueController {
           int page,
       @Parameter(description = "페이지 크기 1~100", example = "10") @RequestParam(defaultValue = "10")
           int size) {
+
     return SuccessResponse.of(
         listService.search(
             Long.valueOf(jwt.getSubject()), district, status, issueType, keyword, page, size),
         PublicIssueSuccessCode.LIST_FOUND);
   }
 
+  // 지역·공공 문제 현황 조회
   @GetMapping(value = "/status", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역·공공 문제 현황 건수 조회",
@@ -80,11 +87,13 @@ public class AdminPublicIssueController {
       @Parameter(description = "지역 주소·문제 상세·현장 확인 내용 부분 검색, 최대 255자")
           @RequestParam(defaultValue = "")
           String keyword) {
+
     return SuccessResponse.of(
         listService.status(Long.valueOf(jwt.getSubject()), district, issueType, keyword),
         PublicIssueSuccessCode.STATUS_FOUND);
   }
 
+  // 지역·공공 문제 상세 조회
   @GetMapping(value = "/{publicIssueId}", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역 문제·참고 정보 상세 조회",
@@ -93,11 +102,13 @@ public class AdminPublicIssueController {
   public SuccessResponse<AdminPublicIssueDetailResponse> detail(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "지역·공공 문제 ID", example = "1") @PathVariable Long publicIssueId) {
+
     return SuccessResponse.of(
         detailService.detail(Long.valueOf(jwt.getSubject()), publicIssueId),
         PublicIssueSuccessCode.DETAIL_FOUND);
   }
 
+  // 지역·공공 문제 등록
   @PostMapping(
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
@@ -107,8 +118,22 @@ public class AdminPublicIssueController {
           "관할 원본 점검에 연결된 문제를 RECEIVED로 등록합니다. 주소는 선택이며 생략·null이면 원본 점검 신청 주소를 사용합니다. 나머지 필드는 필수이며 주소는 255자, 상세 내용·현장 확인 내용은 각각 4000자까지 허용합니다. 동일 주소는 원본 좌표를 재사용하고 다른 주소는 기존 좌표 서비스를 호출합니다. 같은 점검에서 여러 건 등록할 수 있습니다.")
   public SuccessResponse<CreatePublicIssueResponse> register(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreatePublicIssueRequest request) {
+
     return SuccessResponse.of(
         service.register(Long.valueOf(jwt.getSubject()), request),
         PublicIssueSuccessCode.REGISTERED);
+  }
+
+  // 공공시설 관련 주민 신청 목록 조회 (PR #202)
+  @GetMapping(
+      value = "/{publicIssueId}/resident-applications",
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  @Operation(summary = "공공시설 관련 주민 신청 목록 조회", description = "공공시설 문제와 주소가 동일한 주민 신청 목록을 조회합니다.")
+  public SuccessResponse<RelatedApplicationsResponse> getRelatedApplications(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable Long publicIssueId) {
+
+    return SuccessResponse.of(
+        relatedApplicationService.getRelated(Long.valueOf(jwt.getSubject()), publicIssueId),
+        PublicIssueSuccessCode.RELATED_APPLICATIONS_RETRIEVED);
   }
 }

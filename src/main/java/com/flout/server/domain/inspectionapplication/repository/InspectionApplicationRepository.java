@@ -2,6 +2,7 @@ package com.flout.server.domain.inspectionapplication.repository;
 
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplication;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -53,4 +54,22 @@ public interface InspectionApplicationRepository
   @Modifying
   @Query("update InspectionApplication a set a.internalMemo = :memo where a.id = :applicationId")
   int updateInternalMemo(@Param("applicationId") Long applicationId, @Param("memo") String memo);
+
+  @Query(
+      value =
+          """
+                    SELECT a.*
+                    FROM inspection_applications a
+                    WHERE REGEXP_REPLACE(
+                            REGEXP_REPLACE(
+                                TRIM(a.address), '[[:space:]]+', ' '
+                            ),
+                            '^경기 ', '경기도 '
+                          ) = :normalizedAddress
+                      AND a.status <> 'DRAFT'
+                    ORDER BY a.created_at DESC, a.application_id DESC
+                    """,
+      nativeQuery = true)
+  List<InspectionApplication> findRelatedByNormalizedAddress(
+      @Param("normalizedAddress") String normalizedAddress);
 }
