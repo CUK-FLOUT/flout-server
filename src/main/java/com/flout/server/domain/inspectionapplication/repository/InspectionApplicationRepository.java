@@ -55,7 +55,6 @@ public interface InspectionApplicationRepository
   @Query("update InspectionApplication a set a.internalMemo = :memo where a.id = :applicationId")
   int updateInternalMemo(@Param("applicationId") Long applicationId, @Param("memo") String memo);
 
-  @EntityGraph(attributePaths = {"assessment"})
   @Query(
       value =
           """
