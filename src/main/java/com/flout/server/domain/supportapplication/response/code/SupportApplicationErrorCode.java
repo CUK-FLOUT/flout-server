@@ -15,7 +15,7 @@ public enum SupportApplicationErrorCode implements BaseResponseCode {
   PROGRAM_NOT_FOUND(404, "SUPPORT_404_2", "지원사업을 찾을 수 없습니다."),
   MATCHED_PROGRAM_NOT_FOUND(404, "SUPPORT_404_3", "분석 결과와 주소에 맞는 지원사업을 찾을 수 없습니다."),
   DUPLICATE_APPLICATION(409, "SUPPORT_409_1", "이미 접수된 지원 신청이 존재합니다."),
-  MATCHING_INPUT_INVALID(400, "SUPPORT_400_4", "공식 상담 안내 설정이 없어 매칭을 처리할 수 없습니다."),
+  MATCHING_INPUT_INVALID(500, "SUPPORT_500_1", "추천 서비스를 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."),
   GEMINI_RETRY_REQUIRED(503, "SUPPORT_503_1", "추천 서비스에 일시적인 문제가 발생했습니다. 다시 시도해 주세요.");
 
   private final int status;

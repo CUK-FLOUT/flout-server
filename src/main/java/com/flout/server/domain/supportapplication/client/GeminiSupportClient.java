@@ -8,12 +8,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-// Gemini 모델의 ID/판정값만 받아온다. 사업명과 링크는 서비스에서 DB로 다시 조회한다.
+/** Gemini 모델의 ID/판정값만 받아온다. 사업명과 링크는 서비스에서 DB로 다시 조회한다. */
+@Slf4j
 @Component
 public class GeminiSupportClient {
   private final ObjectMapper mapper;
@@ -40,7 +42,10 @@ public class GeminiSupportClient {
   }
 
   public Decision decide(Map<String, Object> input) {
-    if (apiKey == null || apiKey.isBlank()) throw retryRequired();
+    if (apiKey == null || apiKey.isBlank()) {
+      log.warn("Gemini 호출 불가: API 키가 설정되지 않았습니다.");
+      throw retryRequired();
+    }
     String prompt =
         """
         너는 FLOUT의 주민용 침수 피해 예방·대비·회복 지원 안내 도우미다.
@@ -79,7 +84,10 @@ public class GeminiSupportClient {
               .POST(HttpRequest.BodyPublishers.ofString(body))
               .build();
       HttpResponse<String> result = http.send(request, HttpResponse.BodyHandlers.ofString());
-      if (result.statusCode() / 100 != 2) throw retryRequired();
+      if (result.statusCode() / 100 != 2) {
+        log.warn("Gemini 호출 실패: HTTP status={}", result.statusCode());
+        throw retryRequired();
+      }
       JsonNode response = mapper.readTree(result.body());
       String output =
           response
@@ -108,10 +116,12 @@ public class GeminiSupportClient {
     } catch (BaseException e) {
       throw e;
     } catch (InterruptedException e) {
+      log.warn("Gemini 호출 중단: {}", e.getClass().getSimpleName());
       Thread.currentThread().interrupt();
       throw retryRequired();
     } catch (Exception e) {
-      // 개인정보·프롬프트·API 키를 로그에 출력하지 않는다.
+      // 개인정보·프롬프트·API 키·예외 메시지를 로그에 출력하지 않는다.
+      log.warn("Gemini 응답 처리 실패: {}", e.getClass().getSimpleName());
       throw retryRequired();
     }
   }

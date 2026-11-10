@@ -29,7 +29,8 @@ import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class SupportProgramMatchingService {
   private final InspectionVulnerabilityRepository vulnerabilities;
   private final SupportProgramRepository programs;
   private final GeminiSupportClient gemini;
+  private final PlatformTransactionManager transactionManager;
 
   @Value("${app.support.fallback-guidance.id:}")
   private String guidanceId;
@@ -54,18 +56,102 @@ public class SupportProgramMatchingService {
   @Value("${app.support.fallback-guidance.official-url:}")
   private String guidanceUrl;
 
-  @Transactional(readOnly = true)
   public SupportProgramMatchingResponse match(Long userId, Long applicationId) {
-    if (applicationId == null || applicationId <= 0)
+    if (applicationId == null || applicationId <= 0) {
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    }
 
+    // 서버 설정 오류는 사용자 입력 오류가 아니며, DB 조회 전에 발견한다.
+    validateGuidance();
+
+    // DB 조회와 필요한 데이터 복사를 완료한 후 트랜잭션을 종료한다.
+    TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+    transaction.setReadOnly(true);
+    MatchingSnapshot snapshot = transaction.execute(status -> loadSnapshot(userId, applicationId));
+    if (snapshot == null) {
+      throw new IllegalStateException("지원사업 조회 결과를 준비하지 못했습니다.");
+    }
+    if (snapshot.candidates().isEmpty()) {
+      return guidance(applicationId, "현재 확인 가능한 지원사업이 없어 공식 상담을 안내해 드립니다.");
+    }
+
+    // 외부 네트워크 호출은 트랜잭션이 완전히 종료된 뒤에 수행한다.
+    var decision = gemini.decide(snapshot.input());
+    if ("CONSULTATION".equals(decision.itemType())) {
+      if (!"GUIDANCE".equals(decision.matchStatus())
+          || !"GUIDANCE".equals(decision.matchType())
+          || !Objects.equals(guidanceId, decision.guidanceId())) {
+        return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
+      }
+      return guidance(applicationId, safeReason(decision.reason(), "공식 상담에서 지원 가능 여부를 확인해 주세요."));
+    }
+    if (!"PROGRAM".equals(decision.itemType()) || decision.programId() == null) {
+      return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
+    }
+    if (!Set.of("DIRECT", "COMPLEMENTARY").contains(decision.matchType())) {
+      return guidance(applicationId, "지원사업의 관련성을 확인하지 못해 공식 상담을 안내해 드립니다.");
+    }
+
+    ProgramCandidate chosen =
+        snapshot.candidates().stream()
+            .filter(p -> p.id().equals(decision.programId()))
+            .findFirst()
+            .orElse(null);
+    if (chosen == null) {
+      return guidance(applicationId, "현재 신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
+    }
+
+    ProgramInfo info = chosen.info();
+    List<String> missing = new ArrayList<>(decision.missingInformation());
+    if (!"OPEN".equalsIgnoreCase(String.valueOf(info.applicationStatus()))) {
+      missing.add("접수상태 확인 필요");
+    }
+    if (info.applicationStartDate() == null || info.applicationEndDate() == null) {
+      missing.add("공식 접수기간 확인 필요");
+    }
+    if (info.eligibilityConditions() == null || info.eligibilityConditions().isBlank()) {
+      missing.add("신청 자격 확인 필요");
+    }
+    if (snapshot.region() == null) {
+      missing.add("대상 지역 확인 필요");
+    }
+    String matchStatus =
+        missing.isEmpty() && "MATCHED".equals(decision.matchStatus())
+            ? "MATCHED"
+            : "NEEDS_CONFIRMATION";
+
+    List<Evidence> evidence =
+        Stream.of(
+                new Evidence("supportProgram.name", info.name()),
+                new Evidence("supportProgram.targetDescription", info.targetDescription()),
+                new Evidence("inspectionResult.summary", snapshot.summary()))
+            .filter(e -> e.sourceText() != null && !e.sourceText().isBlank())
+            .toList();
+
+    var recommendation =
+        new Recommendation(
+            "PROGRAM",
+            chosen.id(),
+            null,
+            decision.matchType(),
+            safeReason(decision.reason(), "현장점검 결과와 관련된 사업으로 검토되었습니다."),
+            List.of(),
+            evidence,
+            missing.stream().distinct().toList(),
+            info,
+            null);
+    return new SupportProgramMatchingResponse(applicationId, matchStatus, recommendation);
+  }
+
+  private MatchingSnapshot loadSnapshot(Long userId, Long applicationId) {
     var application =
         applications
             .findForResidentDetail(applicationId)
             .orElseThrow(
                 () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
-    if (!application.getApplicant().getId().equals(userId))
+    if (!application.getApplicant().getId().equals(userId)) {
       throw new BaseException(InspectionApplicationErrorCode.APPLICATION_DETAIL_ACCESS_DENIED);
+    }
 
     var result =
         inspections
@@ -79,12 +165,29 @@ public class SupportProgramMatchingService {
     LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
     var available =
         programs.findAllByOrderByIdAsc().stream().filter(p -> !isExcluded(p, today)).toList();
-
-    // 실제 공식 상담 안내가 없는 상태에서 임의 연락처를 생성하지 않는다.
-    validateGuidance();
-    if (available.isEmpty()) return guidance(applicationId, "현재 확인 가능한 지원사업이 없어 공식 상담을 안내해 드립니다.");
-
     String region = extractRegion(application.getAddress());
+
+    List<ProgramCandidate> candidates =
+        available.stream()
+            .map(
+                p ->
+                    new ProgramCandidate(
+                        p.getId(),
+                        new ProgramInfo(
+                            p.getName(),
+                            p.getDescription(),
+                            p.getTargetDescription(),
+                            p.getEligibilityConditions(),
+                            p.getExclusionConditions(),
+                            p.getSupportedFacilities(),
+                            p.getRequiredDocuments(),
+                            p.getApplicationMethod(),
+                            p.getApplicationStartDate(),
+                            p.getApplicationEndDate(),
+                            p.getApplicationStatus(),
+                            p.getOfficialSource(),
+                            p.getOfficialUrl())))
+            .toList();
     List<Map<String, Object>> findingInputs =
         findings.stream()
             .map(
@@ -98,23 +201,25 @@ public class SupportProgramMatchingService {
                 })
             .toList();
     List<Map<String, Object>> programInputs =
-        available.stream()
+        candidates.stream()
             .map(
-                p -> {
+                candidate -> {
+                  ProgramInfo p = candidate.info();
                   Map<String, Object> row = new HashMap<>();
-                  row.put("id", p.getId());
-                  row.put("name", p.getName());
-                  row.put("description", p.getDescription());
-                  row.put("targetDescription", p.getTargetDescription());
-                  row.put("eligibilityConditions", p.getEligibilityConditions());
-                  row.put("exclusionConditions", p.getExclusionConditions());
-                  row.put("supportedFacilities", p.getSupportedFacilities());
-                  row.put("applicationStatus", p.getApplicationStatus());
-                  row.put("applicationStartDate", p.getApplicationStartDate());
-                  row.put("applicationEndDate", p.getApplicationEndDate());
+                  row.put("id", candidate.id());
+                  row.put("name", p.name());
+                  row.put("description", p.description());
+                  row.put("targetDescription", p.targetDescription());
+                  row.put("eligibilityConditions", p.eligibilityConditions());
+                  row.put("exclusionConditions", p.exclusionConditions());
+                  row.put("supportedFacilities", p.supportedFacilities());
+                  row.put("applicationStatus", p.applicationStatus());
+                  row.put("applicationStartDate", p.applicationStartDate());
+                  row.put("applicationEndDate", p.applicationEndDate());
                   return row;
                 })
             .toList();
+
     Map<String, Object> input = new HashMap<>();
     input.put("serverDate", today.toString());
     input.put("region", region);
@@ -129,77 +234,16 @@ public class SupportProgramMatchingService {
     input.put(
         "fallbackGuidance",
         Map.of("id", guidanceId, "title", guidanceTitle, "description", guidanceDescription));
-    var decision = gemini.decide(input);
-
-    if ("CONSULTATION".equals(decision.itemType())) {
-      if (!"GUIDANCE".equals(decision.matchStatus())
-          || !"GUIDANCE".equals(decision.matchType())
-          || !Objects.equals(guidanceId, decision.guidanceId()))
-        return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
-      return guidance(applicationId, safeReason(decision.reason(), "공식 상담에서 지원 가능 여부를 확인해 주세요."));
-    }
-    if (!"PROGRAM".equals(decision.itemType()) || decision.programId() == null)
-      return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
-    if (!Set.of("DIRECT", "COMPLEMENTARY").contains(decision.matchType()))
-      return guidance(applicationId, "지원사업의 관련성을 확인하지 못해 공식 상담을 안내해 드립니다.");
-    SupportProgram chosen =
-        available.stream()
-            .filter(p -> p.getId().equals(decision.programId()))
-            .findFirst()
-            .orElse(null);
-    if (chosen == null) return guidance(applicationId, "현재 신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
-
-    List<String> missing = new ArrayList<>(decision.missingInformation());
-    // 모델의 MATCHED 판정을 그대로 신뢰하지 않고 접수 상태와 기간을 서버에서 검증한다.
-    if (!"OPEN".equalsIgnoreCase(String.valueOf(chosen.getApplicationStatus())))
-      missing.add("접수상태 확인 필요");
-    if (chosen.getApplicationStartDate() == null || chosen.getApplicationEndDate() == null)
-      missing.add("공식 접수기간 확인 필요");
-    if (chosen.getEligibilityConditions() == null || chosen.getEligibilityConditions().isBlank())
-      missing.add("신청 자격 확인 필요");
-    // 주소의 행정구역 판정 및 기타 제외조건도 공식 공고 대조가 필요하다.
-    if (region == null) missing.add("대상 지역 확인 필요");
-    String matchStatus =
-        missing.isEmpty() && "MATCHED".equals(decision.matchStatus())
-            ? "MATCHED"
-            : "NEEDS_CONFIRMATION";
-
-    ProgramInfo program =
-        new ProgramInfo(
-            chosen.getName(),
-            chosen.getDescription(),
-            chosen.getTargetDescription(),
-            chosen.getEligibilityConditions(),
-            chosen.getExclusionConditions(),
-            chosen.getSupportedFacilities(),
-            chosen.getRequiredDocuments(),
-            chosen.getApplicationMethod(),
-            chosen.getApplicationStartDate(),
-            chosen.getApplicationEndDate(),
-            chosen.getApplicationStatus(),
-            chosen.getOfficialSource(),
-            chosen.getOfficialUrl());
-    List<Evidence> evidence =
-        Stream.of(
-                new Evidence("supportProgram.name", chosen.getName()),
-                new Evidence("supportProgram.targetDescription", chosen.getTargetDescription()),
-                new Evidence("inspectionResult.summary", result.getSummary()))
-            .filter(e -> e.sourceText() != null && !e.sourceText().isBlank())
-            .toList();
-    var recommendation =
-        new Recommendation(
-            "PROGRAM",
-            chosen.getId(),
-            null,
-            decision.matchType(),
-            safeReason(decision.reason(), "현장점검 결과와 관련된 사업으로 검토되었습니다."),
-            List.of(),
-            evidence,
-            missing.stream().distinct().toList(),
-            program,
-            null);
-    return new SupportProgramMatchingResponse(applicationId, matchStatus, recommendation);
+    return new MatchingSnapshot(input, candidates, region, result.getSummary());
   }
+
+  private record ProgramCandidate(Long id, ProgramInfo info) {}
+
+  private record MatchingSnapshot(
+      Map<String, Object> input,
+      List<ProgramCandidate> candidates,
+      String region,
+      String summary) {}
 
   private boolean isExcluded(SupportProgram p, LocalDate today) {
     String status = String.valueOf(p.getApplicationStatus()).toUpperCase(Locale.ROOT);
