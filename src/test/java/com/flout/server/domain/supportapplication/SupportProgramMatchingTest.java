@@ -71,6 +71,7 @@ class SupportProgramMatchingTest {
             "support_applications",
             "support_programs",
             "inspection_vulnerabilities",
+            "prevention_recommendations",
             "inspection_results",
             "inspection_status_histories",
             "inspections",
@@ -344,6 +345,97 @@ class SupportProgramMatchingTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"));
     verifyNoInteractions(gemini);
+  }
+
+  @Test
+  void directFacilityMatchIncludesOnlyRealExpertActionId() throws Exception {
+    Long resultId = publishResult("현장점검 결과");
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "출입구에 물막이판 설치를 권장합니다.",
+        0);
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "배수펌프 설치를 권장합니다.",
+        1);
+    Long recommendedId =
+        jdbc.queryForObject(
+            "SELECT recommendation_id FROM prevention_recommendations WHERE result_id=? AND sort_order=0",
+            Long.class,
+            resultId);
+    var program = programs.saveAndFlush(SupportProgram.create("물막이판 지원", "설치", "부천시", "접수중"));
+    jdbc.update(
+        "UPDATE support_programs SET supported_facilities=? WHERE program_id=?",
+        "[\"물막이판\"]",
+        program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "MATCHED", "PROGRAM", program.getId(), null, "DIRECT", "권장시설과 일치", List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.recommendation.matchedActionIds[0]").value(recommendedId))
+        .andExpect(jsonPath("$.result.recommendation.matchedActionIds.length()").value(1))
+        .andExpect(
+            jsonPath(
+                "$.result.recommendation.evidence[*].sourceField",
+                hasItem("preventionRecommendation." + recommendedId)));
+  }
+
+  @Test
+  void directFacilityMismatchFallsBackToConsultation() throws Exception {
+    Long resultId = publishResult("현장점검 결과");
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "배수펌프 설치를 권장합니다.",
+        0);
+    var program = programs.saveAndFlush(SupportProgram.create("물막이판 지원", "설치", "부천시", "접수중"));
+    jdbc.update(
+        "UPDATE support_programs SET supported_facilities=? WHERE program_id=?",
+        "[\"물막이판\"]",
+        program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "MATCHED", "PROGRAM", program.getId(), null, "DIRECT", "추천", List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"));
+  }
+
+  @Test
+  void complementaryRecommendationDoesNotClaimDirectExpertFacilityMatch() throws Exception {
+    Long resultId = publishResult("현장점검 결과");
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "물막이판 설치를 권장합니다.",
+        0);
+    var program = programs.saveAndFlush(SupportProgram.create("이주 지원", "상담", "부천시", "문의 필요"));
+    jdbc.update(
+        "UPDATE support_programs SET supported_facilities='[]' WHERE program_id=?",
+        program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "NEEDS_CONFIRMATION",
+                "PROGRAM",
+                program.getId(),
+                null,
+                "COMPLEMENTARY",
+                "이주 상담 안내",
+                List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("COMPLEMENTARY"))
+        .andExpect(jsonPath("$.result.recommendation.matchedActionIds.length()").value(0));
   }
 
   @Test

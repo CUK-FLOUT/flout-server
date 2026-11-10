@@ -4,6 +4,7 @@ import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspection.repository.InspectionResultRepository;
 import com.flout.server.domain.inspection.repository.InspectionVulnerabilityRepository;
+import com.flout.server.domain.inspection.repository.PreventionRecommendationRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.supportapplication.client.GeminiSupportClient;
@@ -40,6 +41,8 @@ public class SupportProgramMatchingService {
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
   private final InspectionVulnerabilityRepository vulnerabilities;
+  private final PreventionRecommendationRepository preventionRecommendations;
+  private final SupportFacilityMatcher facilityMatcher;
   private final SupportProgramRepository programs;
   private final GeminiSupportClient gemini;
   private final PlatformTransactionManager transactionManager;
@@ -102,7 +105,20 @@ public class SupportProgramMatchingService {
     }
 
     ProgramInfo info = chosen.info();
+    var facilityMatch =
+        "DIRECT".equals(decision.matchType())
+            ? facilityMatcher.match(info.supportedFacilities(), snapshot.actions())
+            : new SupportFacilityMatcher.MatchResult(true, List.of(), List.of());
+    // DIRECT means related to an expert-recommended facility. Do not claim a false match.
+    if ("DIRECT".equals(decision.matchType())
+        && facilityMatch.facilitiesKnown()
+        && !facilityMatch.hasMatch()) {
+      return guidance(applicationId, "권장시설과 지원시설이 일치하지 않아 공식 상담을 안내합니다.");
+    }
     List<String> missing = new ArrayList<>(decision.missingInformation());
+    if ("DIRECT".equals(decision.matchType()) && !facilityMatch.facilitiesKnown()) {
+      missing.add("지원시설 정보 확인 필요");
+    }
     if (!"OPEN".equalsIgnoreCase(String.valueOf(info.applicationStatus()))) {
       missing.add("접수상태 확인 필요");
     }
@@ -121,10 +137,16 @@ public class SupportProgramMatchingService {
             : "NEEDS_CONFIRMATION";
 
     List<Evidence> evidence =
-        Stream.of(
-                new Evidence("supportProgram.name", info.name()),
-                new Evidence("supportProgram.targetDescription", info.targetDescription()),
-                new Evidence("inspectionResult.summary", snapshot.summary()))
+        Stream.concat(
+                Stream.of(
+                    new Evidence("supportProgram.name", info.name()),
+                    new Evidence("supportProgram.targetDescription", info.targetDescription()),
+                    new Evidence("inspectionResult.summary", snapshot.summary())),
+                facilityMatch.matchedActions().stream()
+                    .map(
+                        action ->
+                            new Evidence(
+                                "preventionRecommendation." + action.id(), action.description())))
             .filter(e -> e.sourceText() != null && !e.sourceText().isBlank())
             .toList();
 
@@ -135,7 +157,7 @@ public class SupportProgramMatchingService {
             null,
             decision.matchType(),
             safeReason(decision.reason(), "현장점검 결과와 관련된 사업으로 검토되었습니다."),
-            List.of(),
+            facilityMatch.matchedActionIds(),
             evidence,
             missing.stream().distinct().toList(),
             info,
@@ -162,6 +184,10 @@ public class SupportProgramMatchingService {
                         inspection.getId(), ResultStatus.PUBLISHED))
             .orElseThrow(() -> new BaseException(SupportApplicationErrorCode.RESULT_NOT_PUBLISHED));
     var findings = vulnerabilities.findByResultIdOrderBySortOrderAsc(result.getId());
+    List<SupportFacilityMatcher.Action> actions =
+        preventionRecommendations.findByResultIdOrderBySortOrderAsc(result.getId()).stream()
+            .map(item -> new SupportFacilityMatcher.Action(item.getId(), item.getDescription()))
+            .toList();
     LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
     var available =
         programs.findAllByOrderByIdAsc().stream().filter(p -> !isExcluded(p, today)).toList();
@@ -229,12 +255,23 @@ public class SupportProgramMatchingService {
             "occupancyType", application.getOccupancyType().name(),
             "floodExperience", application.getFloodExperience().name(),
             "existingFacility", application.isExistingFacility()));
-    input.put("expertRecommendations", findingInputs);
+    input.put("inspectionFindings", findingInputs);
+    input.put(
+        "expertRecommendations",
+        actions.stream()
+            .map(
+                action -> {
+                  Map<String, Object> row = new HashMap<>();
+                  row.put("id", action.id());
+                  row.put("description", action.description());
+                  return row;
+                })
+            .toList());
     input.put("programs", programInputs);
     input.put(
         "fallbackGuidance",
         Map.of("id", guidanceId, "title", guidanceTitle, "description", guidanceDescription));
-    return new MatchingSnapshot(input, candidates, region, result.getSummary());
+    return new MatchingSnapshot(input, candidates, region, result.getSummary(), actions);
   }
 
   private record ProgramCandidate(Long id, ProgramInfo info) {}
@@ -243,7 +280,8 @@ public class SupportProgramMatchingService {
       Map<String, Object> input,
       List<ProgramCandidate> candidates,
       String region,
-      String summary) {}
+      String summary,
+      List<SupportFacilityMatcher.Action> actions) {}
 
   private boolean isExcluded(SupportProgram p, LocalDate today) {
     String status = String.valueOf(p.getApplicationStatus()).toUpperCase(Locale.ROOT);
