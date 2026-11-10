@@ -28,6 +28,10 @@ public class SupportProgram {
   @Column(name = "operating_status", length = 50)
   private String operatingStatus;
 
+  // V63: FACILITY / RELOCATION / INSURANCE. Null means legacy/unclassified.
+  @Column(name = "program_kind", length = 30)
+  private String programKind;
+
   // 신청 자격
   @Column(name = "eligibility_conditions", columnDefinition = "TEXT")
   private String eligibilityConditions;

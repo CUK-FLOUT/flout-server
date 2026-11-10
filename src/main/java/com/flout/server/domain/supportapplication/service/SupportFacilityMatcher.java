@@ -50,6 +50,29 @@ public class SupportFacilityMatcher {
     return new MatchResult(true, List.copyOf(ids), List.copyOf(evidence));
   }
 
+  /** A requested item must be one unambiguous supported facility AND explicitly recommended. */
+  public boolean canApplyForFacility(
+      String supportedFacilitiesJson, String requestedFacility, List<Action> recommendations) {
+    String wanted = canonicalFacility(requestedFacility);
+    if (wanted == null || requestedFacility == null) return false;
+    // Reject compound requests such as "배수펌프 및 물막이판" disguised as a single facility.
+    String compact = requestedFacility.replaceAll("\\s+", "");
+    long names = FACILITIES.stream().filter(compact::contains).count();
+    if (names != 1) return false;
+    boolean supported =
+        parseSupported(supportedFacilitiesJson).stream()
+            .map(SupportFacilityMatcher::canonicalFacility)
+            .anyMatch(wanted::equals);
+    if (!supported) return false;
+    for (Action recommendation : recommendations) {
+      if (recommendation.description() == null) continue;
+      if (extractor.extract(List.of(recommendation.description())).stream()
+          .map(SupportFacilityMatcher::canonicalFacility)
+          .anyMatch(wanted::equals)) return true;
+    }
+    return false;
+  }
+
   private List<String> parseSupported(String json) {
     try {
       JsonNode root = mapper.readTree(json);
