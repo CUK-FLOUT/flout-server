@@ -51,25 +51,66 @@ public class SupportFacilityMatcher {
   }
 
   /** A requested item must be one unambiguous supported facility AND explicitly recommended. */
+
+  /**
+   * A requested item must be one unambiguous supported facility and must be explicitly recommended.
+   */
   public boolean canApplyForFacility(
       String supportedFacilitiesJson, String requestedFacility, List<Action> recommendations) {
+
     String wanted = canonicalFacility(requestedFacility);
-    if (wanted == null || requestedFacility == null) return false;
-    // Reject compound requests such as "배수펌프 및 물막이판" disguised as a single facility.
+    if (wanted == null || requestedFacility == null || recommendations == null) {
+      return false;
+    }
+
     String compact = requestedFacility.replaceAll("\\s+", "").replace("역류방지용밸브", "역류방지밸브");
-    long names = FACILITIES.stream().filter(compact::contains).count();
+
+    // 명시적인 복합시설 신청은 차단한다.
+    if (compact.contains("및")
+        || compact.contains(",")
+        || compact.contains("/")
+        || compact.contains("+")
+        || compact.contains("&")
+        || FACILITIES.stream()
+            .anyMatch(name -> compact.contains(name + "와") || compact.contains(name + "과"))) {
+      return false;
+    }
+
+    // 배수구나 집수정이 설치 위치로 사용된 경우,
+    // 별도의 신청시설로 중복 집계하지 않는다.
+    String facilityNames = compact;
+
+    if (!"배수구".equals(wanted)) {
+      facilityNames = facilityNames.replace("화장실배수구", "화장실").replace("바닥배수구", "바닥");
+    }
+
+    if (!"집수정".equals(wanted)) {
+      facilityNames = facilityNames.replace("집수정", "");
+    }
+
+    final String namesToCheck = facilityNames;
+    long names = FACILITIES.stream().filter(namesToCheck::contains).count();
+
     if (names != 1) return false;
+
     boolean supported =
         parseSupported(supportedFacilitiesJson).stream()
             .map(SupportFacilityMatcher::canonicalFacility)
             .anyMatch(wanted::equals);
+
     if (!supported) return false;
+
     for (Action recommendation : recommendations) {
       if (recommendation.description() == null) continue;
-      if (extractor.extract(List.of(recommendation.description())).stream()
-          .map(SupportFacilityMatcher::canonicalFacility)
-          .anyMatch(wanted::equals)) return true;
+
+      boolean recommended =
+          extractor.extract(List.of(recommendation.description())).stream()
+              .map(SupportFacilityMatcher::canonicalFacility)
+              .anyMatch(wanted::equals);
+
+      if (recommended) return true;
     }
+
     return false;
   }
 
