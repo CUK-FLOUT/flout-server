@@ -56,7 +56,7 @@ public class SupportFacilityMatcher {
     String wanted = canonicalFacility(requestedFacility);
     if (wanted == null || requestedFacility == null) return false;
     // Reject compound requests such as "배수펌프 및 물막이판" disguised as a single facility.
-    String compact = requestedFacility.replaceAll("\\s+", "");
+    String compact = requestedFacility.replaceAll("\\s+", "").replace("역류방지용밸브", "역류방지밸브");
     long names = FACILITIES.stream().filter(compact::contains).count();
     if (names != 1) return false;
     boolean supported =

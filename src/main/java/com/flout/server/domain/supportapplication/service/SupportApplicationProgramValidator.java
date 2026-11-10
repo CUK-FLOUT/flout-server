@@ -7,8 +7,8 @@ import com.flout.server.domain.inspection.repository.PreventionRecommendationRep
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportprogram.entity.SupportProgram;
 import com.flout.server.global.exception.BaseException;
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -18,15 +18,18 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class SupportApplicationProgramValidator {
-  private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
   private final PreventionRecommendationRepository recommendations;
   private final SupportFacilityMatcher facilities;
+  private final Clock clock;
 
+  /**
+   * Validates intake status, eligibility and explicitly recommended facilities before submission.
+   */
   public void validate(Long applicationId, SupportProgram program, String requestedFacility) {
     String state = program.getApplicationStatus();
-    LocalDate today = LocalDate.now(KOREA);
+    LocalDate today = LocalDate.now(clock);
     if (state != null
         && List.of("CLOSED", "ENDED", "SUSPENDED").contains(state.toUpperCase(Locale.ROOT))) {
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_ACCEPTING);
