@@ -1891,21 +1891,40 @@ public class OpenApiConfig {
     var code = SupportApplicationSuccessCode.PROGRAM_MATCHED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(code.getMessage());
+
+    var program = new LinkedHashMap<String, Object>();
+    program.put("name", "물막이판 설치 지원");
+    program.put("description", "침수 예방을 위한 출입구 물막이판 설치 비용을 지원합니다.");
+    program.put("targetDescription", "부천시 침수 취약 주택");
+    program.put("applicationStatus", "UNKNOWN");
+
+    var recommendation = new LinkedHashMap<String, Object>();
+    recommendation.put("itemType", "PROGRAM");
+    recommendation.put("programId", 3);
+    recommendation.put("guidanceId", null);
+    recommendation.put("matchType", "DIRECT");
+    recommendation.put("reason", "출입구 침수 위험에 물막이판 설치 지원이 관련됩니다.");
+    recommendation.put("matchedActionIds", List.of());
+    recommendation.put("evidence", List.of());
+    recommendation.put("missingInformation", List.of("접수상태 확인 필요", "신청 자격 확인 필요"));
+    recommendation.put("program", program);
+    recommendation.put("guidance", null);
+
     var result = new LinkedHashMap<String, Object>();
     result.put("supportApplicationId", 12);
-    result.put("programId", 3);
-    result.put("programName", "물막이판 설치 지원");
-    result.put("jurisdiction", "부천시");
-    result.put("description", "침수 예방을 위한 출입구 물막이판 설치 비용을 지원합니다.");
-    result.put("targetDescription", "부천시 침수 취약 주택");
-    result.put("operatingStatus", "접수중");
-    result.put("matchedReason", "현장점검에서 출입구 취약지점이 확인됐어요.");
-    result.put("eligibilityConfirmed", false);
+    result.put("matchStatus", "NEEDS_CONFIRMATION");
+    result.put("recommendation", recommendation);
     addExample(success, "supportProgramMatched", envelope(true, code, code.getMessage(), result));
+
     addError(
         operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
     addError(
         operation, "resultNotPublished", SupportApplicationErrorCode.RESULT_NOT_PUBLISHED, null);
+    addError(
+        operation,
+        "matchingInputInvalid",
+        SupportApplicationErrorCode.MATCHING_INPUT_INVALID,
+        null);
     addError(
         operation,
         "applicationAccessDenied",
@@ -1916,13 +1935,9 @@ public class OpenApiConfig {
         "applicationNotFound",
         InspectionApplicationErrorCode.APPLICATION_NOT_FOUND,
         null);
-    addError(operation, "programNotFound", SupportApplicationErrorCode.PROGRAM_NOT_FOUND, null);
+    operation.getResponses().get("404").setDescription("현장점검 신청을 찾을 수 없음");
     addError(
-        operation,
-        "matchedProgramNotFound",
-        SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND,
-        null);
-    operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없음");
+        operation, "geminiRetryRequired", SupportApplicationErrorCode.GEMINI_RETRY_REQUIRED, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
   }
 
@@ -2511,7 +2526,7 @@ public class OpenApiConfig {
     }
     operation.getResponses().get("403").setDescription("주민 권한이 없거나 본인 소유의 현장점검 신청이 아닙니다.");
     operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없습니다.");
-    operation.getResponses().get("409").setDescription("동일 현장점검 신청으로 이미 신청했습니다.");
+    operation.getResponses().get("409").setDescription("중복 신청, 공식 접수 미확인 또는 신청 자격 정보 확인 불가.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);

@@ -11,12 +11,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/support-application")
-@Tag(name = "주민-지원신청", description = "주민의 침수 예방시설 지원 신청")
+@Tag(name = "주민-지원신청", description = "주민의 침수 예방·대비·회복 지원 안내")
 public class SupportProgramMatchingController {
   private final SupportProgramMatchingService service;
 
@@ -24,12 +27,14 @@ public class SupportProgramMatchingController {
       value = "/{supportApplicationId}/matching",
       produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "지원사업 매칭",
+      summary = "지원사업 AI 매칭",
       description =
-          "본인의 공개된 현장점검 결과와 신청 주소를 서버 내부의 고정 매칭 규칙으로 지원사업 정보와 대조합니다. 관련 근거가 없는 사업을 임의 반환하지 않으며 주소·좌표·상세주소·SHAP 값은 생성형 AI에 전송하지 않습니다. supportApplicationId에는 지원 신청 전 단계의 현장점검 신청 ID를 전달합니다. 반환 결과는 지원 가능성 안내이며 최종 지원 대상 확정을 의미하지 않습니다.")
+          "현장점검 신청 ID를 받아 공개된 점검 결과, 주민·주택 정보 및 DB 사업목록을 비교해 최대 1개 사업을 안내합니다. "
+              + "적합한 사업이 없으면 서버에 등록된 공식 상담 안내를 반환하며, Gemini 호출 실패는 503 재시도 오류로 구분합니다. "
+              + "매칭은 지원 승인·공식 접수가 아닙니다. 개인정보 보호를 위해 상세주소·연락처·좌표를 모델에 전송하지 않습니다.")
   public SuccessResponse<SupportProgramMatchingResponse> match(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "현장점검 신청 ID") @PathVariable Long supportApplicationId) {
+      @Parameter(description = "지원신청 ID가 아닌 현장점검 신청 ID") @PathVariable Long supportApplicationId) {
     return SuccessResponse.of(
         service.match(Long.valueOf(jwt.getSubject()), supportApplicationId),
         SupportApplicationSuccessCode.PROGRAM_MATCHED);

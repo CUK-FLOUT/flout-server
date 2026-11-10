@@ -593,7 +593,7 @@ class SupportApplicationTest {
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/support-applications'].post.responses['409'].description")
-                .value("동일 현장점검 신청으로 이미 신청했습니다."))
+                .value("중복 신청, 공식 접수 미확인 또는 신청 자격 정보 확인 불가."))
         .andExpect(jsonPath("$.paths['/api/resident/support-applications'].get").doesNotExist());
     mvc.perform(get("/v3/api-docs"))
         .andExpect(

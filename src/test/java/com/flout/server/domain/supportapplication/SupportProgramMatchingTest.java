@@ -1,6 +1,8 @@
 package com.flout.server.domain.supportapplication;
 
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -11,10 +13,13 @@ import com.flout.server.domain.inspectionapplication.entity.*;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.riskassessment.entity.*;
 import com.flout.server.domain.riskassessment.repository.RiskAssessmentRepository;
+import com.flout.server.domain.supportapplication.client.GeminiSupportClient;
+import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportprogram.entity.SupportProgram;
 import com.flout.server.domain.supportprogram.repository.SupportProgramRepository;
 import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.repository.UserRepository;
+import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
@@ -32,7 +38,11 @@ import org.springframework.test.web.servlet.MockMvc;
       "spring.flyway.enabled=true",
       "spring.jpa.hibernate.ddl-auto=validate",
       "spring.datasource.url=jdbc:h2:mem:support-program-matching;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
-      "app.inspection.auto-start.enabled=false"
+      "app.inspection.auto-start.enabled=false",
+      "app.support.fallback-guidance.id=BUCHEON-CONSULT",
+      "app.support.fallback-guidance.title=공식 상담 안내",
+      "app.support.fallback-guidance.description=담당 기관에서 자격을 확인하세요",
+      "app.support.fallback-guidance.official-url=https://www.bucheon.go.kr"
     })
 @AutoConfigureMockMvc
 class SupportProgramMatchingTest {
@@ -44,6 +54,7 @@ class SupportProgramMatchingTest {
   @Autowired InspectionRepository inspections;
   @Autowired SupportProgramRepository programs;
   @Autowired JwtService jwt;
+  @MockitoBean GeminiSupportClient gemini;
 
   Long applicationId;
   Long inspectionId;
@@ -60,6 +71,7 @@ class SupportProgramMatchingTest {
             "support_applications",
             "support_programs",
             "inspection_vulnerabilities",
+            "prevention_recommendations",
             "inspection_results",
             "inspection_status_histories",
             "inspections",
@@ -135,23 +147,39 @@ class SupportProgramMatchingTest {
             SupportProgram.create(
                 "물막이판 설치 지원", "침수 예방을 위한 출입구 물막이판 설치 비용을 지원합니다.", "부천시 침수 취약 주택", "접수중"));
 
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "MATCHED",
+                "PROGRAM",
+                entrance.getId(),
+                null,
+                "DIRECT",
+                "출입구의 침수 위험에 물막이판 설치 지원이 관련됩니다.",
+                List.of()));
+
     mvc.perform(matching(ownerToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("SUPPORT_200_3"))
         .andExpect(jsonPath("$.result.supportApplicationId").value(applicationId))
-        .andExpect(jsonPath("$.result.programId").value(entrance.getId()))
-        .andExpect(jsonPath("$.result.programName").value("물막이판 설치 지원"))
-        .andExpect(jsonPath("$.result.jurisdiction").value("부천시"))
-        .andExpect(jsonPath("$.result.description", containsString("물막이판")))
-        .andExpect(jsonPath("$.result.targetDescription").value("부천시 침수 취약 주택"))
-        .andExpect(jsonPath("$.result.operatingStatus").value("접수중"))
-        .andExpect(jsonPath("$.result.matchedReason").value("현장점검에서 출입구 취약지점이 확인됐어요."))
-        .andExpect(jsonPath("$.result.eligibilityConfirmed").value(false))
+        .andExpect(jsonPath("$.result.matchStatus").value("NEEDS_CONFIRMATION"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("PROGRAM"))
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("DIRECT"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(entrance.getId()))
+        .andExpect(jsonPath("$.result.recommendation.program.name").value("물막이판 설치 지원"))
+        .andExpect(jsonPath("$.result.recommendation.program.description", containsString("물막이판")))
+        .andExpect(
+            jsonPath("$.result.recommendation.program.targetDescription").value("부천시 침수 취약 주택"))
+        .andExpect(jsonPath("$.result.recommendation.reason", containsString("출입구")))
+        .andExpect(jsonPath("$.result.recommendation.missingInformation", hasItem("신청 자격 확인 필요")))
+        .andExpect(jsonPath("$.result.recommendation.guidance").value(nullValue()))
         .andExpect(jsonPath("$.result.address").doesNotExist())
         .andExpect(jsonPath("$.result.detailAddress").doesNotExist())
         .andExpect(jsonPath("$.result.latitude").doesNotExist())
         .andExpect(jsonPath("$.result.longitude").doesNotExist())
         .andExpect(jsonPath("$.result.shapValues").doesNotExist());
+
+    verify(gemini).decide(anyMap());
   }
 
   @Test
@@ -162,22 +190,48 @@ class SupportProgramMatchingTest {
         resultId);
     programs.saveAndFlush(SupportProgram.create("다른 지역 사업", "설명", "서울시 지원 대상", "접수중"));
     var bucheon = programs.saveAndFlush(SupportProgram.create("지역 지원사업", "설명", "부천시 지원 대상", "접수중"));
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "NEEDS_CONFIRMATION",
+                "PROGRAM",
+                bucheon.getId(),
+                null,
+                "COMPLEMENTARY",
+                "거주 지역과 관련된 사업으로 검토할 수 있습니다.",
+                List.of("시설 관련성 확인 필요")));
 
     mvc.perform(matching(ownerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.programId").value(bucheon.getId()))
-        .andExpect(jsonPath("$.result.matchedReason").value("현장점검 결과를 바탕으로 확인할 수 있는 지원사업이에요."));
+        .andExpect(jsonPath("$.result.matchStatus").value("NEEDS_CONFIRMATION"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(bucheon.getId()))
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("COMPLEMENTARY"))
+        .andExpect(jsonPath("$.result.recommendation.reason", containsString("거주 지역")))
+        .andExpect(jsonPath("$.result.recommendation.missingInformation", hasItem("시설 관련성 확인 필요")));
   }
 
   @Test
   void doesNotRecommendAnUnrelatedProgramAsAFallback() throws Exception {
     publishResult("점검 결과");
     programs.saveAndFlush(SupportProgram.create("일반 주거 지원", "침수와 관련 없는 사업", "서울시 지원 대상", "접수중"));
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "GUIDANCE",
+                "CONSULTATION",
+                null,
+                "BUCHEON-CONSULT",
+                "GUIDANCE",
+                "관련 사업을 찾지 못했습니다.",
+                List.of()));
 
     mvc.perform(matching(ownerToken))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.code").value("SUPPORT_404_3"))
-        .andExpect(jsonPath("$.result").value(nullValue()));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(nullValue()))
+        .andExpect(jsonPath("$.result.recommendation.guidanceId").value("BUCHEON-CONSULT"))
+        .andExpect(jsonPath("$.result.recommendation.guidance.title").value("공식 상담 안내"));
   }
 
   @Test
@@ -193,8 +247,10 @@ class SupportProgramMatchingTest {
 
     publishResult("점검 결과");
     mvc.perform(matching(ownerToken))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.code").value("SUPPORT_404_2"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"));
+
     mvc.perform(
             post("/api/resident/support-application/0/matching")
                 .header("Authorization", "Bearer " + ownerToken))
@@ -208,6 +264,7 @@ class SupportProgramMatchingTest {
             post("/api/resident/support-application/not-a-number/matching")
                 .header("Authorization", "Bearer " + ownerToken))
         .andExpect(status().isBadRequest());
+    verifyNoInteractions(gemini);
   }
 
   @Test
@@ -216,7 +273,7 @@ class SupportProgramMatchingTest {
         "$.paths['/api/resident/support-application/{supportApplicationId}/matching'].post";
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath(operation + ".summary").value("지원사업 매칭"))
+        .andExpect(jsonPath(operation + ".summary").value("지원사업 AI 매칭"))
         .andExpect(
             jsonPath(
                     operation
@@ -235,18 +292,161 @@ class SupportProgramMatchingTest {
         .andExpect(
             jsonPath(
                     operation
-                        + ".responses['404'].content['application/json'].examples.matchedProgramNotFound.value.code")
-                .value("SUPPORT_404_3"))
+                        + ".responses['503'].content['application/json'].examples.geminiRetryRequired.value.code")
+                .value("SUPPORT_503_1"))
         .andExpect(
             jsonPath(
-                    "$.paths['/api/resident/support-applications'].post.responses['404'].content['application/json'].examples.MATCHED_PROGRAM_NOT_FOUND")
-                .doesNotExist())
+                    operation
+                        + ".responses['200'].content['application/json'].examples.supportProgramMatched.value.result.matchStatus")
+                .value("NEEDS_CONFIRMATION"))
+        .andExpect(
+            jsonPath(
+                    operation
+                        + ".responses['200'].content['application/json'].examples.supportProgramMatched.value.result.recommendation.itemType")
+                .value("PROGRAM"))
+        .andExpect(
+            jsonPath("$.components.schemas.SupportProgramMatchingResponse.properties.matchStatus")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.SupportProgramMatchingResponse.properties.recommendation")
+                .exists())
         .andExpect(
             jsonPath(
                     "$.components.schemas.SupportProgramMatchingResponse.properties.eligibilityConfirmed")
-                .exists())
+                .doesNotExist());
+  }
+
+  @Test
+  void rejectsUnrecognizedGeminiProgramId() throws Exception {
+    publishResult("점검 결과");
+    programs.saveAndFlush(SupportProgram.create("물막이판 설치 지원", "출입구 설치", "부천시", "접수중"));
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "MATCHED", "PROGRAM", Long.MAX_VALUE, null, "DIRECT", "추천", List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(nullValue()))
+        .andExpect(jsonPath("$.result.recommendation.guidanceId").value("BUCHEON-CONSULT"));
+  }
+
+  @Test
+  void rejectsClosedProgramBeforeCallingGemini() throws Exception {
+    publishResult("점검 결과");
+    var program = programs.saveAndFlush(SupportProgram.create("종료된 지원사업", "출입구 설치", "부천시", "접수종료"));
+    jdbc.update(
+        "UPDATE support_programs SET application_status='CLOSED' WHERE program_id=?",
+        program.getId());
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"));
+    verifyNoInteractions(gemini);
+  }
+
+  @Test
+  void directFacilityMatchIncludesOnlyRealExpertActionId() throws Exception {
+    Long resultId = publishResult("현장점검 결과");
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "출입구에 물막이판 설치를 권장합니다.",
+        0);
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "배수펌프 설치를 권장합니다.",
+        1);
+    Long recommendedId =
+        jdbc.queryForObject(
+            "SELECT recommendation_id FROM prevention_recommendations WHERE result_id=? AND sort_order=0",
+            Long.class,
+            resultId);
+    var program = programs.saveAndFlush(SupportProgram.create("물막이판 지원", "설치", "부천시", "접수중"));
+    jdbc.update(
+        "UPDATE support_programs SET supported_facilities=? WHERE program_id=?",
+        "[\"물막이판\"]",
+        program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "MATCHED", "PROGRAM", program.getId(), null, "DIRECT", "권장시설과 일치", List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.recommendation.matchedActionIds[0]").value(recommendedId))
+        .andExpect(jsonPath("$.result.recommendation.matchedActionIds.length()").value(1))
         .andExpect(
-            jsonPath("$.components.schemas.SupportProgramMatchingResponse.properties.matchedReason")
-                .exists());
+            jsonPath(
+                "$.result.recommendation.evidence[*].sourceField",
+                hasItem("preventionRecommendation." + recommendedId)));
+  }
+
+  @Test
+  void directFacilityMismatchFallsBackToConsultation() throws Exception {
+    Long resultId = publishResult("현장점검 결과");
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "배수펌프 설치를 권장합니다.",
+        0);
+    var program = programs.saveAndFlush(SupportProgram.create("물막이판 지원", "설치", "부천시", "접수중"));
+    jdbc.update(
+        "UPDATE support_programs SET supported_facilities=? WHERE program_id=?",
+        "[\"물막이판\"]",
+        program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "MATCHED", "PROGRAM", program.getId(), null, "DIRECT", "추천", List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"));
+  }
+
+  @Test
+  void complementaryRecommendationDoesNotClaimDirectExpertFacilityMatch() throws Exception {
+    Long resultId = publishResult("현장점검 결과");
+    jdbc.update(
+        "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
+        resultId,
+        "물막이판 설치를 권장합니다.",
+        0);
+    var program = programs.saveAndFlush(SupportProgram.create("이주 지원", "상담", "부천시", "문의 필요"));
+    jdbc.update(
+        "UPDATE support_programs SET supported_facilities='[]' WHERE program_id=?",
+        program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "NEEDS_CONFIRMATION",
+                "PROGRAM",
+                program.getId(),
+                null,
+                "COMPLEMENTARY",
+                "이주 상담 안내",
+                List.of()));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("COMPLEMENTARY"))
+        .andExpect(jsonPath("$.result.recommendation.matchedActionIds.length()").value(0));
+  }
+
+  @Test
+  void returnsRetryableErrorWhenGeminiIsUnavailable() throws Exception {
+    publishResult("점검 결과");
+    programs.saveAndFlush(SupportProgram.create("물막이판 설치 지원", "출입구 설치", "부천시", "접수중"));
+    when(gemini.decide(anyMap()))
+        .thenThrow(new BaseException(SupportApplicationErrorCode.GEMINI_RETRY_REQUIRED));
+
+    mvc.perform(matching(ownerToken))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("SUPPORT_503_1"));
   }
 }
