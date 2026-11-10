@@ -65,6 +65,12 @@ app:
     api-key: ${GEMINI_API_KEY:}
     connect-timeout-millis: ${GEMINI_CONNECT_TIMEOUT_MILLIS:3000}
     read-timeout-millis: ${GEMINI_READ_TIMEOUT_MILLIS:15000}
+  support:
+    fallback-guidance:
+      id: ${SUPPORT_GUIDANCE_ID:}
+      title: ${SUPPORT_GUIDANCE_TITLE:}
+      description: ${SUPPORT_GUIDANCE_DESCRIPTION:}
+      official-url: ${SUPPORT_GUIDANCE_OFFICIAL_URL:}
 
 springdoc:
   swagger-ui:

@@ -1,46 +1,149 @@
 package com.flout.server.domain.supportapplication.service;
 
-import com.flout.server.domain.inspection.entity.InspectionVulnerability;
 import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.InspectionRepository;
 import com.flout.server.domain.inspection.repository.InspectionResultRepository;
 import com.flout.server.domain.inspection.repository.InspectionVulnerabilityRepository;
 import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
+import com.flout.server.domain.supportapplication.client.GeminiSupportClient;
 import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse;
+import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.Evidence;
+import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.GuidanceInfo;
+import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.ProgramInfo;
+import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.Recommendation;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportprogram.entity.SupportProgram;
 import com.flout.server.domain.supportprogram.repository.SupportProgramRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
-import java.util.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
 public class SupportProgramMatchingService {
-  private static final Map<String, List<String>> TYPE_KEYWORDS =
-      Map.of(
-          "ENTRANCE", List.of("물막이판", "차수판", "방수판", "출입구", "현관", "문턱"),
-          "WINDOW_OPENING", List.of("창호", "창문", "개구부", "방수"),
-          "DRAIN", List.of("배수", "하수", "역류", "펌프", "배수구"),
-          "OTHER_STRUCTURE", List.of("벽체", "균열", "지붕", "방수", "구조"));
-
+  private static final Set<String> EXCLUDED = Set.of("CLOSED", "ENDED", "SUSPENDED");
   private final InspectionApplicationRepository applications;
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
   private final InspectionVulnerabilityRepository vulnerabilities;
   private final SupportProgramRepository programs;
+  private final GeminiSupportClient gemini;
+  private final PlatformTransactionManager transactionManager;
 
-  @Transactional(readOnly = true)
+  @Value("${app.support.fallback-guidance.id:}")
+  private String guidanceId;
+
+  @Value("${app.support.fallback-guidance.title:}")
+  private String guidanceTitle;
+
+  @Value("${app.support.fallback-guidance.description:}")
+  private String guidanceDescription;
+
+  @Value("${app.support.fallback-guidance.official-url:}")
+  private String guidanceUrl;
+
   public SupportProgramMatchingResponse match(Long userId, Long applicationId) {
     if (applicationId == null || applicationId <= 0) {
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     }
 
+    // 서버 설정 오류는 사용자 입력 오류가 아니며, DB 조회 전에 발견한다.
+    validateGuidance();
+
+    // DB 조회와 필요한 데이터 복사를 완료한 후 트랜잭션을 종료한다.
+    TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+    transaction.setReadOnly(true);
+    MatchingSnapshot snapshot = transaction.execute(status -> loadSnapshot(userId, applicationId));
+    if (snapshot == null) {
+      throw new IllegalStateException("지원사업 조회 결과를 준비하지 못했습니다.");
+    }
+    if (snapshot.candidates().isEmpty()) {
+      return guidance(applicationId, "현재 확인 가능한 지원사업이 없어 공식 상담을 안내해 드립니다.");
+    }
+
+    // 외부 네트워크 호출은 트랜잭션이 완전히 종료된 뒤에 수행한다.
+    var decision = gemini.decide(snapshot.input());
+    if ("CONSULTATION".equals(decision.itemType())) {
+      if (!"GUIDANCE".equals(decision.matchStatus())
+          || !"GUIDANCE".equals(decision.matchType())
+          || !Objects.equals(guidanceId, decision.guidanceId())) {
+        return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
+      }
+      return guidance(applicationId, safeReason(decision.reason(), "공식 상담에서 지원 가능 여부를 확인해 주세요."));
+    }
+    if (!"PROGRAM".equals(decision.itemType()) || decision.programId() == null) {
+      return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
+    }
+    if (!Set.of("DIRECT", "COMPLEMENTARY").contains(decision.matchType())) {
+      return guidance(applicationId, "지원사업의 관련성을 확인하지 못해 공식 상담을 안내해 드립니다.");
+    }
+
+    ProgramCandidate chosen =
+        snapshot.candidates().stream()
+            .filter(p -> p.id().equals(decision.programId()))
+            .findFirst()
+            .orElse(null);
+    if (chosen == null) {
+      return guidance(applicationId, "현재 신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
+    }
+
+    ProgramInfo info = chosen.info();
+    List<String> missing = new ArrayList<>(decision.missingInformation());
+    if (!"OPEN".equalsIgnoreCase(String.valueOf(info.applicationStatus()))) {
+      missing.add("접수상태 확인 필요");
+    }
+    if (info.applicationStartDate() == null || info.applicationEndDate() == null) {
+      missing.add("공식 접수기간 확인 필요");
+    }
+    if (info.eligibilityConditions() == null || info.eligibilityConditions().isBlank()) {
+      missing.add("신청 자격 확인 필요");
+    }
+    if (snapshot.region() == null) {
+      missing.add("대상 지역 확인 필요");
+    }
+    String matchStatus =
+        missing.isEmpty() && "MATCHED".equals(decision.matchStatus())
+            ? "MATCHED"
+            : "NEEDS_CONFIRMATION";
+
+    List<Evidence> evidence =
+        Stream.of(
+                new Evidence("supportProgram.name", info.name()),
+                new Evidence("supportProgram.targetDescription", info.targetDescription()),
+                new Evidence("inspectionResult.summary", snapshot.summary()))
+            .filter(e -> e.sourceText() != null && !e.sourceText().isBlank())
+            .toList();
+
+    var recommendation =
+        new Recommendation(
+            "PROGRAM",
+            chosen.id(),
+            null,
+            decision.matchType(),
+            safeReason(decision.reason(), "현장점검 결과와 관련된 사업으로 검토되었습니다."),
+            List.of(),
+            evidence,
+            missing.stream().distinct().toList(),
+            info,
+            null);
+    return new SupportProgramMatchingResponse(applicationId, matchStatus, recommendation);
+  }
+
+  private MatchingSnapshot loadSnapshot(Long userId, Long applicationId) {
     var application =
         applications
             .findForResidentDetail(applicationId)
@@ -59,112 +162,127 @@ public class SupportProgramMatchingService {
                         inspection.getId(), ResultStatus.PUBLISHED))
             .orElseThrow(() -> new BaseException(SupportApplicationErrorCode.RESULT_NOT_PUBLISHED));
     var findings = vulnerabilities.findByResultIdOrderBySortOrderAsc(result.getId());
-    var candidates = programs.findAllByOrderByIdAsc();
-    if (candidates.isEmpty()) {
-      throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_FOUND);
-    }
+    LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+    var available =
+        programs.findAllByOrderByIdAsc().stream().filter(p -> !isExcluded(p, today)).toList();
+    String region = extractRegion(application.getAddress());
 
-    var scored = bestMatch(candidates, findings, application.getAddress()).orElseThrow();
-    if (scored.score() <= 0) {
-      // 관련 근거가 없는 사업을 임의로 추천하거나 지원 자격이 있는 것처럼 보이지 않는다.
-      throw new BaseException(SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND);
-    }
-    var matched = scored.program();
-    var reasonFinding = bestFinding(matched, findings);
+    List<ProgramCandidate> candidates =
+        available.stream()
+            .map(
+                p ->
+                    new ProgramCandidate(
+                        p.getId(),
+                        new ProgramInfo(
+                            p.getName(),
+                            p.getDescription(),
+                            p.getTargetDescription(),
+                            p.getEligibilityConditions(),
+                            p.getExclusionConditions(),
+                            p.getSupportedFacilities(),
+                            p.getRequiredDocuments(),
+                            p.getApplicationMethod(),
+                            p.getApplicationStartDate(),
+                            p.getApplicationEndDate(),
+                            p.getApplicationStatus(),
+                            p.getOfficialSource(),
+                            p.getOfficialUrl())))
+            .toList();
+    List<Map<String, Object>> findingInputs =
+        findings.stream()
+            .map(
+                f -> {
+                  Map<String, Object> row = new HashMap<>();
+                  row.put("type", f.getType());
+                  row.put("title", f.getTitle());
+                  row.put("expertOpinion", f.getExpertOpinion());
+                  row.put("fieldFindings", f.getFieldFindings());
+                  return row;
+                })
+            .toList();
+    List<Map<String, Object>> programInputs =
+        candidates.stream()
+            .map(
+                candidate -> {
+                  ProgramInfo p = candidate.info();
+                  Map<String, Object> row = new HashMap<>();
+                  row.put("id", candidate.id());
+                  row.put("name", p.name());
+                  row.put("description", p.description());
+                  row.put("targetDescription", p.targetDescription());
+                  row.put("eligibilityConditions", p.eligibilityConditions());
+                  row.put("exclusionConditions", p.exclusionConditions());
+                  row.put("supportedFacilities", p.supportedFacilities());
+                  row.put("applicationStatus", p.applicationStatus());
+                  row.put("applicationStartDate", p.applicationStartDate());
+                  row.put("applicationEndDate", p.applicationEndDate());
+                  return row;
+                })
+            .toList();
 
-    return new SupportProgramMatchingResponse(
-        applicationId,
-        matched.getId(),
-        matched.getName(),
-        jurisdiction(application.getAddress()),
-        matched.getDescription(),
-        matched.getTargetDescription(),
-        matched.getOperatingStatus(),
-        matchedReason(reasonFinding, result.getSummary()),
-        false);
+    Map<String, Object> input = new HashMap<>();
+    input.put("serverDate", today.toString());
+    input.put("region", region);
+    input.put(
+        "housing",
+        Map.of(
+            "occupancyType", application.getOccupancyType().name(),
+            "floodExperience", application.getFloodExperience().name(),
+            "existingFacility", application.isExistingFacility()));
+    input.put("expertRecommendations", findingInputs);
+    input.put("programs", programInputs);
+    input.put(
+        "fallbackGuidance",
+        Map.of("id", guidanceId, "title", guidanceTitle, "description", guidanceDescription));
+    return new MatchingSnapshot(input, candidates, region, result.getSummary());
   }
 
-  private ScoredProgram scored(
-      SupportProgram program, List<InspectionVulnerability> findings, String address) {
-    return new ScoredProgram(program, score(program, findings, address));
+  private record ProgramCandidate(Long id, ProgramInfo info) {}
+
+  private record MatchingSnapshot(
+      Map<String, Object> input,
+      List<ProgramCandidate> candidates,
+      String region,
+      String summary) {}
+
+  private boolean isExcluded(SupportProgram p, LocalDate today) {
+    String status = String.valueOf(p.getApplicationStatus()).toUpperCase(Locale.ROOT);
+    if (EXCLUDED.contains(status)) return true;
+    if (p.getApplicationEndDate() != null && today.isAfter(p.getApplicationEndDate())) return true;
+    return p.getApplicationStartDate() != null && today.isBefore(p.getApplicationStartDate());
   }
 
-  private Optional<ScoredProgram> bestMatch(
-      List<SupportProgram> candidates, List<InspectionVulnerability> findings, String address) {
-    return candidates.stream()
-        .map(program -> scored(program, findings, address))
-        .max(
-            Comparator.comparingInt(ScoredProgram::score)
-                .thenComparing(value -> value.program().getId(), Comparator.reverseOrder()));
+  private void validateGuidance() {
+    if (Stream.of(guidanceId, guidanceTitle, guidanceDescription, guidanceUrl)
+        .anyMatch(s -> s == null || s.isBlank()))
+      throw new BaseException(SupportApplicationErrorCode.MATCHING_INPUT_INVALID);
   }
 
-  private int score(
-      SupportProgram program, List<InspectionVulnerability> findings, String address) {
-    String programText =
-        Stream.of(
-                program.getName(),
-                program.getDescription(),
-                program.getTargetDescription(),
-                program.getOperatingStatus())
-            .filter(Objects::nonNull)
-            .map(String::toLowerCase)
-            .reduce("", (left, right) -> left + " " + right);
-
-    int score = 0;
-    for (var finding : findings) {
-      var typeKeywords =
-          finding.getType() == null
-              ? List.<String>of()
-              : TYPE_KEYWORDS.getOrDefault(finding.getType(), List.of());
-      for (String keyword : typeKeywords) {
-        if (programText.contains(keyword)) score += 10;
-      }
-      for (String token : tokens(finding.getTitle())) {
-        if (programText.contains(token)) score += 3;
-      }
-    }
-    for (String token : tokens(address)) {
-      if ((token.endsWith("시") || token.endsWith("군") || token.endsWith("구"))
-          && programText.contains(token)) score += 2;
-    }
-    return score;
+  private SupportProgramMatchingResponse guidance(Long applicationId, String reason) {
+    Recommendation rec =
+        new Recommendation(
+            "CONSULTATION",
+            null,
+            guidanceId,
+            "GUIDANCE",
+            reason,
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            new GuidanceInfo(guidanceTitle, guidanceDescription, guidanceUrl));
+    return new SupportProgramMatchingResponse(applicationId, "GUIDANCE", rec);
   }
 
-  private InspectionVulnerability bestFinding(
-      SupportProgram program, List<InspectionVulnerability> findings) {
-    return findings.stream()
-        .filter(finding -> score(program, List.of(finding), "") > 0)
-        .max(
-            Comparator.<InspectionVulnerability>comparingInt(
-                    finding -> score(program, List.of(finding), ""))
-                .thenComparingInt(finding -> -finding.getSortOrder()))
-        .orElse(null);
+  private String safeReason(String reason, String fallback) {
+    if (reason == null || reason.isBlank()) return fallback;
+    return reason.length() > 300 ? reason.substring(0, 300) : reason;
   }
 
-  private List<String> tokens(String value) {
-    if (value == null || value.isBlank()) return List.of();
-    return Arrays.stream(value.toLowerCase().split("[^0-9a-zA-Z가-힣]+"))
-        .filter(token -> token.length() >= 2)
-        .toList();
+  private String extractRegion(String address) {
+    if (address == null || address.isBlank()) return null;
+    String[] parts = address.strip().split("\\s+");
+    for (String part : parts) if (part.endsWith("시") || part.endsWith("군")) return part;
+    return null;
   }
-
-  private String jurisdiction(String address) {
-    if (address == null) return null;
-    return Arrays.stream(address.strip().split("\\s+"))
-        .filter(token -> token.endsWith("시") || token.endsWith("군"))
-        .reduce((first, second) -> second)
-        .orElse(null);
-  }
-
-  private String matchedReason(InspectionVulnerability finding, String summary) {
-    if (finding != null && finding.getTitle() != null && !finding.getTitle().isBlank()) {
-      return "현장점검에서 " + finding.getTitle().strip() + " 취약지점이 확인됐어요.";
-    }
-    if (summary != null && !summary.isBlank()) {
-      return "현장점검 결과를 바탕으로 확인할 수 있는 지원사업이에요.";
-    }
-    return "입력한 주소에서 확인할 수 있는 지원사업이에요.";
-  }
-
-  private record ScoredProgram(SupportProgram program, int score) {}
 }
