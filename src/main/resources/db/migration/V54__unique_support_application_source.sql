@@ -4,4 +4,6 @@ ALTER TABLE support_applications
     ADD CONSTRAINT uk_support_application_source UNIQUE (application_id);
 
 ALTER TABLE support_applications
-    DROP CONSTRAINT uk_support_application_program;
+DROP CONSTRAINT uk_support_application_program;
+
+lity_review_target.sql
