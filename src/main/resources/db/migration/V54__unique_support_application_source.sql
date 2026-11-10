@@ -5,5 +5,3 @@ ALTER TABLE support_applications
 
 ALTER TABLE support_applications
 DROP CONSTRAINT uk_support_application_program;
-
-lity_review_target.sql
