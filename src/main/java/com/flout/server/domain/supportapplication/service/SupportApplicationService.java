@@ -32,6 +32,7 @@ public class SupportApplicationService {
   private final SupportProgramRepository programs;
   private final SupportApplicationRepository supports;
   private final SupportResultPublicationValidator publicationValidator;
+  private final SupportApplicationProgramValidator programValidator;
   private final EntityManager entityManager;
   private final NotificationService notifications;
   private final TransactionTemplate transaction;
@@ -43,6 +44,7 @@ public class SupportApplicationService {
       SupportProgramRepository programs,
       SupportApplicationRepository supports,
       SupportResultPublicationValidator publicationValidator,
+      SupportApplicationProgramValidator programValidator,
       EntityManager entityManager,
       NotificationService notifications,
       PlatformTransactionManager manager,
@@ -52,6 +54,7 @@ public class SupportApplicationService {
     this.programs = programs;
     this.supports = supports;
     this.publicationValidator = publicationValidator;
+    this.programValidator = programValidator;
     this.entityManager = entityManager;
     this.notifications = notifications;
     this.formDrafts = formDrafts;
@@ -102,6 +105,7 @@ public class SupportApplicationService {
                         () -> new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_FOUND));
             if (supports.existsByApplicationId(source.getId()))
               throw new BaseException(SupportApplicationErrorCode.DUPLICATE_APPLICATION);
+            programValidator.validate(source.getId(), program, request.requestedFacility());
             if (source.getApplicantName() == null
                 || source.getApplicantName().isBlank()
                 || source.getContact() == null
