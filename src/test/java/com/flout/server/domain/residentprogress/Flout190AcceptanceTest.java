@@ -401,7 +401,15 @@ class Flout190AcceptanceTest {
                 .content(json(publication)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.inspectionStatus").value("COMPLETED"));
-    progress("INSPECTION_RESULT_PUBLISHED", "CHECK_SUPPORT_OPTIONS");
+    progress("INSPECTION_RESULT_PUBLISHED", "VIEW_INSPECTION_RESULT");
+    mvc.perform(get("/api/resident/progress").header("Authorization", "Bearer " + residentToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.items[0].nextAction.target.applicationId").value(app));
+    mvc.perform(
+            get("/api/resident/applications/{applicationId}/result", app)
+                .header("Authorization", "Bearer " + residentToken))
+        .andExpect(status().isOk());
+    progress("INSPECTION_RESULT_PUBLISHED", "VIEW_INSPECTION_RESULT");
     long support =
         result(
                 mvc.perform(
@@ -433,7 +441,12 @@ class Flout190AcceptanceTest {
                     .andExpect(status().isOk()))
             .path("constructionId")
             .asLong();
-    progress("SUPPORT_APPROVED", "VIEW_CONSTRUCTION_SCHEDULE");
+    progress("SUPPORT_APPROVED", "VIEW_SUPPORT_RESULT");
+    mvc.perform(get("/api/resident/progress").header("Authorization", "Bearer " + residentToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.items[0].nextAction.target.length()").value(1))
+        .andExpect(
+            jsonPath("$.result.items[0].nextAction.target.supportApplicationId").value(support));
     mvc.perform(
             post("/api/admin/constructions/{id}/schedule", construction)
                 .header("Authorization", "Bearer " + adminToken)
