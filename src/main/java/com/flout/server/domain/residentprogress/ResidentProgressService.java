@@ -267,7 +267,7 @@ public class ResidentProgressService {
         }
         case "APPROVED" -> {
           stage = "SUPPORT_APPROVED";
-          action = "VIEW_CONSTRUCTION_SCHEDULE";
+          action = "VIEW_SUPPORT_RESULT";
           rank = 2;
         }
         case "REJECTED" -> {
@@ -286,7 +286,7 @@ public class ResidentProgressService {
       rank = 0;
     } else if (published != null) {
       stage = "INSPECTION_RESULT_PUBLISHED";
-      action = "CHECK_SUPPORT_OPTIONS";
+      action = "VIEW_INSPECTION_RESULT";
       targetKey = "applicationId";
       target = applicationId;
       rank = 2;
