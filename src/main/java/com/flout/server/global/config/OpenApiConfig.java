@@ -57,6 +57,7 @@ public class OpenApiConfig {
       Set.of(
           "/api/auth/signup",
           "/api/auth/refresh",
+          "/api/auth/logout",
           "/api/auth/login",
           "/api/auth/admin/login",
           "/api/auth/google",
@@ -177,7 +178,7 @@ public class OpenApiConfig {
                                 describeRefresh(operation, expiresIn);
                               } else if (path.endsWith("/google")) {
                                 describeGoogle(operation, path.contains("/admin/"), expiresIn);
-                              } else {
+                              } else if (!path.equals("/api/auth/logout")) {
                                 describeLogin(operation, path.endsWith("/admin/login"), expiresIn);
                               }
                               addError(

@@ -26,4 +26,8 @@ public class TokenRefreshService {
             .orElseThrow(() -> new BaseException(UserErrorCode.INVALID_REFRESH_TOKEN));
     return jwt.issue(user);
   }
+
+  public void logout(String raw) {
+    refreshTokens.revoke(raw);
+  }
 }
