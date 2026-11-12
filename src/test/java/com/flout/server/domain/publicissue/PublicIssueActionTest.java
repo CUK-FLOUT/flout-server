@@ -522,4 +522,41 @@ class PublicIssueActionTest {
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images']")
                 .doesNotExist());
   }
+
+  @Test
+  void rejectsLegacyJsonCompletionRequestWithoutChangingState() throws Exception {
+    mvc.perform(
+            post("/api/admin/public-issues/{publicIssueId}/actions", publicIssueId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body("빗물받이 정비"))))
+        .andExpect(status().isUnsupportedMediaType());
+
+    assertThat(actionCount()).isZero();
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
+    assertThat(reviewStatus()).isEqualTo("UNDER_REVIEW");
+  }
+
+  @Test
+  void keepsLegacyCompletedActionWithoutPhotosUnchanged() throws Exception {
+    jdbc.update(
+        "INSERT INTO facility_action(review_id,user_id,action_description,"
+            + "action_status,created_at,completed_at) "
+            + "VALUES(?,?,'과거 조치','COMPLETED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+        reviewId,
+        adminId);
+    jdbc.update(
+        "UPDATE public_issues SET status='COMPLETED' WHERE public_issue_id=?", publicIssueId);
+    jdbc.update("UPDATE facility_review SET review_status='COMPLETED' WHERE review_id=?", reviewId);
+
+    postAction(publicIssueId, token, body("중복 완료 시도"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_1"));
+
+    assertThat(actionCount()).isEqualTo(1);
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("COMPLETED");
+    assertThat(reviewStatus()).isEqualTo("COMPLETED");
+  }
 }
