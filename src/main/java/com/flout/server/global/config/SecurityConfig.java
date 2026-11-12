@@ -41,6 +41,7 @@ public class SecurityConfig {
                         HttpMethod.POST,
                         "/api/auth/signup",
                         "/api/auth/refresh",
+                        "/api/auth/logout",
                         "/api/auth/login",
                         "/api/auth/google",
                         "/api/auth/admin/google",

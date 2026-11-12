@@ -131,6 +131,22 @@ class RefreshTokenTest {
   }
 
   @Test
+  void logoutRevokesOnlyTheRequestedSessionAndCanBeRetried() throws Exception {
+    String currentToken = login().path("refreshToken").asText();
+    String otherToken = login().path("refreshToken").asText();
+    var logout =
+        post("/api/auth/logout")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body(currentToken));
+
+    mvc.perform(logout).andExpect(status().isNoContent());
+    mvc.perform(logout).andExpect(status().isNoContent());
+
+    rejected(currentToken);
+    refresh(otherToken);
+  }
+
+  @Test
   void rejectsExpiredForgedAndAccessTokens() throws Exception {
     var tokens = login();
     rejected("a".repeat(43));

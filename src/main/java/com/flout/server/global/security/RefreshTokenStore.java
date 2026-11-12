@@ -60,6 +60,13 @@ public class RefreshTokenStore {
     return userId;
   }
 
+  @Transactional
+  public void revoke(String raw) {
+    if (raw.matches("[A-Za-z0-9_-]{43}")) {
+      tokens.consume(hash(raw), LocalDateTime.now(ZoneOffset.UTC));
+    }
+  }
+
   private static BaseException invalid() {
     return new BaseException(UserErrorCode.INVALID_REFRESH_TOKEN);
   }
