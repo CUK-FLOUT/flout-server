@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/map/public-issues")
-@Tag(name = "운영자-현장점검 관리", description = "관할 지역의 현장점검 관리")
+@Tag(name = "운영자-공공인프라", description = "ADMIN 및 부천시 관할 공공시설 문제 관리")
 public class AdminPublicIssueMapController {
   private final AdminPublicIssueListService service;
 
