@@ -6,6 +6,7 @@ import com.flout.server.domain.publicissue.entity.PublicIssueActionStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 public record CompletePublicIssueActionResponse(
     Long actionId,
@@ -16,8 +17,12 @@ public record CompletePublicIssueActionResponse(
     PublicIssueActionStatus actionStatus,
     FacilityReviewStatus reviewStatus,
     PublicIssueStatus publicIssueStatus,
-    OffsetDateTime completedAt) {
-  public static CompletePublicIssueActionResponse from(PublicIssueAction action) {
+    OffsetDateTime completedAt,
+    List<FacilityActionImageUploadResponse.Image> images) {
+
+  public static CompletePublicIssueActionResponse from(
+      PublicIssueAction action, List<FacilityActionImageUploadResponse.Image> images) {
+
     OffsetDateTime completedAt =
         action.getCompletedAt() == null
             ? null
@@ -26,6 +31,7 @@ public record CompletePublicIssueActionResponse(
                 .atZone(ZoneId.systemDefault())
                 .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
                 .toOffsetDateTime();
+
     return new CompletePublicIssueActionResponse(
         action.getId(),
         action.getReview().getId(),
@@ -35,6 +41,7 @@ public record CompletePublicIssueActionResponse(
         action.getStatus(),
         action.getReview().getReviewStatus(),
         action.getReview().getLocalProblem().getStatus(),
-        completedAt);
+        completedAt,
+        images);
   }
 }

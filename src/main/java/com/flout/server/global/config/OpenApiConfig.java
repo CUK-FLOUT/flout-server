@@ -249,11 +249,6 @@ public class OpenApiConfig {
                                 && method == PathItem.HttpMethod.POST) {
                               describeFacilityReview(operation);
                             }
-                            if (path.equals(
-                                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images")
-                                && method == PathItem.HttpMethod.POST) {
-                              describeFacilityActionImageUpload(operation);
-                            }
                             if (method == PathItem.HttpMethod.GET
                                 && Set.of(
                                         "/api/resident/support-applications/{supportApplicationId}/review",
@@ -748,7 +743,9 @@ public class OpenApiConfig {
   private void describePublicIssueActionCompletion(Operation operation) {
     var code = PublicIssueSuccessCode.ACTION_COMPLETED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+
     success.setDescription(code.getMessage());
+
     addExample(
         success,
         "publicIssueActionCompleted",
@@ -774,30 +771,46 @@ public class OpenApiConfig {
                 "publicIssueStatus",
                 "COMPLETED",
                 "completedAt",
-                "2026-11-05T10:00:00+09:00")));
-    if (operation.getRequestBody() != null
-        && operation.getRequestBody().getContent() != null
-        && operation.getRequestBody().getContent().get(JSON) != null) {
-      operation
-          .getRequestBody()
-          .getContent()
-          .get(JSON)
-          .addExamples(
-              "completePublicIssueAction",
-              new Example()
-                  .summary("조치 완료 처리")
-                  .value(Map.of("actionDescription", "빗물받이 퇴적물 제거 및 주변 배수로 정비")));
-    }
+                "2026-11-12T11:00:00+09:00",
+                "images",
+                List.of(
+                    Map.of(
+                        "imageId", 11,
+                        "imageUrl", "https://example.invalid/signed",
+                        "uploadedAt", "2026-11-12T11:00:00+09:00")))));
+
     addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+
+    addError(operation, "emptyImages", PublicIssueErrorCode.EMPTY_ACTION_IMAGES, null);
+
+    addError(operation, "invalidImages", PublicIssueErrorCode.INVALID_ACTION_IMAGES, null);
+
     addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
+
     addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
+
     addError(operation, "actionNotAllowed", PublicIssueErrorCode.ACTION_NOT_ALLOWED, null);
+
     addError(operation, "reviewRequired", PublicIssueErrorCode.REVIEW_REQUIRED, null);
+
+    addError(
+        operation,
+        "imageTooLarge",
+        GeneralErrorCode.PAYLOAD_TOO_LARGE,
+        "사진은 파일당 최대 10MiB까지 업로드할 수 있습니다. 요청 전체는 80MiB 이하입니다.");
+
+    addError(operation, "imageUploadFailed", PublicIssueErrorCode.ACTION_IMAGE_UPLOAD_FAILED, null);
+
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+
     operation.getResponses().get("404").setDescription("공공시설 문제를 찾을 수 없습니다.");
+
     operation.getResponses().get("409").setDescription("이미 완료된 문제이거나 검토 내용이 저장되지 않았습니다.");
+
+    operation.getResponses().get("413").setDescription("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다.");
   }
 
   private void describeFacilityReview(Operation operation) {
@@ -834,49 +847,6 @@ public class OpenApiConfig {
         .getResponses()
         .get("409")
         .setDescription(PublicIssueErrorCode.REVIEW_NOT_ALLOWED.getMessage());
-  }
-
-  private void describeFacilityActionImageUpload(Operation operation) {
-    var code = PublicIssueSuccessCode.ACTION_IMAGES_UPLOADED;
-    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
-    success.setDescription(code.getMessage());
-    addExample(
-        success,
-        "facilityActionImagesUploaded",
-        envelope(
-            true,
-            code,
-            code.getMessage(),
-            Map.of(
-                "publicIssueId",
-                1,
-                "actionId",
-                3,
-                "images",
-                List.of(
-                    Map.of(
-                        "imageId",
-                        11,
-                        "imageUrl",
-                        "https://flout-dev-files-kr.s3.ap-northeast-2.amazonaws.com/public-issues/1/actions/3/example?X-Amz-Signature=...",
-                        "uploadedAt",
-                        "2026-11-06T10:00:00+09:00")))));
-    addError(operation, "emptyImages", PublicIssueErrorCode.EMPTY_ACTION_IMAGES, null);
-    addError(operation, "invalidImages", PublicIssueErrorCode.INVALID_ACTION_IMAGES, null);
-    addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
-    addError(operation, "actionNotFound", PublicIssueErrorCode.ACTION_NOT_FOUND, null);
-    addError(operation, "jurisdictionDenied", InspectionErrorCode.JURISDICTION_ACCESS_DENIED, null);
-    addError(
-        operation,
-        "imageTooLarge",
-        GeneralErrorCode.PAYLOAD_TOO_LARGE,
-        "사진은 파일당 최대 10MiB까지 업로드할 수 있습니다. 요청 전체는 80MiB 이하입니다.");
-    addError(operation, "imageUploadFailed", PublicIssueErrorCode.ACTION_IMAGE_UPLOAD_FAILED, null);
-    addError(
-        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
-    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
-    operation.getResponses().get("404").setDescription("공공시설 문제 또는 조치를 찾을 수 없습니다.");
-    operation.getResponses().get("413").setDescription("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다.");
   }
 
   private void describeInspectionPhotoUpload(Operation operation) {
