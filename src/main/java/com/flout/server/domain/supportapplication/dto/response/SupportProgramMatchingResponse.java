@@ -9,7 +9,7 @@ public record SupportProgramMatchingResponse(
 
   public record Recommendation(
       String itemType,
-      Long programId,
+      long programId,
       String guidanceId,
       String matchType,
       String reason,
