@@ -366,25 +366,17 @@ public class ResidentProgressService {
       rank = 2;
     }
     LocalDateTime updated =
-        switch (stage) {
-          case "CONSTRUCTION_COMPLETED", "CONSTRUCTION_IN_PROGRESS", "CONSTRUCTION_SCHEDULED" ->
-              constructionChangedAt(construction);
-          case "SUPPORT_DRAFT" -> time(support, "created_at");
-          case "SUPPORT_REVIEW" -> time(support, "submitted_at");
-          case "SUPPORT_APPROVED", "SUPPORT_REJECTED" -> time(support, "approved_at");
-          case "SUPPORT_FORM_EDITING" -> time(supportDraft, "updated_at");
-          case "INSPECTION_RESULT_PUBLISHED" -> time(published, "published_at");
-          case "INSPECTION_RESULT_PENDING", "INSPECTION_IN_PROGRESS", "VISIT_SCHEDULED" ->
-              inspectionChangedAt(inspection);
-          case "INSPECTION_RECEIVED" -> receivedAt(app);
-          case "INSPECTION_DRAFT" -> time(app, "created_at");
-          case "INSPECTION_FORM_EDITING" -> time(inspectionDraft, "updated_at");
-          case "GUIDE_COMPLETED" ->
-              firstTime(guide, "completed_at", "progress_updated_at", "generated_at");
-          case "GUIDE_IN_PROGRESS" -> firstTime(guide, "progress_updated_at", "generated_at");
-          case "GUIDE_AVAILABLE" -> time(guide, "generated_at");
-          default -> time(a, "created_at");
-        };
+        stageUpdatedAt(
+            stage,
+            a,
+            guide,
+            app,
+            inspectionDraft,
+            inspection,
+            published,
+            support,
+            supportDraft,
+            construction);
     boolean supportStage = supportId != null || "SUPPORT_FORM_EDITING".equals(stage);
     String applicationType =
         supportStage
@@ -418,6 +410,38 @@ public class ResidentProgressService {
             updated == null ? null : updated.atOffset(java.time.ZoneOffset.ofHours(9))),
         rank,
         () -> stageHistory(a, guide, app, inspection, published, support, construction));
+  }
+
+  private LocalDateTime stageUpdatedAt(
+      String stage,
+      Map<String, Object> assessment,
+      Map<String, Object> guide,
+      Map<String, Object> app,
+      Map<String, Object> inspectionDraft,
+      Map<String, Object> inspection,
+      Map<String, Object> published,
+      Map<String, Object> support,
+      Map<String, Object> supportDraft,
+      Map<String, Object> construction) {
+    return switch (stage) {
+      case "CONSTRUCTION_COMPLETED", "CONSTRUCTION_IN_PROGRESS", "CONSTRUCTION_SCHEDULED" ->
+          constructionChangedAt(construction);
+      case "SUPPORT_DRAFT" -> time(support, "created_at");
+      case "SUPPORT_REVIEW" -> time(support, "submitted_at");
+      case "SUPPORT_APPROVED", "SUPPORT_REJECTED" -> time(support, "approved_at");
+      case "SUPPORT_FORM_EDITING" -> time(supportDraft, "updated_at");
+      case "INSPECTION_RESULT_PUBLISHED" -> time(published, "published_at");
+      case "INSPECTION_RESULT_PENDING", "INSPECTION_IN_PROGRESS", "VISIT_SCHEDULED" ->
+          inspectionChangedAt(inspection);
+      case "INSPECTION_RECEIVED" -> receivedAt(app);
+      case "INSPECTION_DRAFT" -> time(app, "created_at");
+      case "INSPECTION_FORM_EDITING" -> time(inspectionDraft, "updated_at");
+      case "GUIDE_COMPLETED" ->
+          firstTime(guide, "completed_at", "progress_updated_at", "generated_at");
+      case "GUIDE_IN_PROGRESS" -> firstTime(guide, "progress_updated_at", "generated_at");
+      case "GUIDE_AVAILABLE" -> time(guide, "generated_at");
+      default -> time(assessment, "created_at");
+    };
   }
 
   private String homeTitle(String stage) {
