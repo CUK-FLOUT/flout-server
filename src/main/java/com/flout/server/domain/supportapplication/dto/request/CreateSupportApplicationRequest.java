@@ -34,7 +34,7 @@ public record CreateSupportApplicationRequest(
             type = "string",
             format = "date",
             description = "지원시설 설치 희망 방문일 (오늘 이후, yyyy-MM-dd). 현장점검 일정과 별개",
-            example = "2026-12-01")
+            example = "2030-12-01")
         LocalDate preferredVisitDate,
     @NotNull @JsonDeserialize(using = StrictVisitTime.class)
         @Schema(
