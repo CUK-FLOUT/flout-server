@@ -39,6 +39,7 @@ public class AddressCoordinatesService {
                           || (d.roadAddress() != null
                               && normalized.equals(normalize(d.roadAddress().addressName()))))
               .toList();
+      // 직접 일치하는 주소를 우선하고 중복 결과를 제거한 뒤 유일한 좌표만 반환한다.
       var direct =
           candidates.stream().filter(d -> normalized.equals(normalize(d.addressName()))).toList();
       var preferred = direct.isEmpty() ? candidates : direct;

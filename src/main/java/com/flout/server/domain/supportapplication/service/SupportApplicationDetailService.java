@@ -30,6 +30,7 @@ public class SupportApplicationDetailService {
     access.requireOperator(operatorId);
     if (id == null || id <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    // 관할 밖 신청과 존재하지 않는 신청은 같은 오류로 처리한다.
     var application =
         applications
             .findAdminDetail(id, SupportDecisionAccess.BUCHEON_ADDRESS.pattern())

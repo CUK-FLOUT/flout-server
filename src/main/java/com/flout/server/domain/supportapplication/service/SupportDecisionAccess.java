@@ -24,6 +24,7 @@ public class SupportDecisionAccess {
     if (id == null || id <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     var operator = requireOperator(operatorId, true);
+    // 승인과 미승인이 동시에 처리되지 않도록 신청을 잠근 뒤 상태를 확인한다.
     var application =
         applications
             .findForApproval(id)

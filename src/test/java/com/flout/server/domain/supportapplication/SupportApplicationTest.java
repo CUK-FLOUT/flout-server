@@ -589,11 +589,11 @@ class SupportApplicationTest {
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/support-applications'].post.responses['404'].description")
-                .value("현장점검 신청 또는 지원사업을 찾을 수 없습니다."))
+                .value("현장점검 신청, 지원사업 또는 제출에 사용한 임시저장 폼을 찾을 수 없습니다."))
         .andExpect(
             jsonPath(
                     "$.paths['/api/resident/support-applications'].post.responses['409'].description")
-                .value("중복 신청, 공식 접수 미확인 또는 신청 자격 정보 확인 불가."))
+                .value("중복 신청, 공식 접수 미확인, 신청 자격 정보 확인 불가 또는 폼 제출 충돌입니다."))
         .andExpect(jsonPath("$.paths['/api/resident/support-applications'].get").doesNotExist());
     mvc.perform(get("/v3/api-docs"))
         .andExpect(

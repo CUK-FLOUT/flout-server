@@ -51,6 +51,7 @@ public class ConsentService {
     if (user.getRole() != UserRole.RESIDENT) {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     }
+    // 두 필수 동의를 현재 설정된 버전으로 같은 트랜잭션에 저장한다.
     LocalDateTime now = LocalDateTime.now();
     save(user, ConsentType.THIRD_PARTY_PROVISION, thirdPartyVersion, now);
     save(user, ConsentType.STATUS_NOTIFICATION, notificationVersion, now);

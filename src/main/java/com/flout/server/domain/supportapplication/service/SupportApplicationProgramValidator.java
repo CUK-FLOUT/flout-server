@@ -14,10 +14,7 @@ import java.util.Locale;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
-/**
- * Validates support program eligibility and requested facilities before a resident submits a
- * support application.
- */
+/** 지원 신청 전 사업 접수 상태와 신청 시설의 적합성을 확인한다. */
 @Component
 public class SupportApplicationProgramValidator {
 
@@ -27,10 +24,6 @@ public class SupportApplicationProgramValidator {
   private final SupportFacilityMatcher facilities;
   private final Clock clock;
 
-  /**
-   * Explicitly injects the support-application clock to avoid ambiguity with inspectionClock and
-   * fcmClock.
-   */
   public SupportApplicationProgramValidator(
       InspectionRepository inspections,
       InspectionResultRepository results,
@@ -45,48 +38,40 @@ public class SupportApplicationProgramValidator {
     this.clock = clock;
   }
 
-  /**
-   * Validates intake status, eligibility, and explicitly recommended facilities before submission.
-   */
   public void validate(Long applicationId, SupportProgram program, String requestedFacility) {
 
     String state = program.getApplicationStatus();
     LocalDate today = LocalDate.now(clock);
 
-    // 1. 종료 또는 중단된 지원사업 차단
     if (state != null
         && List.of("CLOSED", "ENDED", "SUSPENDED").contains(state.toUpperCase(Locale.ROOT))) {
 
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_ACCEPTING);
     }
 
-    // 2. 신청 시작일 이전 차단
     if (program.getApplicationStartDate() != null
         && today.isBefore(program.getApplicationStartDate())) {
 
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_ACCEPTING);
     }
 
-    // 3. 신청 종료일 이후 차단
     if (program.getApplicationEndDate() != null && today.isAfter(program.getApplicationEndDate())) {
 
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_ACCEPTING);
     }
 
-    // 4. 레거시 사업 호환성 유지
+    // 사업 유형이 없는 기존 데이터는 추가 자격·시설 검증을 적용하지 않는다.
     String kind = program.getProgramKind();
 
     if (kind == null || kind.isBlank()) {
       return;
     }
 
-    // 5. 시설 설치 지원사업만 허용
     if (!"FACILITY".equalsIgnoreCase(kind)) {
 
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_FACILITY_APPLICATION);
     }
 
-    // 6. 공식 접수 여부 및 신청기간 확인
     if (!"OPEN".equalsIgnoreCase(state)
         || program.getApplicationStartDate() == null
         || program.getApplicationEndDate() == null) {
@@ -94,26 +79,22 @@ public class SupportApplicationProgramValidator {
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_NOT_ACCEPTING);
     }
 
-    // 7. 신청 자격 정보 확인
     if (program.getEligibilityConditions() == null
         || program.getEligibilityConditions().isBlank()) {
 
       throw new BaseException(SupportApplicationErrorCode.PROGRAM_ELIGIBILITY_UNCONFIRMED);
     }
 
-    // 8. 현장점검 조회
     var inspection =
         inspections
             .findByApplicationId(applicationId)
             .orElseThrow(() -> new BaseException(SupportApplicationErrorCode.RESULT_NOT_PUBLISHED));
 
-    // 9. 공개된 점검 결과 확인
     var result =
         results
             .findByInspectionIdAndResultStatus(inspection.getId(), ResultStatus.PUBLISHED)
             .orElseThrow(() -> new BaseException(SupportApplicationErrorCode.RESULT_NOT_PUBLISHED));
 
-    // 10. 전문가 권장조치 조회
     var actions =
         recommendations.findByResultIdOrderBySortOrderAsc(result.getId()).stream()
             .map(
@@ -121,7 +102,6 @@ public class SupportApplicationProgramValidator {
                     new SupportFacilityMatcher.Action(action.getId(), action.getDescription()))
             .toList();
 
-    // 11. 신청시설과 지원·권장시설 일치 여부 확인
     if (!facilities.canApplyForFacility(
         program.getSupportedFacilities(), requestedFacility, actions)) {
 

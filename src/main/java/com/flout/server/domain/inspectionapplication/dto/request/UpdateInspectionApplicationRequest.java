@@ -43,10 +43,10 @@ public class UpdateInspectionApplicationRequest {
   @Size(max = 2000, message = "요청 사유는 2000자 이하여야 합니다.") @Schema(description = "점검 요청 사유. null이면 삭제", nullable = true)
   private String requestReason;
 
-  @FutureOrPresent(message = "희망 방문일은 오늘 이후여야 합니다.") @Schema(description = "희망 방문일")
+  @FutureOrPresent(message = "희망 방문일은 오늘 이후여야 합니다.") @Schema(description = "희망 방문일. 오늘 이후", example = "2026-12-01")
   private LocalDate preferredVisitDate;
 
-  @Schema(description = "희망 방문 시간대")
+  @Schema(description = "희망 방문 시간대", example = "MORNING")
   private PreferredTimeSlot preferredTimeSlot;
 
   @Setter

@@ -77,7 +77,7 @@ public class FormDraftService {
     if (user.getRole() != UserRole.RESIDENT) throw new BaseException(FormDraftErrorCode.NOT_FOUND);
   }
 
-  /** Called inside the creation transaction; the row lock serializes retries. */
+  /** 생성 트랜잭션에서 폼을 잠가 같은 제출의 재시도를 직렬화한다. */
   public <T> T priorSubmission(
       Long userId, String type, UUID id, Long source, Object request, Class<T> responseType) {
     if (id == null) return null;
@@ -96,7 +96,7 @@ public class FormDraftService {
     return null;
   }
 
-  /** Restores only a committed, owned submission; an unsent form never bypasses validation. */
+  /** 저장된 본인 제출만 복구하며, 미제출 폼은 검증을 우회하지 않는다. */
   @Transactional(readOnly = true)
   public <T> T recoverExpiredSubmission(
       Long userId, String type, UUID id, Long source, Object request, Class<T> responseType) {
@@ -177,7 +177,7 @@ public class FormDraftService {
         linkedId);
   }
 
-  /** Best-effort association for legacy clients; never change the outcome of their submission. */
+  /** 기존 클라이언트의 제출 결과를 바꾸지 않고 가능한 경우에만 폼을 연결한다. */
   public void scheduleUniqueLink(
       Long userId, String type, Long source, Long linkedId, Object request, Object response) {
     if (!org.springframework.transaction.support.TransactionSynchronizationManager
@@ -264,7 +264,7 @@ public class FormDraftService {
     if (!"DRAFT".equals(actual.get(0).get("status").toString())) complete(type, linkedId);
   }
 
-  /** Synchronize linked forms with the authoritative inspection application after a patch. */
+  /** 신청 수정 후 연결된 폼을 실제 현장점검 신청 값에 맞춘다. */
   public void syncInspection(
       com.flout.server.domain.inspectionapplication.entity.InspectionApplication app,
       java.util.List<com.flout.server.domain.inspectionapplication.entity.InflowLocation>
@@ -312,7 +312,7 @@ public class FormDraftService {
     }
   }
 
-  /** Serialize inspection creation with new form creation for the same assessment. */
+  /** 같은 분석에 대한 현장점검 신청과 폼 생성을 직렬화한다. */
   public void lockInspectionSource(Long assessmentId, Long userId) {
     if (jdbc.queryForList(
             "SELECT assessment_id FROM risk_assessments WHERE assessment_id=? AND user_id=? FOR UPDATE",
@@ -321,7 +321,7 @@ public class FormDraftService {
         .isEmpty()) throw new BaseException(FormDraftErrorCode.NOT_FOUND);
   }
 
-  /** Serialize support submission with form saves using the same lock order. */
+  /** 지원 신청 제출과 폼 저장에서 같은 순서로 원본 신청을 잠근다. */
   public void lockSupportSource(Long applicationId) {
     jdbc.queryForList(
         "SELECT application_id FROM inspection_applications WHERE application_id=? FOR UPDATE",
@@ -414,6 +414,7 @@ public class FormDraftService {
       if (((Number) row.get("user_id")).longValue() != userId
           || !row.get("draft_type").equals(type))
         throw new BaseException(FormDraftErrorCode.NOT_FOUND);
+      // 최초 저장 응답을 받지 못한 재시도는 내용이 동일할 때만 기존 결과를 반환한다.
       if (request.version() == null
           && ((Number) row.get("source_id")).longValue() == source
           && "EDITING".equals(row.get("form_state"))
