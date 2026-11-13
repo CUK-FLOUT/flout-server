@@ -169,7 +169,6 @@ public class InspectionApplicationSubmissionTransaction {
     return response;
   }
 
-  // 유입 위치 중복 제거
   private void saveInflowLocations(
       InspectionApplication application, List<InflowLocation> requestedLocations) {
     if (requestedLocations == null) {

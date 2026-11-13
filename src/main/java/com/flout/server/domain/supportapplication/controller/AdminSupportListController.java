@@ -26,7 +26,7 @@ public class AdminSupportListController {
   @Operation(
       summary = "지원 신청 목록 조회·검색",
       description =
-          "인증된 운영자의 관할 내 지원 신청을 검색합니다. DRAFT는 제외하며 신청 ID 내림차순으로 정렬합니다. 지역(district)·지원 상태(status)·검색어를 조합할 수 있으며 건수와 페이지에도 동일하게 적용합니다. REVIEWING 필터는 SUBMITTED를 포함합니다.")
+          "인증된 운영자의 관할 내 지원 신청을 검색합니다. DRAFT는 제외하며 신청 ID 내림차순으로 정렬합니다. 지역(district)·지원 상태(status)·검색어를 조합할 수 있으며 건수와 페이지에도 동일하게 적용합니다. REVIEWING 필터는 SUBMITTED를 포함합니다. 현재 저장 상태에는 REVIEWING과 SCHEDULING이 없습니다.")
   @ApiResponse(responseCode = "200", description = "조회 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",

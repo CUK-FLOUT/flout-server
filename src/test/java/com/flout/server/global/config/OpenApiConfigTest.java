@@ -14,6 +14,37 @@ import org.junit.jupiter.api.Test;
 
 class OpenApiConfigTest {
   @Test
+  void supportDecisionsDocumentMediaTypeErrorsWithoutLosingDecisionErrors() {
+    var api = new OpenAPI().paths(new Paths());
+    for (String action : Set.of("approve", "reject")) {
+      var body =
+          new io.swagger.v3.oas.models.parameters.RequestBody()
+              .content(
+                  new io.swagger.v3.oas.models.media.Content()
+                      .addMediaType(
+                          "application/json", new io.swagger.v3.oas.models.media.MediaType()));
+      api.getPaths()
+          .addPathItem(
+              "/api/admin/support-applications/{supportApplicationId}/" + action,
+              new PathItem().post(new Operation().requestBody(body)));
+    }
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+    for (String action : Set.of("approve", "reject")) {
+      var responses =
+          api.getPaths()
+              .get("/api/admin/support-applications/{supportApplicationId}/" + action)
+              .getPost()
+              .getResponses();
+      assertAddressExample(
+          responses, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR);
+      assertAddressExample(
+          responses, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR);
+      assertThat(responses.get("409").getContent().get("application/json").getExamples())
+          .containsKey("ALREADY_DECIDED");
+    }
+  }
+
+  @Test
   void inspectionResultQueryDocumentsEmptyResultAndReadErrors() {
     String path = "/api/admin/inspections/{inspectionId}/result";
     var api = new OpenAPI().paths(new Paths());
@@ -191,9 +222,10 @@ class OpenApiConfigTest {
     assertThat(responses.get("403").getContent().get("application/json").getExamples())
         .containsKeys("assessmentAccessDenied", "residentOnly");
     assertThat(responses.get("403").getDescription()).isEqualTo("취약도 분석 결과에 대한 접근 권한이 없습니다.");
-    assertThat(responses.get("404").getDescription()).isEqualTo("취약도 분석 결과를 찾을 수 없습니다.");
+    assertThat(responses.get("404").getDescription())
+        .isEqualTo("취약도 분석 결과 또는 제출에 사용한 임시저장 폼을 찾을 수 없습니다.");
     assertThat(responses.get("409").getDescription())
-        .isEqualTo("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했거나 기존 임시 신청과 요청 내용이 다릅니다.");
+        .isEqualTo("취약도 분석 미완료, 중복 신청, 기존 임시 신청 내용 불일치 또는 폼 제출 충돌입니다.");
     assertExampleMessage(responses, "403", "assessmentAccessDenied", "본인의 취약도 분석 결과만 사용할 수 있습니다.");
     assertExampleMessage(responses, "404", "assessmentNotFound", "취약도 분석 결과를 찾을 수 없습니다.");
     assertExampleMessage(

@@ -38,6 +38,7 @@ public class SupportApprovalService {
         && !attachments.existsByApplicationIdAndAttachmentType(
             id, SupportAttachmentType.LANDLORD_CONSENT))
       throw new BaseException(SupportApprovalErrorCode.CONSENT_DOCUMENT_REQUIRED);
+    // 승인 이력과 미배정 시공 건을 같은 트랜잭션에서 생성한다.
     var previousStatus = application.getStatus();
     application.approve(
         request.supportScope(), operator, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));

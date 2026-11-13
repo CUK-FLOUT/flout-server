@@ -104,10 +104,7 @@ public class ResidentSupportDetailService {
         published);
   }
 
-  /**
-   * Uses the approval view's ownership check and confirmed schedule, including an unscheduled
-   * approval.
-   */
+  /** 승인 상세의 소유권 검증과 확정 일정 조회를 재사용한다. */
   public ResidentSupportScheduleResponse schedule(Long userId, Long id) {
     var approval = approval(userId, id);
     return new ResidentSupportScheduleResponse(

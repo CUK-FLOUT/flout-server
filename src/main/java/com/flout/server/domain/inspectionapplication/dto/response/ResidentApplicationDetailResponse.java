@@ -12,7 +12,7 @@ public record ResidentApplicationDetailResponse(
     Long applicationId,
     @Schema(description = "신청 ID를 최소 6자리로 표시한 접수번호", example = "000001") String receiptNumber,
     Applicant applicant,
-    String address,
+    @Schema(description = "신청 주소", example = "경기도 부천시 원미구 지봉로 43") String address,
     @Schema(description = "신청 상세주소", nullable = true) String detailAddress,
     OccupancyType occupancyType,
     FloodExperience floodExperience,
@@ -35,7 +35,9 @@ public record ResidentApplicationDetailResponse(
     @Schema(description = "내 신청 통합 진행 상태와 공개된 점검·지원·시공 요약. 기존 신청 필드는 유지됩니다.")
         ResidentApplicationProgressResponse progress) {
 
-  public record Applicant(String name, String phone) {}
+  public record Applicant(
+      @Schema(description = "신청 당시 이름", example = "김주민") String name,
+      @Schema(description = "신청 연락처", example = "010-1234-5678") String phone) {}
 
   public static ResidentApplicationDetailResponse from(
       InspectionApplication application,

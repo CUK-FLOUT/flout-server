@@ -39,7 +39,7 @@ public class InspectionApplicationController {
   @Operation(
       summary = "현장점검 신청",
       description =
-          "완료된 본인 침수 위험도 분석 결과를 기반으로 신청 정보를 DRAFT로 저장합니다. 사진 업로드 성공 시 접수 및 점검이 생성됩니다. 동일한 임시 신청 요청은 기존 신청을 반환합니다.")
+          "완료된 본인 침수 위험도 분석을 기반으로 현장점검 신청을 DRAFT로 저장합니다. 부천시의 신청 주소와 상세 주소는 분석 결과와 일치해야 하며, 분석 결과당 신청은 한 건만 가능합니다. 기존 DRAFT와 동일한 요청은 기존 신청을 201로 반환하고 내용이 다르면 충돌합니다. 사진 등록에 성공하면 신청이 접수되고 점검이 생성됩니다.")
   public ResponseEntity<SuccessResponse<CreateInspectionApplicationResponse>> submit(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "신규 폼을 제출할 때 PUT에 사용한 draftId. 응답 유실 시 동일 ID와 동일 요청으로 재시도합니다.")
@@ -58,10 +58,11 @@ public class InspectionApplicationController {
   @Operation(
       summary = "임시 현장점검 신청 수정",
       description =
-          "본인의 DRAFT 신청만 부분 수정합니다. 생략한 필드는 유지하고 요청 사유는 null로 삭제합니다. 희망 일정은 null일 수 없고 유입 위치는 1개 이상으로 전체 교체합니다.")
+          "본인의 DRAFT 신청만 부분 수정합니다. 생략한 필드는 유지하고 요청 사유는 null로 삭제합니다. 다른 수정 필드에는 null을 전달할 수 없으며, 유입 위치는 1개 이상으로 전체 교체합니다. 수정할 수 없는 필드는 거부합니다.")
   public SuccessResponse<UpdateInspectionApplicationResponse> update(
       @AuthenticationPrincipal Jwt jwt,
-      @PathVariable Long applicationId,
+      @Parameter(description = "본인의 임시 현장점검 신청 ID", example = "1", required = true) @PathVariable
+          Long applicationId,
       @Valid @RequestBody UpdateInspectionApplicationRequest request) {
     return SuccessResponse.of(
         updateService.update(Long.valueOf(jwt.getSubject()), applicationId, request),

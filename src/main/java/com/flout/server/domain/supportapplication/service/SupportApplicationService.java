@@ -80,6 +80,7 @@ public class SupportApplicationService {
                     .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
             if (user.getRole() != UserRole.RESIDENT)
               throw new BaseException(SupportApplicationErrorCode.RESIDENT_ONLY);
+            // 같은 현장점검 신청의 중복 제출과 폼 저장을 직렬화한다.
             formDrafts.lockSupportSource(request.applicationId());
             var previous =
                 formDrafts.priorSubmission(

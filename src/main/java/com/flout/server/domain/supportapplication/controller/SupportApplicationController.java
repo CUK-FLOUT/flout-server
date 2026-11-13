@@ -29,7 +29,7 @@ public class SupportApplicationController {
   @Operation(
       summary = "지원 신청 등록",
       description =
-          "주민에게 공개된 PUBLISHED 점검 결과가 있는 본인 신청과 지원사업을 연결합니다. TENANT는 DRAFT로 저장한 뒤 동의서 업로드 시 접수되며 OWNER·ETC는 즉시 SUBMITTED로 접수됩니다. 신청자 정보는 현장점검 신청에서 복사합니다. 현장점검 신청당 지원 신청은 한 건만 가능합니다.")
+          "주민에게 공개된 PUBLISHED 점검 결과가 있는 본인 현장점검 신청에 지원사업을 연결합니다. 사업의 접수 상태·기간을 확인하며, 사업 유형에 따라 자격 정보와 신청 시설의 지원·권장 적합성을 검증합니다. TENANT는 DRAFT로 저장한 뒤 동의서 제출 시 접수되고 OWNER·ETC는 즉시 접수됩니다. 신청자 정보는 현장점검 신청에서 복사하며, 현장점검 신청당 지원 신청은 한 건입니다. 동일 폼 ID와 동일 요청의 재시도는 기존 결과를 반환합니다.")
   public SuccessResponse<CreateSupportApplicationResponse> submit(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "신규 폼을 제출할 때 PUT에 사용한 draftId. 응답 유실 시 동일 ID와 동일 요청으로 재시도합니다.")

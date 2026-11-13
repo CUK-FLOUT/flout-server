@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Match only explicitly recommended installations against facilities supported by a program. */
+/** 명시적으로 권장된 설치 시설과 사업의 지원 시설을 대조한다. */
 @Component
 public class SupportFacilityMatcher {
   private static final Set<String> FACILITIES =
@@ -50,11 +50,7 @@ public class SupportFacilityMatcher {
     return new MatchResult(true, List.copyOf(ids), List.copyOf(evidence));
   }
 
-  /** A requested item must be one unambiguous supported facility AND explicitly recommended. */
-
-  /**
-   * A requested item must be one unambiguous supported facility and must be explicitly recommended.
-   */
+  /** 신청 시설은 하나로 식별되어야 하며 사업 지원과 전문가 권장 조건을 모두 만족해야 한다. */
   public boolean canApplyForFacility(
       String supportedFacilitiesJson, String requestedFacility, List<Action> recommendations) {
 
@@ -76,8 +72,7 @@ public class SupportFacilityMatcher {
       return false;
     }
 
-    // 배수구나 집수정이 설치 위치로 사용된 경우,
-    // 별도의 신청시설로 중복 집계하지 않는다.
+    // 배수구나 집수정이 설치 위치로 쓰인 경우 별도 신청 시설로 세지 않는다.
     String facilityNames = compact;
 
     if (!"배수구".equals(wanted)) {
@@ -124,7 +119,7 @@ public class SupportFacilityMatcher {
       }
       return values;
     } catch (Exception ignored) {
-      // Unknown / malformed source data must not produce a positive facility match.
+      // 지원 시설 정보를 해석할 수 없으면 일치하는 시설이 없는 것으로 처리한다.
       return List.of();
     }
   }
@@ -135,7 +130,7 @@ public class SupportFacilityMatcher {
     if (compact.endsWith("역류방지용밸브")) return "역류방지밸브";
     if (compact.endsWith("역류방지밸브")) return "역류방지밸브";
     if (compact.endsWith("물막이판")) return "물막이판";
-    // Do not treat 차수판 and 물막이판 as identical without explicit support data.
+    // 지원 정보에 명시되지 않은 차수판과 물막이판은 서로 다른 시설로 취급한다.
     for (String name : FACILITIES) {
       if (compact.endsWith(name)) return name;
     }
