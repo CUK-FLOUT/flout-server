@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
+import com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode;
+import com.flout.server.domain.riskassessment.response.code.RiskAssessmentErrorCode;
 import com.flout.server.global.response.code.BaseResponseCode;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import io.swagger.v3.oas.models.*;
@@ -324,6 +326,8 @@ class OpenApiConfigTest {
         .containsKey("riskAssessmentCreated");
     assertThat(assessment)
         .containsKeys("201", "400", "401", "403", "404", "422", "500", "502", "503");
+    assertThat(assessment.get("422").getDescription())
+        .isEqualTo(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE.getMessage());
     assertExampleMessage(assessment, "422", "analysisUnavailable", "입력한 주소는 취약도 분석 대상 지역이 아닙니다.");
     assertExampleMessage(assessment, "503", "aiServiceTimeout", "AI 취약도 분석 서비스 응답 시간이 초과되었습니다.");
 
@@ -336,6 +340,10 @@ class OpenApiConfigTest {
         .containsKey("preventionGuideGenerated");
     assertThat(guide).containsKeys("200", "400", "401", "403", "404", "409", "500");
     assertThat(guide).doesNotContainKeys("502", "503");
+    assertThat(guide.get("404").getDescription())
+        .isEqualTo(PreventionGuideErrorCode.ASSESSMENT_NOT_FOUND.getMessage());
+    assertThat(guide.get("409").getDescription())
+        .isEqualTo(PreventionGuideErrorCode.ASSESSMENT_NOT_COMPLETED.getMessage());
     assertExampleMessage(
         guide, "400", "unsupportedHousingType", "맞춤 예방 가이드는 반지하 또는 1층 거주자에게 제공됩니다.");
   }

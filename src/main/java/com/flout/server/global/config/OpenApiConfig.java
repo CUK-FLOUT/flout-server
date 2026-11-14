@@ -1053,6 +1053,10 @@ public class OpenApiConfig {
     addError(operation, "invalidAddress", AddressErrorCode.INVALID_COORDINATE_ADDRESS, null);
     addError(operation, "addressMismatch", AddressErrorCode.COORDINATE_ADDRESS_MISMATCH, null);
     addError(operation, "analysisUnavailable", RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE, null);
+    operation
+        .getResponses()
+        .get("422")
+        .setDescription(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE.getMessage());
     addError(operation, "addressServiceFailed", AddressErrorCode.KAKAO_API_ERROR, null);
     addError(operation, "aiServiceFailed", RiskAssessmentErrorCode.AI_SERVICE_ERROR, null);
     addError(operation, "invalidAiResponse", RiskAssessmentErrorCode.INVALID_AI_RESPONSE, null);
@@ -1133,6 +1137,14 @@ public class OpenApiConfig {
     addError(
         operation, "invalidAssessmentId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(PreventionGuideErrorCode.ASSESSMENT_NOT_FOUND.getMessage());
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(PreventionGuideErrorCode.ASSESSMENT_NOT_COMPLETED.getMessage());
   }
 
   private void describeInspectionPhotoUpload(Operation operation) {
