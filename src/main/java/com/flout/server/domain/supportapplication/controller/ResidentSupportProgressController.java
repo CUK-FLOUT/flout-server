@@ -35,17 +35,18 @@ public class ResidentSupportProgressController {
 
   @GetMapping(value = "/schedule", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "주민 지원 일정 조율중 상세 조회",
+      summary = "지원 시공 일정 조회",
       description =
           "RESIDENT 본인의 APPROVED 지원 신청을 조회합니다. 시공 일정이 확정되면 저장된 날짜와 시간을 반환하며, 미확정이면 둘 다 null입니다.")
-  @ApiResponse(responseCode = "200", description = "일정 조율중 상세 조회 성공", useReturnTypeSchema = true)
+  @ApiResponse(responseCode = "200", description = "시공 일정 조회 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "409",
       description = "SUPPORT_DETAIL_409_1: APPROVED이 아닌 상태",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<ResidentSupportScheduleResponse> schedule(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "지원 신청 ID. 점검·시공 ID와 다릅니다.") @PathVariable
+      @Parameter(description = "본인의 지원 신청 ID. 점검·시공 ID와 다릅니다.", example = "201", required = true)
+          @PathVariable
           Long supportApplicationId) {
     return SuccessResponse.ok(
         service.schedule(Long.valueOf(jwt.getSubject()), supportApplicationId));
@@ -53,9 +54,9 @@ public class ResidentSupportProgressController {
 
   @GetMapping(value = "/attachments", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "주민 지원 신청 증빙서류 조회",
+      summary = "지원 신청 증빙서류 조회",
       description =
-          "RESIDENT 본인 신청의 실제 증빙서류 메타데이터·동의 상태·15분 유효 열람 URL을 반환합니다. 신청 상태에 관계없이 본인 자료를 조회할 수 있습니다. 서류가 없으면 attachments=[]이며 S3를 호출하지 않습니다. 파일이 있으면 기존 AttachmentStorage로 URL을 발급하며 AWS_REGION/AWS_S3_BUCKET 및 AWS 기본 자격 증명 체인을 사용합니다. 설정·인증·서명 실패 시 500이며 가짜 URL·빈 목록으로 숨기지 않습니다. 객체 존재 확인이나 파일 바이트 다운로드는 수행하지 않아 실제 열람 시 S3에서 403/404가 발생할 수 있습니다. 내부 객체 키는 노출하지 않으며 발급된 URL은 만료 전 외부 공유하지 않아야 합니다. PDF·이미지는 contentType과 fileUrl로 열람하고 프론트 뷰어 UI는 포함하지 않습니다. 별도 다운로드 API는 추가하지 않습니다.")
+          "본인 신청의 제출된 증빙서류 메타데이터와 15분 유효 열람 URL을 반환합니다. 신청 상태에 관계없이 조회할 수 있으며 서류가 없으면 attachments는 빈 배열입니다. URL 발급 시 파일의 존재 여부는 확인하지 않으므로 실제 열람에 실패할 수 있습니다. URL은 외부에 공유하지 않아야 합니다.")
   @ApiResponse(
       responseCode = "200",
       description = "증빙서류 조회 성공. 미제출 시 빈 배열",
@@ -66,7 +67,8 @@ public class ResidentSupportProgressController {
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<ResidentSupportAttachmentsResponse> attachments(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "지원 신청 ID") @PathVariable Long supportApplicationId) {
+      @Parameter(description = "본인의 지원 신청 ID", example = "201", required = true) @PathVariable
+          Long supportApplicationId) {
     return SuccessResponse.ok(
         service.attachments(Long.valueOf(jwt.getSubject()), supportApplicationId));
   }

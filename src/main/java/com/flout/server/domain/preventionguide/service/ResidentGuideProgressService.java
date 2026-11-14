@@ -42,6 +42,7 @@ public class ResidentGuideProgressService {
     item.setCompleted(completed);
     guide.recordProgressChange();
     items.flush();
+    // 미완료에서 완료로 전환될 때 최초 완료 시각을 기록한다.
     if (!alreadyComplete && isComplete(guide)) guide.recordCompletion();
     return response(guide);
   }

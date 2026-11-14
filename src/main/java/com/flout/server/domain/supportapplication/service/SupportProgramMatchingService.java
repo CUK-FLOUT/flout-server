@@ -10,11 +10,9 @@ import com.flout.server.domain.inspectionapplication.response.code.InspectionApp
 import com.flout.server.domain.supportapplication.client.GeminiSupportClient;
 import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse;
 import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.Evidence;
-import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.GuidanceInfo;
 import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.ProgramInfo;
 import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.Recommendation;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
-import com.flout.server.domain.supportprogram.entity.SupportProgram;
 import com.flout.server.domain.supportprogram.repository.SupportProgramRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
@@ -22,9 +20,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @RequiredArgsConstructor
 public class SupportProgramMatchingService {
-  private static final Set<String> EXCLUDED = Set.of("CLOSED", "ENDED", "SUSPENDED");
+  private static final Set<String> PROGRAM_MATCH_TYPES = Set.of("DIRECT", "COMPLEMENTARY");
   private final InspectionApplicationRepository applications;
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
@@ -59,15 +55,14 @@ public class SupportProgramMatchingService {
   @Value("${app.support.fallback-guidance.official-url:}")
   private String guidanceUrl;
 
+  /** DB 스냅샷을 먼저 확정하고 트랜잭션 밖에서 Gemini를 호출한 뒤 실제 DB 사업만 반환한다. */
   public SupportProgramMatchingResponse match(Long userId, Long applicationId) {
     if (applicationId == null || applicationId <= 0) {
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     }
 
-    // 서버 설정 오류는 사용자 입력 오류가 아니며, DB 조회 전에 발견한다.
     validateGuidance();
 
-    // DB 조회와 필요한 데이터 복사를 완료한 후 트랜잭션을 종료한다.
     TransactionTemplate transaction = new TransactionTemplate(transactionManager);
     transaction.setReadOnly(true);
     MatchingSnapshot snapshot = transaction.execute(status -> loadSnapshot(userId, applicationId));
@@ -75,48 +70,41 @@ public class SupportProgramMatchingService {
       throw new IllegalStateException("지원사업 조회 결과를 준비하지 못했습니다.");
     }
     if (snapshot.candidates().isEmpty()) {
-      return guidance(applicationId, "현재 확인 가능한 지원사업이 없어 공식 상담을 안내해 드립니다.");
+      throw new BaseException(SupportApplicationErrorCode.MATCHING_INPUT_INVALID);
     }
 
-    // 외부 네트워크 호출은 트랜잭션이 완전히 종료된 뒤에 수행한다.
     var decision = gemini.decide(snapshot.input());
-    if ("CONSULTATION".equals(decision.itemType())) {
-      if (!"GUIDANCE".equals(decision.matchStatus())
-          || !"GUIDANCE".equals(decision.matchType())
-          || !Objects.equals(guidanceId, decision.guidanceId())) {
-        return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
-      }
-      return guidance(applicationId, safeReason(decision.reason(), "공식 상담에서 지원 가능 여부를 확인해 주세요."));
-    }
-    if (!"PROGRAM".equals(decision.itemType()) || decision.programId() == null) {
-      return guidance(applicationId, "신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
-    }
-    if (!Set.of("DIRECT", "COMPLEMENTARY").contains(decision.matchType())) {
-      return guidance(applicationId, "지원사업의 관련성을 확인하지 못해 공식 상담을 안내해 드립니다.");
-    }
-
     ProgramCandidate chosen =
         snapshot.candidates().stream()
             .filter(p -> p.id().equals(decision.programId()))
             .findFirst()
-            .orElse(null);
-    if (chosen == null) {
-      return guidance(applicationId, "현재 신청 가능한 사업을 확인하지 못해 공식 상담을 안내해 드립니다.");
-    }
+            // 모델이 허용된 후보 밖의 ID를 반환해도 실제 DB 후보만 노출한다.
+            .orElse(snapshot.candidates().getFirst());
+    boolean validDecision =
+        "PROGRAM".equals(decision.itemType())
+            && chosen.id().equals(decision.programId())
+            && PROGRAM_MATCH_TYPES.contains(decision.matchType());
+    String matchType = validDecision ? decision.matchType() : "COMPLEMENTARY";
 
     ProgramInfo info = chosen.info();
     var facilityMatch =
-        "DIRECT".equals(decision.matchType())
+        "DIRECT".equals(matchType)
             ? facilityMatcher.match(info.supportedFacilities(), snapshot.actions())
             : new SupportFacilityMatcher.MatchResult(true, List.of(), List.of());
-    // DIRECT means related to an expert-recommended facility. Do not claim a false match.
-    if ("DIRECT".equals(decision.matchType())
+    // DIRECT는 전문가 권장시설과 실제로 일치할 때만 유지한다.
+    String reason = decision.reason();
+    if ("DIRECT".equals(matchType)
         && facilityMatch.facilitiesKnown()
         && !facilityMatch.hasMatch()) {
-      return guidance(applicationId, "권장시설과 지원시설이 일치하지 않아 공식 상담을 안내합니다.");
+      matchType = "COMPLEMENTARY";
+      facilityMatch = new SupportFacilityMatcher.MatchResult(true, List.of(), List.of());
+      reason = "권장시설과 직접 일치하지 않지만 참고할 수 있는 지원사업입니다.";
+      validDecision = false;
+    } else if (!validDecision) {
+      reason = "가장 관련 있는 지원사업을 참고용으로 안내합니다.";
     }
     List<String> missing = new ArrayList<>(decision.missingInformation());
-    if ("DIRECT".equals(decision.matchType()) && !facilityMatch.facilitiesKnown()) {
+    if ("DIRECT".equals(matchType) && !facilityMatch.facilitiesKnown()) {
       missing.add("지원시설 정보 확인 필요");
     }
     if (!"OPEN".equalsIgnoreCase(String.valueOf(info.applicationStatus()))) {
@@ -132,7 +120,7 @@ public class SupportProgramMatchingService {
       missing.add("대상 지역 확인 필요");
     }
     String matchStatus =
-        missing.isEmpty() && "MATCHED".equals(decision.matchStatus())
+        validDecision && missing.isEmpty() && "MATCHED".equals(decision.matchStatus())
             ? "MATCHED"
             : "NEEDS_CONFIRMATION";
 
@@ -155,8 +143,8 @@ public class SupportProgramMatchingService {
             "PROGRAM",
             chosen.id(),
             null,
-            decision.matchType(),
-            safeReason(decision.reason(), "현장점검 결과와 관련된 사업으로 검토되었습니다."),
+            matchType,
+            safeReason(reason, "현장점검 결과와 관련된 사업으로 검토되었습니다."),
             facilityMatch.matchedActionIds(),
             evidence,
             missing.stream().distinct().toList(),
@@ -189,8 +177,8 @@ public class SupportProgramMatchingService {
             .map(item -> new SupportFacilityMatcher.Action(item.getId(), item.getDescription()))
             .toList();
     LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-    var available =
-        programs.findAllByOrderByIdAsc().stream().filter(p -> !isExcluded(p, today)).toList();
+    // 종료·예정 사업도 참고 연결 후보로 유지한다. 접수 가능 여부는 응답에 그대로 노출한다.
+    var available = programs.findAllByOrderByIdAsc();
     String region = extractRegion(application.getAddress());
 
     List<ProgramCandidate> candidates =
@@ -283,33 +271,10 @@ public class SupportProgramMatchingService {
       String summary,
       List<SupportFacilityMatcher.Action> actions) {}
 
-  private boolean isExcluded(SupportProgram p, LocalDate today) {
-    String status = String.valueOf(p.getApplicationStatus()).toUpperCase(Locale.ROOT);
-    if (EXCLUDED.contains(status)) return true;
-    if (p.getApplicationEndDate() != null && today.isAfter(p.getApplicationEndDate())) return true;
-    return p.getApplicationStartDate() != null && today.isBefore(p.getApplicationStartDate());
-  }
-
   private void validateGuidance() {
     if (Stream.of(guidanceId, guidanceTitle, guidanceDescription, guidanceUrl)
         .anyMatch(s -> s == null || s.isBlank()))
       throw new BaseException(SupportApplicationErrorCode.MATCHING_INPUT_INVALID);
-  }
-
-  private SupportProgramMatchingResponse guidance(Long applicationId, String reason) {
-    Recommendation rec =
-        new Recommendation(
-            "CONSULTATION",
-            null,
-            guidanceId,
-            "GUIDANCE",
-            reason,
-            List.of(),
-            List.of(),
-            List.of(),
-            null,
-            new GuidanceInfo(guidanceTitle, guidanceDescription, guidanceUrl));
-    return new SupportProgramMatchingResponse(applicationId, "GUIDANCE", rec);
   }
 
   private String safeReason(String reason, String fallback) {

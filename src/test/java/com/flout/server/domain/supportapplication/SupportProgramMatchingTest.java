@@ -211,9 +211,11 @@ class SupportProgramMatchingTest {
   }
 
   @Test
-  void doesNotRecommendAnUnrelatedProgramAsAFallback() throws Exception {
+  void returnsARealProgramWhenGeminiUnexpectedlyChoosesConsultation() throws Exception {
     publishResult("점검 결과");
-    programs.saveAndFlush(SupportProgram.create("일반 주거 지원", "침수와 관련 없는 사업", "서울시 지원 대상", "접수중"));
+    var fallback =
+        programs.saveAndFlush(
+            SupportProgram.create("일반 주거 지원", "침수와 관련 없는 사업", "서울시 지원 대상", "접수중"));
     when(gemini.decide(anyMap()))
         .thenReturn(
             new GeminiSupportClient.Decision(
@@ -227,11 +229,12 @@ class SupportProgramMatchingTest {
 
     mvc.perform(matching(ownerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
-        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"))
-        .andExpect(jsonPath("$.result.recommendation.programId").value(nullValue()))
-        .andExpect(jsonPath("$.result.recommendation.guidanceId").value("BUCHEON-CONSULT"))
-        .andExpect(jsonPath("$.result.recommendation.guidance.title").value("공식 상담 안내"));
+        .andExpect(jsonPath("$.result.matchStatus").value("NEEDS_CONFIRMATION"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("PROGRAM"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(fallback.getId()))
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("COMPLEMENTARY"))
+        .andExpect(jsonPath("$.result.recommendation.guidanceId").value(nullValue()))
+        .andExpect(jsonPath("$.result.recommendation.program.name").value("일반 주거 지원"));
   }
 
   @Test
@@ -247,9 +250,8 @@ class SupportProgramMatchingTest {
 
     publishResult("점검 결과");
     mvc.perform(matching(ownerToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
-        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"));
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.code").value("SUPPORT_500_1"));
 
     mvc.perform(
             post("/api/resident/support-application/0/matching")
@@ -318,9 +320,10 @@ class SupportProgramMatchingTest {
   }
 
   @Test
-  void rejectsUnrecognizedGeminiProgramId() throws Exception {
+  void fallsBackToARealProgramForUnrecognizedGeminiProgramId() throws Exception {
     publishResult("점검 결과");
-    programs.saveAndFlush(SupportProgram.create("물막이판 설치 지원", "출입구 설치", "부천시", "접수중"));
+    var fallback =
+        programs.saveAndFlush(SupportProgram.create("물막이판 설치 지원", "출입구 설치", "부천시", "접수중"));
     when(gemini.decide(anyMap()))
         .thenReturn(
             new GeminiSupportClient.Decision(
@@ -328,23 +331,36 @@ class SupportProgramMatchingTest {
 
     mvc.perform(matching(ownerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
-        .andExpect(jsonPath("$.result.recommendation.programId").value(nullValue()))
-        .andExpect(jsonPath("$.result.recommendation.guidanceId").value("BUCHEON-CONSULT"));
+        .andExpect(jsonPath("$.result.matchStatus").value("NEEDS_CONFIRMATION"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(fallback.getId()))
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("COMPLEMENTARY"))
+        .andExpect(jsonPath("$.result.recommendation.guidanceId").value(nullValue()));
   }
 
   @Test
-  void rejectsClosedProgramBeforeCallingGemini() throws Exception {
+  void keepsClosedProgramAsAReferenceCandidate() throws Exception {
     publishResult("점검 결과");
     var program = programs.saveAndFlush(SupportProgram.create("종료된 지원사업", "출입구 설치", "부천시", "접수종료"));
     jdbc.update(
         "UPDATE support_programs SET application_status='CLOSED' WHERE program_id=?",
         program.getId());
+    when(gemini.decide(anyMap()))
+        .thenReturn(
+            new GeminiSupportClient.Decision(
+                "NEEDS_CONFIRMATION",
+                "PROGRAM",
+                program.getId(),
+                null,
+                "COMPLEMENTARY",
+                "현재 종료된 사업이지만 참고용으로 안내합니다.",
+                List.of()));
 
     mvc.perform(matching(ownerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"));
-    verifyNoInteractions(gemini);
+        .andExpect(jsonPath("$.result.matchStatus").value("NEEDS_CONFIRMATION"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(program.getId()))
+        .andExpect(jsonPath("$.result.recommendation.program.applicationStatus").value("CLOSED"));
+    verify(gemini).decide(anyMap());
   }
 
   @Test
@@ -386,7 +402,7 @@ class SupportProgramMatchingTest {
   }
 
   @Test
-  void directFacilityMismatchFallsBackToConsultation() throws Exception {
+  void directFacilityMismatchStillReturnsTheChosenProgramAsComplementary() throws Exception {
     Long resultId = publishResult("현장점검 결과");
     jdbc.update(
         "INSERT INTO prevention_recommendations(result_id,description,sort_order) VALUES(?,?,?)",
@@ -405,8 +421,10 @@ class SupportProgramMatchingTest {
 
     mvc.perform(matching(ownerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.matchStatus").value("GUIDANCE"))
-        .andExpect(jsonPath("$.result.recommendation.itemType").value("CONSULTATION"));
+        .andExpect(jsonPath("$.result.matchStatus").value("NEEDS_CONFIRMATION"))
+        .andExpect(jsonPath("$.result.recommendation.itemType").value("PROGRAM"))
+        .andExpect(jsonPath("$.result.recommendation.programId").value(program.getId()))
+        .andExpect(jsonPath("$.result.recommendation.matchType").value("COMPLEMENTARY"));
   }
 
   @Test

@@ -92,6 +92,7 @@ public class SupportAttachmentService {
                 var currentType = resolveType(application);
                 if (currentType != type)
                   throw new BaseException(SupportAttachmentErrorCode.INVALID_OCCUPANCY);
+                // 저장소 업로드 중 다른 요청이 제출했을 수 있어 잠금 후 다시 검증한다.
                 rejectDuplicate(applicationId, currentType);
                 requireDraft(application);
                 var saved =

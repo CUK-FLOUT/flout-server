@@ -6,11 +6,11 @@ import java.time.*;
 import java.util.Locale;
 
 public record CreateSupportApplicationResponse(
-    Long supportApplicationId,
-    Long applicationId,
-    Long programId,
-    SupportApplicationStatus status,
-    OffsetDateTime submittedAt,
+    @Schema(description = "지원 신청 ID", example = "201") Long supportApplicationId,
+    @Schema(description = "연결된 현장점검 신청 ID", example = "101") Long applicationId,
+    @Schema(description = "지원사업 ID", example = "1") Long programId,
+    @Schema(description = "임시 저장 또는 접수 상태", example = "SUBMITTED") SupportApplicationStatus status,
+    @Schema(description = "접수 시각. 임시 저장 상태에서는 null", nullable = true) OffsetDateTime submittedAt,
     @Schema(description = "기존 주민 신청 상세와 동일한 현장점검 신청 ID 최소 6자리 표기", example = "000101")
         String receiptNumber,
     @Schema(description = "지원 신청에 저장된 신청자 이름 스냅샷", example = "홍길동") String applicantName,

@@ -13,7 +13,7 @@ public record CreateInspectionApplicationResponse(
             nullable = true,
             types = {"integer", "null"})
         Long inspectionId,
-    String receiptNo,
+    @Schema(description = "신청 ID를 최소 6자리로 표시한 접수번호", example = "000001") String receiptNo,
     @Schema(description = "임시 저장 상태", example = "DRAFT") InspectionApplicationStatus status,
     @Schema(
             description = "임시 신청의 접수 시각은 null",

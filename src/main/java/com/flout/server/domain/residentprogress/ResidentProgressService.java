@@ -45,7 +45,7 @@ public class ResidentProgressService {
       @Schema(description = "내 신청과 같은 현장점검 신청 ID 기반 6자리 표시 번호. 입력 중인 폼은 null", nullable = true)
           String receiptNumber,
       @Schema(description = "홈 카드 제목") String title,
-      @Schema(description = "분석 주소") String address,
+      @Schema(description = "분석 주소", example = "경기도 부천시 원미구 지봉로 43") String address,
       @Schema(description = "상세 주소", nullable = true) String detailAddress,
       @Schema(description = "분석 위험 등급") String riskLevel,
       @Schema(description = "현재 진행 단계") String currentStage,
@@ -61,7 +61,7 @@ public class ResidentProgressService {
 
   public record AssessmentDetail(
       @Schema(description = "취약도 분석 ID") Long assessmentId,
-      @Schema(description = "분석 주소") String address,
+      @Schema(description = "분석 주소", example = "경기도 부천시 원미구 지봉로 43") String address,
       @Schema(description = "상세 주소", nullable = true) String detailAddress,
       @Schema(description = "분석 상태") String status,
       @Schema(description = "분석 위험 등급") String riskLevel,
@@ -176,6 +176,7 @@ public class ResidentProgressService {
             .filter(row -> after == null || ORDER.compare(key(row), after) > 0)
             .limit((long) size + 1)
             .toList();
+    // 페이지에 포함된 항목만 이력을 조회하고, 추가 항목으로 다음 페이지 존재를 판단한다.
     var items = page.stream().limit(size).map(Ranked::withHistory).toList();
     return new Progress(items, page.size() > size ? encodeCursor(key(page.get(size - 1))) : null);
   }
@@ -232,6 +233,7 @@ public class ResidentProgressService {
     Object target;
     int rank;
     boolean closed = false;
+    // 시공부터 지원·점검·가이드 순으로 가장 진행된 상태를 홈 단계로 선택한다.
     if (construction != null && "COMPLETED".equals(str(construction, "status"))) {
       stage = "CONSTRUCTION_COMPLETED";
       action = "VIEW_COMPLETION";

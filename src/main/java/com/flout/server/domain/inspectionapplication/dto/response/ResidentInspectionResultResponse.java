@@ -9,9 +9,13 @@ public record ResidentInspectionResultResponse(
     @Schema(description = "현장점검 신청 ID", example = "101") Long applicationId,
     @Schema(description = "점검 결과 요약 및 전체 전문가 의견", example = "출입구와 배수구의 침수 예방이 필요합니다.")
         String summary,
-    @Schema(description = "결과 공개 시각", format = "date-time", example = "2026-11-04T10:00:00+09:00")
+    @Schema(
+            description = "결과 공개 시각. 저장된 시각이 없으면 null",
+            format = "date-time",
+            nullable = true,
+            example = "2026-11-04T10:00:00+09:00")
         OffsetDateTime publishedAt,
-    @Schema(description = "등록 순서의 취약지점 목록") List<Vulnerability> vulnerabilities,
+    @Schema(description = "저장된 표시 순서의 취약지점 목록") List<Vulnerability> vulnerabilities,
     @Schema(description = "현장점검 결과 사진 목록") List<Photo> photos) {
   @Schema(description = "취약지점")
   public record Vulnerability(

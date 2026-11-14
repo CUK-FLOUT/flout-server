@@ -88,14 +88,12 @@ public class InspectionApplicationService {
       throw new BaseException(InspectionApplicationErrorCode.GUIDE_NOT_FOUND);
     }
 
-    // 신청 주소의 앞뒤 공백을 제거
+    // 관할 및 분석 주소 비교에는 앞뒤 공백을 제거한 주소를 사용한다.
     String normalizedAddress = request.address() == null ? null : request.address().strip();
 
-    // 정규화된 주소로 관할 및 취약도 분석 주소 검증
     validateJurisdiction(normalizedAddress);
     validateAssessmentAddress(assessment, normalizedAddress, request.detailAddress());
 
-    // 실제 저장에도 정규화된 주소를 사용
     CreateInspectionApplicationRequest normalizedRequest =
         new CreateInspectionApplicationRequest(
             request.assessmentId(),
@@ -131,7 +129,6 @@ public class InspectionApplicationService {
   private void validateAssessmentAddress(
       RiskAssessment assessment, String address, String detailAddress) {
 
-    // 취약도 분석 주소에도 동일하게 앞뒤 공백 제거
     String assessmentAddress =
         assessment.getAddress() == null ? null : assessment.getAddress().strip();
 
@@ -153,8 +150,9 @@ public class InspectionApplicationService {
             ? submissionTransaction.create(applicant, assessment, request)
             : submissionTransaction.create(applicant, assessment, request, draftId);
       } catch (ReceiptNumberCollisionException e) {
-        // 저장 전 접수번호 중복 감지
+        // 접수번호 충돌은 새 트랜잭션에서 다시 시도한다.
       } catch (DataIntegrityViolationException e) {
+        // 같은 분석에 대한 동시 요청은 이미 생성된 임시 신청의 내용과 비교한다.
         if (isUniqueConstraintViolation(e, ASSESSMENT_UNIQUE_CONSTRAINT)) {
           return draftId == null
               ? submissionTransaction.reuseDraft(applicant.getId(), request)

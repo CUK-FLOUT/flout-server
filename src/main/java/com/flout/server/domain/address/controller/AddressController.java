@@ -35,7 +35,10 @@ public class AddressController {
   }
 
   @GetMapping("/coordinates")
-  @Operation(summary = "선택한 주소 좌표 조회")
+  @Operation(
+      summary = "선택한 주소 좌표 조회",
+      description =
+          "부천시 원미구·소사구·오정구의 건물번호가 포함된 주소로 좌표를 조회합니다. 주소와 직접 일치하는 결과를 우선하고 중복을 제거한 뒤 한 건으로 식별되는 경우 좌표를 반환합니다.")
   public SuccessResponse<AddressCoordinatesResponse> coordinates(
       @Valid @ModelAttribute AddressCoordinatesRequest request) {
     return SuccessResponse.of(

@@ -23,7 +23,7 @@ public class ConsentController {
   @Operation(
       summary = "정보 제공 동의 저장",
       description =
-          "로그인한 주민의 필수 정보 제공 동의 내역을 저장합니다. 이메일 및 구글 로그인 사용자 모두 동일하게 사용합니다. JWT 인증이 필요합니다.")
+          "로그인한 주민의 개인정보 제3자 제공 및 진행상태 알림 필수 동의를 현재 설정된 버전으로 저장합니다. 두 항목 모두 true여야 하며 이메일 및 구글 로그인 사용자 모두 동일하게 사용합니다. JWT 인증이 필요합니다.")
   public SuccessResponse<ConsentResult> agree(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ConsentRequest request) {
     consents.agree(Long.valueOf(jwt.getSubject()));

@@ -31,6 +31,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
@@ -44,6 +45,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class PublicIssueActionTest {
   private static final String ADDRESS = "경기도 부천시 원미구 길주로 53";
+
   @Autowired MockMvc mvc;
   @Autowired JdbcTemplate jdbc;
   @Autowired UserRepository users;
@@ -51,6 +53,7 @@ class PublicIssueActionTest {
   @Autowired ObjectMapper mapper;
   @MockitoSpyBean PublicIssueActionRepository actions;
   @MockitoBean AttachmentStorage storage;
+
   long publicIssueId, reviewId, inspectionId, adminId;
   String token, residentToken;
   Map<String, byte[]> storedObjects;
@@ -81,15 +84,20 @@ class PublicIssueActionTest {
             "refresh_tokens",
             "user_consents",
             "users")) jdbc.update("DELETE FROM " + table);
+
     var resident = users.saveAndFlush(User.resident("action-resident@example.com", "hash", "주민"));
     residentToken = jwt.issue(resident).accessToken();
     jdbc.update(
-        "INSERT INTO users(email,password_hash,name,role,jurisdiction_id) VALUES('action-admin@example.com','hash','운영자','ADMIN',(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시'))");
+        "INSERT INTO users(email,password_hash,name,role,jurisdiction_id) "
+            + "VALUES('action-admin@example.com','hash','운영자','ADMIN',"
+            + "(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시'))");
     var admin = users.findByEmail("action-admin@example.com").orElseThrow();
     adminId = admin.getId();
     token = jwt.issue(admin).accessToken();
+
     jdbc.update(
-        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) VALUES(?,?,'101호','HIGH','COMPLETED')",
+        "INSERT INTO risk_assessments(user_id,address,detail_address,risk_level,status) "
+            + "VALUES(?,?,'101호','HIGH','COMPLETED')",
         resident.getId(),
         ADDRESS);
     long assessmentId =
@@ -98,7 +106,11 @@ class PublicIssueActionTest {
             Long.class,
             resident.getId());
     jdbc.update(
-        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,flood_experience,existing_facility,status) VALUES('김주민',?,?,'ACTION-TEST',?,'101호',37.5000000,126.7600000,'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
+        "INSERT INTO inspection_applications(applicant_name,applicant_user_id,assessment_id,"
+            + "receipt_no,address,detail_address,latitude,longitude,contact,occupancy_type,"
+            + "flood_experience,existing_facility,status) "
+            + "VALUES('김주민',?,?,'ACTION-TEST',?,'101호',37.5000000,126.7600000,"
+            + "'010-0000-0000','OWNER','NO',FALSE,'RECEIVED')",
         resident.getId(),
         assessmentId,
         ADDRESS);
@@ -115,7 +127,10 @@ class PublicIssueActionTest {
             Long.class,
             applicationId);
     jdbc.update(
-        "INSERT INTO public_issues(source_inspection_id,address,latitude,longitude,issue_type,description,field_findings,status) VALUES(?,?,37.5000000,126.7600000,'BLOCKED_STORM_DRAIN','빗물받이 막힘','현장 확인 필요','RECEIVED')",
+        "INSERT INTO public_issues(source_inspection_id,address,latitude,longitude,issue_type,"
+            + "description,field_findings,status) "
+            + "VALUES(?,?,37.5000000,126.7600000,'BLOCKED_STORM_DRAIN',"
+            + "'빗물받이 막힘','현장 확인 필요','RECEIVED')",
         inspectionId,
         ADDRESS);
     publicIssueId =
@@ -124,10 +139,14 @@ class PublicIssueActionTest {
             Long.class,
             inspectionId);
     jdbc.update(
-        "INSERT INTO facility_review(user_id,local_problem_id,review_target,inspection_note,review_status,review_reason,reviewed_at) VALUES(?,?,'빗물받이','현장 확인 필요','UNDER_REVIEW','반복 침수 이력 확인',CURRENT_TIMESTAMP)",
+        "INSERT INTO facility_review(user_id,local_problem_id,review_target,inspection_note,"
+            + "review_status,review_reason,reviewed_at) "
+            + "VALUES(?,?,'빗물받이','현장 확인 필요','UNDER_REVIEW',"
+            + "'반복 침수 이력 확인',CURRENT_TIMESTAMP)",
         adminId,
         publicIssueId);
     reviewId = jdbc.queryForObject("SELECT review_id FROM facility_review", Long.class);
+
     storedObjects = new ConcurrentHashMap<>();
     png = pngBytes();
     doAnswer(
@@ -148,17 +167,21 @@ class PublicIssueActionTest {
         .thenAnswer(invocation -> "https://example.invalid/private/" + invocation.getArgument(0));
   }
 
-  org.springframework.test.web.servlet.ResultActions postAction(
-      long issueId, String accessToken, Object body) throws Exception {
+  private MockMultipartFile jsonPart(Object body) throws Exception {
+    return new MockMultipartFile(
+        "request", "request.json", "application/json", mapper.writeValueAsBytes(body));
+  }
+
+  private ResultActions postAction(long issueId, String accessToken, Object body) throws Exception {
     var request =
-        post("/api/admin/public-issues/{publicIssueId}/actions", issueId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(body));
+        multipart("/api/admin/public-issues/{publicIssueId}/actions", issueId)
+            .file(jsonPart(body))
+            .file(new MockMultipartFile("files", "완료.png", "image/png", png));
     if (accessToken != null) request.header("Authorization", "Bearer " + accessToken);
     return mvc.perform(request);
   }
 
-  org.springframework.test.web.servlet.ResultActions postReview(Object body) throws Exception {
+  private ResultActions postReview(Object body) throws Exception {
     return mvc.perform(
         post("/api/admin/public-issues/{publicIssueId}/review", publicIssueId)
             .header("Authorization", "Bearer " + token)
@@ -166,22 +189,31 @@ class PublicIssueActionTest {
             .content(mapper.writeValueAsString(body)));
   }
 
-  Map<String, Object> body(Object description) {
+  private Map<String, Object> body(Object description) {
     var body = new LinkedHashMap<String, Object>();
     body.put("actionDescription", description);
     return body;
   }
 
-  int actionCount() {
+  private int actionCount() {
     return jdbc.queryForObject("SELECT COUNT(*) FROM facility_action", Integer.class);
   }
 
-  long createAction() throws Exception {
-    postAction(publicIssueId, token, body("빗물받이 퇴적물 제거")).andExpect(status().isOk());
-    return jdbc.queryForObject("SELECT action_id FROM facility_action", Long.class);
+  private String issueStatus() {
+    return jdbc.queryForObject(
+        "SELECT status FROM public_issues WHERE public_issue_id=?", String.class, publicIssueId);
   }
 
-  static byte[] pngBytes() {
+  private String reviewStatus() {
+    return jdbc.queryForObject(
+        "SELECT review_status FROM facility_review WHERE review_id=?", String.class, reviewId);
+  }
+
+  private int imageCount() {
+    return jdbc.queryForObject("SELECT COUNT(*) FROM facility_action_image", Integer.class);
+  }
+
+  private static byte[] pngBytes() {
     try {
       var output = new ByteArrayOutputStream();
       ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", output);
@@ -191,7 +223,7 @@ class PublicIssueActionTest {
     }
   }
 
-  Map<String, Object> reviewBody(Object status) {
+  private Map<String, Object> reviewBody(Object status) {
     var body = new LinkedHashMap<String, Object>();
     body.put("reviewTarget", " 빗물받이 ");
     body.put("reviewStatus", status);
@@ -253,9 +285,10 @@ class PublicIssueActionTest {
   }
 
   @Test
-  void completesActionReviewAndIssueAtomically() throws Exception {
+  void completesActionReviewAndIssueAtomicallyWithImage() throws Exception {
     postAction(publicIssueId, token, body("  빗물받이 퇴적물 제거 및 주변 배수로 정비  "))
         .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
         .andExpect(jsonPath("$.isSuccess").value(true))
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_2"))
         .andExpect(jsonPath("$.result.actionId").isNumber())
@@ -266,6 +299,14 @@ class PublicIssueActionTest {
         .andExpect(jsonPath("$.result.actionStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.reviewStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.result.publicIssueStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.result.images.length()").value(1))
+        .andExpect(jsonPath("$.result.images[0].imageId").isNumber())
+        .andExpect(
+            jsonPath("$.result.images[0].imageUrl")
+                .value(org.hamcrest.Matchers.startsWith("https://example.invalid/private/")))
+        .andExpect(
+            jsonPath("$.result.images[0].uploadedAt")
+                .value(org.hamcrest.Matchers.endsWith("+09:00")))
         .andExpect(
             jsonPath("$.result.completedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
     var action = jdbc.queryForMap("SELECT * FROM facility_action");
@@ -274,22 +315,20 @@ class PublicIssueActionTest {
     assertThat(((Number) action.get("REVIEW_ID")).longValue()).isEqualTo(reviewId);
     assertThat(((Number) action.get("USER_ID")).longValue()).isEqualTo(adminId);
     assertThat(action.get("COMPLETED_AT")).isNotNull();
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT review_status FROM facility_review WHERE review_id=?",
-                String.class,
-                reviewId))
-        .isEqualTo("COMPLETED");
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT status FROM public_issues WHERE public_issue_id=?",
-                String.class,
-                publicIssueId))
-        .isEqualTo("COMPLETED");
+    assertThat(reviewStatus()).isEqualTo("COMPLETED");
+    assertThat(issueStatus()).isEqualTo("COMPLETED");
+    assertThat(imageCount()).isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT status FROM inspections WHERE inspection_id=?", String.class, inspectionId))
         .isEqualTo("COMPLETED");
+    var keys =
+        jdbc.queryForList(
+            "SELECT image_url FROM facility_action_image ORDER BY image_id", String.class);
+    assertThat(keys).hasSize(1).allMatch(key -> key.startsWith("public-issues/"));
+    assertThat(storedObjects.keySet()).containsExactlyInAnyOrderElementsOf(keys);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Integer.class))
+        .isZero();
   }
 
   static Stream<Object> invalidDescriptions() {
@@ -301,12 +340,8 @@ class PublicIssueActionTest {
   void rejectsMissingBlankAndNonStringDescription(Object value) throws Exception {
     postAction(publicIssueId, token, body(value)).andExpect(status().isBadRequest());
     assertThat(actionCount()).isZero();
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT status FROM public_issues WHERE public_issue_id=?",
-                String.class,
-                publicIssueId))
-        .isEqualTo("RECEIVED");
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
   }
 
   @Test
@@ -329,6 +364,7 @@ class PublicIssueActionTest {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_2"));
     assertThat(actionCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
   }
 
   @Test
@@ -340,10 +376,10 @@ class PublicIssueActionTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_404_1"));
     mvc.perform(
-            post("/api/admin/public-issues/not-a-number/actions")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(body("조치"))))
+            multipart("/api/admin/public-issues/not-a-number/actions")
+                .file(jsonPart(body("조치")))
+                .file(new MockMultipartFile("files", "완료.png", "image/png", png))
+                .header("Authorization", "Bearer " + token))
         .andExpect(status().isBadRequest());
     assertThat(actionCount()).isZero();
   }
@@ -353,7 +389,8 @@ class PublicIssueActionTest {
     postAction(publicIssueId, null, body("조치")).andExpect(status().isUnauthorized());
     postAction(publicIssueId, residentToken, body("조치")).andExpect(status().isForbidden());
     jdbc.update(
-        "INSERT INTO users(email,password_hash,name,role) VALUES('action-nojur@example.com','hash','무관할','ADMIN')");
+        "INSERT INTO users(email,password_hash,name,role) "
+            + "VALUES('action-nojur@example.com','hash','무관할','ADMIN')");
     String noJurisdiction =
         jwt.issue(users.findByEmail("action-nojur@example.com").orElseThrow()).accessToken();
     postAction(publicIssueId, noJurisdiction, body("조치"))
@@ -390,81 +427,59 @@ class PublicIssueActionTest {
         .saveAndFlush(any());
     postAction(publicIssueId, token, body("조치")).andExpect(status().isInternalServerError());
     assertThat(actionCount()).isZero();
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT status FROM public_issues WHERE public_issue_id=?",
-                String.class,
-                publicIssueId))
-        .isEqualTo("RECEIVED");
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
+    assertThat(reviewStatus()).isEqualTo("UNDER_REVIEW");
+    assertThat(storedObjects).isEmpty();
   }
 
   @Test
-  void uploadsActionImagesAndKeepsInternalObjectKeys() throws Exception {
-    long actionId = createAction();
+  void requiresImagesAndDoesNotCompleteWithoutThem() throws Exception {
     mvc.perform(
-            multipart(
-                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
-                    publicIssueId,
-                    actionId)
-                .file(new MockMultipartFile("files", "출입구.png", "image/png", png))
-                .file(new MockMultipartFile("files", "배수구.png", "image/png", png))
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andExpect(header().string("Cache-Control", "no-store"))
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_4"))
-        .andExpect(jsonPath("$.result.publicIssueId").value(publicIssueId))
-        .andExpect(jsonPath("$.result.actionId").value(actionId))
-        .andExpect(jsonPath("$.result.images.length()").value(2))
-        .andExpect(
-            jsonPath("$.result.images[0].imageUrl")
-                .value(org.hamcrest.Matchers.startsWith("https://example.invalid/private/")))
-        .andExpect(
-            jsonPath("$.result.images[0].uploadedAt")
-                .value(org.hamcrest.Matchers.endsWith("+09:00")));
-    var keys =
-        jdbc.queryForList(
-            "SELECT image_url FROM facility_action_image ORDER BY image_id", String.class);
-    assertThat(keys).hasSize(2).allMatch(key -> key.startsWith("public-issues/"));
-    assertThat(storedObjects.keySet()).containsExactlyInAnyOrderElementsOf(keys);
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment_upload_intents", Integer.class))
-        .isZero();
-  }
-
-  @Test
-  void validatesActionImageUploadRequestAndActionReference() throws Exception {
-    long actionId = createAction();
-    mvc.perform(
-            multipart(
-                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
-                    publicIssueId,
-                    actionId)
+            multipart("/api/admin/public-issues/{publicIssueId}/actions", publicIssueId)
+                .file(jsonPart(body("빗물받이 정비")))
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_4"));
+    assertThat(actionCount()).isZero();
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
+    assertThat(reviewStatus()).isEqualTo("UNDER_REVIEW");
+  }
+
+  @Test
+  void rejectsInvalidImageAndDoesNotComplete() throws Exception {
     mvc.perform(
-            multipart(
-                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
-                    publicIssueId,
-                    actionId)
+            multipart("/api/admin/public-issues/{publicIssueId}/actions", publicIssueId)
+                .file(jsonPart(body("빗물받이 정비")))
                 .file(new MockMultipartFile("files", "가짜.png", "image/png", "not-image".getBytes()))
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_400_5"));
-    mvc.perform(
-            multipart(
-                    "/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images",
-                    publicIssueId,
-                    Long.MAX_VALUE)
-                .file(new MockMultipartFile("files", "사진.png", "image/png", png))
-                .header("Authorization", "Bearer " + token))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_404_3"));
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM facility_action_image", Integer.class))
-        .isZero();
+    assertThat(actionCount()).isZero();
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
   }
 
   @Test
-  void documentsRequestSuccessAndErrors() throws Exception {
+  void rollsBackCompletionWhenS3UploadFails() throws Exception {
+    doThrow(
+            software.amazon.awssdk.services.s3.model.S3Exception.builder()
+                .message("simulated S3 failure")
+                .build())
+        .when(storage)
+        .upload(anyString(), any(byte[].class), anyString());
+    postAction(publicIssueId, token, body("빗물받이 정비"))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_500_1"));
+    assertThat(actionCount()).isZero();
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
+    assertThat(reviewStatus()).isEqualTo("UNDER_REVIEW");
+  }
+
+  @Test
+  void documentsCombinedRequestAndRemovesOldEndpoint() throws Exception {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(
@@ -475,24 +490,17 @@ class PublicIssueActionTest {
             jsonPath("$.paths['/api/admin/public-issues/{publicIssueId}/review'].put")
                 .doesNotExist())
         .andExpect(
-            jsonPath("$.components.schemas.SaveFacilityReviewRequest.properties.reviewTarget.type")
-                .value("string"))
-        .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['404'].description")
-                .value("공공시설 문제를 찾을 수 없습니다."))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/review'].post.responses['409'].description")
-                .value("완료된 공공시설 문제의 검토 내용은 변경할 수 없습니다."))
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.requestBody.content['multipart/form-data']")
+                .exists())
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionCompleted.value.code")
                 .value("PUBLIC_ISSUE_200_2"))
         .andExpect(
             jsonPath(
-                    "$.components.schemas.CompletePublicIssueActionRequest.properties.actionDescription.maxLength")
-                .value(4000))
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['413']")
+                .exists())
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['404'].description")
@@ -511,19 +519,44 @@ class PublicIssueActionTest {
                 .exists())
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['200'].content['application/json'].examples.facilityActionImagesUploaded.value.code")
-                .value("PUBLIC_ISSUE_200_4"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['404'].description")
-                .value("공공시설 문제 또는 조치를 찾을 수 없습니다."))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images'].post.responses['413'].description")
-                .value("사진은 파일당 최대 10MiB까지 업로드할 수 있습니다."))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/status']")
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions/{actionId}/images']")
                 .doesNotExist());
+  }
+
+  @Test
+  void rejectsLegacyJsonCompletionRequestWithoutChangingState() throws Exception {
+    mvc.perform(
+            post("/api/admin/public-issues/{publicIssueId}/actions", publicIssueId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body("빗물받이 정비"))))
+        .andExpect(status().isUnsupportedMediaType());
+
+    assertThat(actionCount()).isZero();
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("RECEIVED");
+    assertThat(reviewStatus()).isEqualTo("UNDER_REVIEW");
+  }
+
+  @Test
+  void keepsLegacyCompletedActionWithoutPhotosUnchanged() throws Exception {
+    jdbc.update(
+        "INSERT INTO facility_action(review_id,user_id,action_description,"
+            + "action_status,created_at,completed_at) "
+            + "VALUES(?,?,'과거 조치','COMPLETED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+        reviewId,
+        adminId);
+    jdbc.update(
+        "UPDATE public_issues SET status='COMPLETED' WHERE public_issue_id=?", publicIssueId);
+    jdbc.update("UPDATE facility_review SET review_status='COMPLETED' WHERE review_id=?", reviewId);
+
+    postAction(publicIssueId, token, body("중복 완료 시도"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_409_1"));
+
+    assertThat(actionCount()).isEqualTo(1);
+    assertThat(imageCount()).isZero();
+    assertThat(issueStatus()).isEqualTo("COMPLETED");
+    assertThat(reviewStatus()).isEqualTo("COMPLETED");
   }
 }

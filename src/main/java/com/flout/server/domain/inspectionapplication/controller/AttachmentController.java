@@ -31,9 +31,9 @@ public class AttachmentController {
   @Operation(
       summary = "현장점검 신청 사진 등록",
       description =
-          "신청 생성 후 반환된 applicationId에 사진을 등록합니다. 첫 사진 등록 성공 시 신청이 접수되고 점검이 생성됩니다. 응답의 inspectionId로 이후 점검 API를 호출하며, 등록 사진 목록은 attachments에 반환합니다. 동일 요청 키 재시도에서도 같은 점검 ID를 반환합니다. 본인 신청만 가능하며 JPG/JPEG/PNG, 파일당 15MB, 기존 사진 포함 최대 5장입니다.")
+          "본인 신청에 JPG/JPEG/PNG 사진을 등록합니다. DRAFT의 첫 사진 등록에 성공하면 신청을 접수하고 점검을 생성하며, 응답에 점검 ID와 등록 사진을 반환합니다. 재시도 시 같은 요청 키와 동일한 파일명·내용·순서를 사용하면 기존 결과를 반환하고, 사진이 다르면 409입니다. 사진은 요청당 1~5장, 파일당 최대 15 MiB이며 기존 사진을 포함해 최대 5장입니다.")
   @ApiResponse(responseCode = "201", description = "사진 등록 완료")
-  @ApiResponse(responseCode = "400", description = "사진 형식 또는 개수 오류", content = @Content)
+  @ApiResponse(responseCode = "400", description = "사진·요청 키 또는 임시 신청 정보 오류", content = @Content)
   @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content)
   @ApiResponse(responseCode = "403", description = "본인 신청이 아님", content = @Content)
   @ApiResponse(responseCode = "404", description = "신청서 없음", content = @Content)
@@ -42,8 +42,11 @@ public class AttachmentController {
   @ApiResponse(responseCode = "500", description = "사진 저장 실패", content = @Content)
   public ResponseEntity<SuccessResponse<UploadResponse>> upload(
       @AuthenticationPrincipal Jwt jwt,
-      @PathVariable Long applicationId,
-      @Parameter(description = "재시도 중복 방지 키. 동일 요청의 재시도에 같은 키를 사용합니다 (최대 128자)")
+      @Parameter(description = "본인의 현장점검 신청 ID", example = "1", required = true) @PathVariable
+          Long applicationId,
+      @Parameter(
+              description = "재시도 중복 방지 키. 영문자·숫자·마침표·밑줄·콜론·하이픈으로 1~128자",
+              example = "upload-20261113-1")
           @RequestHeader(value = "Idempotency-Key", required = false)
           String requestKey,
       @Parameter(description = "JPG, JPEG 또는 PNG 사진 (1~5장)", required = true) @RequestPart("files")

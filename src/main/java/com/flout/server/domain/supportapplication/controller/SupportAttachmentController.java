@@ -28,12 +28,13 @@ public class SupportAttachmentController {
       produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
-      summary = "주민 지원 신청 증빙서류 제출",
+      summary = "지원 신청 증빙서류 제출",
       description =
-          "TENANT의 DRAFT 신청에 임대인 동의서 한 개를 등록하면 SUBMITTED로 접수됩니다. OWNER·ETC는 업로드할 수 없습니다. PDF/JPG/JPEG/PNG, 최대 15 MiB이며 중복 제출은 409입니다.")
+          "본인의 신청이 TENANT의 DRAFT 상태일 때 임대인 동의서 한 개를 등록하면 SUBMITTED로 접수됩니다. OWNER·ETC는 업로드할 수 없습니다. PDF/JPG/JPEG/PNG 파일 한 개를 최대 15 MiB까지 제출할 수 있으며, 중복 제출은 409입니다. 신청이 DRAFT가 아닌 경우에도 409입니다.")
   public SuccessResponse<SupportAttachmentResponse> submit(
       @AuthenticationPrincipal Jwt jwt,
-      @PathVariable Long supportApplicationId,
+      @Parameter(description = "본인의 지원 신청 ID", example = "201", required = true) @PathVariable
+          Long supportApplicationId,
       @Parameter(
               description = "PDF/JPG/JPEG/PNG 단일 파일, 최대 15 MiB",
               schema = @Schema(type = "string", format = "binary"))

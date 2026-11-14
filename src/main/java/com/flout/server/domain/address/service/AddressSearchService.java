@@ -78,6 +78,7 @@ public class AddressSearchService {
                       new AddressSearchResult(
                           j.roadAddrPart1(), j.jibunAddr(), j.bdNm(), j.zipNo()))
               .toList();
+      // 필터링 후 결과가 비어도 외부 검색 결과에 다음 페이지가 있을 수 있다.
       boolean hasMore = (long) page * PAGE_SIZE < total && page < Integer.MAX_VALUE;
       return new AddressSearchResponse(
           addresses, page, PAGE_SIZE, hasMore, hasMore ? page + 1 : null);

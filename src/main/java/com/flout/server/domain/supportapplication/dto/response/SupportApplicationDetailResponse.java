@@ -14,7 +14,7 @@ public record SupportApplicationDetailResponse(
     @Schema(description = "원본 현장점검 신청 ID를 최소 6자리로 표시한 접수번호") String receiptNo,
     String applicantName,
     @Schema(description = "지원 신청 당시 저장된 전체 연락처", example = "010-1234-0002") String contact,
-    String address,
+    @Schema(description = "지원 신청 당시 주소", example = "경기도 부천시 원미구 지봉로 43") String address,
     String detailAddress,
     @Schema(description = "연결된 침수 취약도 분석의 거주층. 미입력은 null이며 주소에서 추정하지 않습니다.", nullable = true)
         HousingType housingType,
