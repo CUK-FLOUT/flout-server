@@ -7,11 +7,15 @@ import com.flout.server.domain.inspection.response.code.InspectionSuccessCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationSuccessCode;
 import com.flout.server.domain.notification.response.code.NotificationSuccessCode;
+import com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode;
+import com.flout.server.domain.preventionguide.response.code.PreventionGuideSuccessCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionSuccessCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.publicissue.response.code.PublicIssueSuccessCode;
 import com.flout.server.domain.residentprogress.FormDraftErrorCode;
+import com.flout.server.domain.riskassessment.response.code.RiskAssessmentErrorCode;
+import com.flout.server.domain.riskassessment.response.code.RiskAssessmentSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
@@ -279,6 +283,16 @@ public class OpenApiConfig {
                             }
                             if (method == PathItem.HttpMethod.GET
                                 && Set.of(
+                                        "/api/admin/public-issues",
+                                        "/api/admin/public-issues/status",
+                                        "/api/admin/public-issues/{publicIssueId}",
+                                        "/api/admin/public-issues/{publicIssueId}/resident-applications",
+                                        "/api/admin/map/public-issues")
+                                    .contains(path)) {
+                              describePublicIssueRead(operation, path);
+                            }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
                                         "/api/resident/support-applications/{supportApplicationId}/review",
                                         "/api/resident/support-applications/{supportApplicationId}/approval",
                                         "/api/resident/support-applications/{supportApplicationId}/rejection")
@@ -315,6 +329,14 @@ public class OpenApiConfig {
                                     "/api/resident/support-application/{supportApplicationId}/matching")
                                 && method == PathItem.HttpMethod.POST) {
                               describeSupportProgramMatching(operation);
+                            }
+                            if (path.equals("/api/resident/risk-assessments")
+                                && method == PathItem.HttpMethod.POST) {
+                              describeRiskAssessment(operation);
+                            }
+                            if (path.equals("/api/resident/risk-assessments/{assessmentId}/guide")
+                                && method == PathItem.HttpMethod.POST) {
+                              describePreventionGuide(operation);
                             }
                             if (path.equals(
                                     "/api/resident/support-applications/{supportApplicationId}/attachments")
@@ -886,6 +908,282 @@ public class OpenApiConfig {
         .getResponses()
         .get("409")
         .setDescription(PublicIssueErrorCode.REVIEW_NOT_ALLOWED.getMessage());
+  }
+
+  private void describePublicIssueRead(Operation operation, String path) {
+    PublicIssueSuccessCode code;
+    String exampleName;
+    Object result;
+    if (path.equals("/api/admin/public-issues")) {
+      code = PublicIssueSuccessCode.LIST_FOUND;
+      exampleName = "publicIssuesFound";
+      result =
+          values(
+              "publicIssues",
+              List.of(
+                  values(
+                      "publicIssueId",
+                      12,
+                      "issueType",
+                      "BLOCKED_STORM_DRAIN",
+                      "relatedApplicationCount",
+                      3,
+                      "floodHistoryCount",
+                      1,
+                      "status",
+                      "UNDER_REVIEW")),
+              "page",
+              0,
+              "size",
+              10,
+              "totalElements",
+              1,
+              "totalPages",
+              1);
+    } else if (path.equals("/api/admin/public-issues/status")) {
+      code = PublicIssueSuccessCode.STATUS_FOUND;
+      exampleName = "publicIssueStatusFound";
+      result =
+          values(
+              "registeredCount",
+              5,
+              "pendingOrUnderReviewCount",
+              2,
+              "actionInProgressCount",
+              2,
+              "completedCount",
+              1);
+    } else if (path.equals("/api/admin/map/public-issues")) {
+      code = PublicIssueSuccessCode.MAP_FOUND;
+      exampleName = "publicIssueMarkersFound";
+      result =
+          Map.of(
+              "markers",
+              List.of(
+                  Map.of(
+                      "publicIssueId",
+                      12,
+                      "latitude",
+                      37.5036,
+                      "longitude",
+                      126.766,
+                      "status",
+                      "UNDER_REVIEW")));
+    } else if (path.endsWith("/resident-applications")) {
+      code = PublicIssueSuccessCode.RELATED_APPLICATIONS_RETRIEVED;
+      exampleName = "relatedApplicationsFound";
+      result =
+          values(
+              "publicIssueId",
+              12,
+              "totalCount",
+              1,
+              "applications",
+              List.of(
+                  values(
+                      "applicationId",
+                      21,
+                      "receiptNo",
+                      "000021",
+                      "address",
+                      "경기도 부천시 원미구 길주로 210",
+                      "vulnerabilityGrade",
+                      "HIGH",
+                      "fieldFindings",
+                      "출입구로 빗물이 유입됩니다.")));
+    } else {
+      code = PublicIssueSuccessCode.DETAIL_FOUND;
+      exampleName = "publicIssueDetailFound";
+      result =
+          values(
+              "publicIssueId",
+              12,
+              "issueType",
+              "BLOCKED_STORM_DRAIN",
+              "status",
+              "UNDER_REVIEW",
+              "address",
+              "경기도 부천시 원미구 길주로 210",
+              "latitude",
+              37.5036,
+              "longitude",
+              126.766,
+              "description",
+              "빗물받이 막힘",
+              "fieldFindings",
+              "퇴적물로 배수가 원활하지 않습니다.",
+              "createdAt",
+              "2026-11-01T16:00:00+09:00",
+              "source",
+              Map.of(
+                  "inspectionId",
+                  31,
+                  "applicationId",
+                  21,
+                  "receiptNo",
+                  "000021",
+                  "applicantName",
+                  "김주민"),
+              "referenceInformation",
+              Map.of(
+                  "relatedApplicationCount", 0,
+                  "floodHistoryCount", 0,
+                  "relatedApplications", List.of()),
+              "review",
+              null,
+              "publicFacility",
+              null,
+              "actions",
+              List.of());
+    }
+
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(success, exampleName, envelope(true, code, code.getMessage(), result));
+    addError(operation, "invalidParameter", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "jurisdictionDenied",
+        path.endsWith("/resident-applications")
+            ? InspectionErrorCode.JURISDICTION_ACCESS_DENIED
+            : InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED,
+        null);
+    if (path.contains("{publicIssueId}")) {
+      addError(operation, "publicIssueNotFound", PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND, null);
+      operation.getResponses().get("404").setDescription("공공시설 문제를 찾을 수 없습니다.");
+    }
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation.getResponses().get("400").setDescription("ID·검색·필터·페이지 조건이 올바르지 않습니다.");
+    operation.getResponses().get("403").setDescription("운영자 권한 또는 부천시 관할이 없습니다.");
+  }
+
+  private void describeRiskAssessment(Operation operation) {
+    var code = RiskAssessmentSuccessCode.ASSESSMENT_CREATED;
+    var success = operation.getResponses().computeIfAbsent("201", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "riskAssessmentCreated",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            values(
+                "assessmentId",
+                1,
+                "riskType",
+                "REGIONAL_RELATIVE_VULNERABILITY",
+                "cellId",
+                "r605c713",
+                "score",
+                0.2841,
+                "riskLevel",
+                "HIGH",
+                "status",
+                "COMPLETED",
+                "reasons",
+                List.of(),
+                "floodRecord",
+                "침수 기록 없음 (안전을 뜻하지 않음)",
+                "disclaimer",
+                "지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다.")));
+    addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    addError(operation, "residentOnly", GeneralErrorCode.ACCESS_DENIED_REQUEST, null);
+    addError(operation, "invalidAddress", AddressErrorCode.INVALID_COORDINATE_ADDRESS, null);
+    addError(operation, "addressMismatch", AddressErrorCode.COORDINATE_ADDRESS_MISMATCH, null);
+    addError(operation, "analysisUnavailable", RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE, null);
+    operation
+        .getResponses()
+        .get("422")
+        .setDescription(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE.getMessage());
+    addError(operation, "addressServiceFailed", AddressErrorCode.KAKAO_API_ERROR, null);
+    addError(operation, "aiServiceFailed", RiskAssessmentErrorCode.AI_SERVICE_ERROR, null);
+    addError(operation, "invalidAiResponse", RiskAssessmentErrorCode.INVALID_AI_RESPONSE, null);
+    addError(operation, "addressServiceTimeout", AddressErrorCode.KAKAO_API_TIMEOUT, null);
+    addError(operation, "aiServiceTimeout", RiskAssessmentErrorCode.AI_SERVICE_TIMEOUT, null);
+    addError(
+        operation,
+        "resultSerializationFailed",
+        RiskAssessmentErrorCode.RESULT_SERIALIZATION_FAILED,
+        null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+  }
+
+  private void describePreventionGuide(Operation operation) {
+    var code = PreventionGuideSuccessCode.GUIDE_GENERATED;
+    var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
+    success.setDescription(code.getMessage());
+    addExample(
+        success,
+        "preventionGuideGenerated",
+        envelope(
+            true,
+            code,
+            code.getMessage(),
+            values(
+                "guideId",
+                7,
+                "assessmentId",
+                1,
+                "source",
+                "AI",
+                "grade",
+                "HIGH",
+                "title",
+                "이것부터 확인하세요",
+                "subtitle",
+                "반지하는 대피 요령부터 확인해 주세요.",
+                "completedCount",
+                0,
+                "totalCount",
+                1,
+                "resolution",
+                null,
+                "items",
+                List.of(
+                    Map.of(
+                        "itemId",
+                        1,
+                        "order",
+                        1,
+                        "ruleId",
+                        "BASEMENT_EVAC",
+                        "title",
+                        "대피 요령 확인",
+                        "description",
+                        "물이 차기 시작하면 즉시 대피해 주세요.",
+                        "completed",
+                        false)))));
+    addError(
+        operation,
+        "unsupportedHousingType",
+        PreventionGuideErrorCode.UNSUPPORTED_HOUSING_TYPE,
+        null);
+    addError(
+        operation,
+        "assessmentAccessDenied",
+        PreventionGuideErrorCode.ASSESSMENT_ACCESS_DENIED,
+        null);
+    addError(operation, "assessmentNotFound", PreventionGuideErrorCode.ASSESSMENT_NOT_FOUND, null);
+    addError(
+        operation,
+        "assessmentNotCompleted",
+        PreventionGuideErrorCode.ASSESSMENT_NOT_COMPLETED,
+        null);
+    addError(operation, "guideSaveFailed", PreventionGuideErrorCode.GUIDE_SAVE_FAILED, null);
+    addError(
+        operation, "invalidAssessmentId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(PreventionGuideErrorCode.ASSESSMENT_NOT_FOUND.getMessage());
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription(PreventionGuideErrorCode.ASSESSMENT_NOT_COMPLETED.getMessage());
   }
 
   private void describeInspectionPhotoUpload(Operation operation) {

@@ -24,7 +24,7 @@ public class PublicIssueAccess {
   private final UserRepository users;
   private final PublicIssueRepository issues;
 
-  // 조치/검토용: 비관적 락 사용
+  /** 조치·검토 변경을 직렬화할 수 있도록 문제 행을 비관적 잠금으로 조회한다. */
   @Transactional(propagation = Propagation.MANDATORY)
   public Access lock(Long operatorId, Long publicIssueId) {
 
