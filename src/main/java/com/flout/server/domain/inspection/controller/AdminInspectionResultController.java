@@ -53,7 +53,7 @@ public class AdminInspectionResultController {
   private final InspectionResultQueryService queryService;
 
   /**
-   * 인증된 운영자의 관할 점검 결과를 공통 성공 응답으로 반환합니다.
+   * 인증된 운영자의 관할 점검 결과를 공통 성공 응답으로 반환한다.
    *
    * @param jwt 운영자 인증 정보
    * @param inspectionId 현장점검 ID

@@ -5,7 +5,7 @@ import java.time.ZoneId;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Provides a stable clock dependency for support-application date validation. */
+/** 지원 신청 날짜 검증에 사용할 기준 시계를 제공한다. */
 @Configuration
 public class SupportApplicationClockConfig {
   @Bean

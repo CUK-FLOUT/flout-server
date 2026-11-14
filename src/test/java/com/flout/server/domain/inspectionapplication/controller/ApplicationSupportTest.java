@@ -50,7 +50,7 @@ class ApplicationSupportTest {
   long constructionId = 900;
   String token, residentToken;
 
-  /** Seeds a local operator and an approved support application for the support tab. */
+  /** 지원 정보 탭에 필요한 관할 운영자와 승인된 지원 신청을 준비한다. */
   @BeforeEach
   void setup() {
     reset(constructions);
@@ -100,7 +100,7 @@ class ApplicationSupportTest {
         supportId);
   }
 
-  /** Requests the support tab with the supplied application ID and optional token. */
+  /** 지정한 신청 ID와 선택적으로 제공한 토큰으로 지원 정보를 조회한다. */
   ResultActions getSupport(String id, String access) throws Exception {
     var request = get("/api/admin/applications/" + id + "/support");
     if (access != null) request.header("Authorization", "Bearer " + access);

@@ -492,7 +492,7 @@ class SupportApplicationTest {
             .getTokenValue();
     send(body(), expired).andExpect(status().isUnauthorized());
     jdbc.update("UPDATE users SET role='ADMIN' WHERE user_id=?", residentId);
-    // DB 역할과 JWT 역할이 달라진 기존 토큰은 공통 인증 정책에 따라 무효화됩니다.
+    // DB 역할과 JWT 역할이 다를 때 기존 토큰 무효화 검증
     send(body(), token).andExpect(status().isUnauthorized());
     send(body(), jwt.issue(users.findById(residentId).orElseThrow()).accessToken())
         .andExpect(status().isForbidden());

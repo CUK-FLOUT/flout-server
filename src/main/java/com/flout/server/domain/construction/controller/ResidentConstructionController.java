@@ -75,7 +75,7 @@ public class ResidentConstructionController {
               }))
   public SuccessResponse<ResidentConstructionScheduleResponse> schedule(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "시공 ID. 지원 신청 ID·현장점검 ID와 구분합니다.") @PathVariable
+      @Parameter(description = "시공 ID. 지원 신청 ID·현장점검 ID와 구분합니다.", example = "9") @PathVariable
           Long constructionId) {
     return SuccessResponse.of(
         service.schedule(Long.valueOf(jwt.getSubject()), constructionId),
@@ -116,7 +116,7 @@ public class ResidentConstructionController {
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<ResidentConstructionResultResponse> result(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "조회할 본인 시공 ID") @PathVariable Long constructionId) {
+      @Parameter(description = "조회할 본인 시공 ID", example = "9") @PathVariable Long constructionId) {
     return SuccessResponse.of(
         service.result(Long.valueOf(jwt.getSubject()), constructionId),
         ConstructionSuccessCode.RESULT_READ);

@@ -77,7 +77,7 @@ public class InspectionPhotoService {
             validator.bytesForUpload(validated.get(i)),
             validated.get(i).contentType());
       }
-      // URL 발급 실패도 DB 저장 전 정리하되, 로그나 DB에 남기지 않기
+      // URL 발급에 실패하면 DB 저장 전에 업로드 파일을 정리한다.
       var urls = keys.stream().map(storage::readUrl).toList();
       var response =
           transactions.execute(
