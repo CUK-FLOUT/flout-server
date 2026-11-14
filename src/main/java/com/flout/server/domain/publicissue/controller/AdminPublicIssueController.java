@@ -33,7 +33,6 @@ public class AdminPublicIssueController {
   private final AdminPublicIssueDetailService detailService;
   private final PublicIssueRelatedApplicationService relatedApplicationService;
 
-  // 지역·공공 문제 목록 조회
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역·공공 문제 목록 조회·검색",
@@ -68,7 +67,6 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.LIST_FOUND);
   }
 
-  // 지역·공공 문제 현황 조회
   @GetMapping(value = "/status", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역·공공 문제 현황 건수 조회",
@@ -93,7 +91,6 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.STATUS_FOUND);
   }
 
-  // 지역·공공 문제 상세 조회
   @GetMapping(value = "/{publicIssueId}", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역 문제·참고 정보 상세 조회",
@@ -108,7 +105,6 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.DETAIL_FOUND);
   }
 
-  // 지역·공공 문제 등록
   @PostMapping(
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
@@ -124,13 +120,16 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.REGISTERED);
   }
 
-  // 공공시설 관련 주민 신청 목록 조회 (PR #202)
   @GetMapping(
       value = "/{publicIssueId}/resident-applications",
       produces = MediaType.APPLICATION_JSON_VALUE)
-  @Operation(summary = "공공시설 관련 주민 신청 목록 조회", description = "공공시설 문제와 주소가 동일한 주민 신청 목록을 조회합니다.")
+  @Operation(
+      summary = "공공시설 관련 주민 신청 목록 조회",
+      description =
+          "인증된 부천시 운영자가 공공시설 문제 주소와 정규화된 주소가 같은 주민 신청을 조회합니다. 주소 앞뒤 공백·연속 공백과 '경기/경기도' 표기를 정규화하며 데이터를 변경하지 않습니다.")
   public SuccessResponse<RelatedApplicationsResponse> getRelatedApplications(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable Long publicIssueId) {
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "지역·공공 문제 ID", example = "1") @PathVariable Long publicIssueId) {
 
     return SuccessResponse.of(
         relatedApplicationService.getRelated(Long.valueOf(jwt.getSubject()), publicIssueId),

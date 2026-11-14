@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Match only explicitly recommended installations against facilities supported by a program. */
+/** 전문가 권장시설과 사업 지원시설이 명시적으로 일치하는 경우만 직접 매칭한다. */
 @Component
 public class SupportFacilityMatcher {
   private static final Set<String> FACILITIES =
@@ -50,11 +50,7 @@ public class SupportFacilityMatcher {
     return new MatchResult(true, List.copyOf(ids), List.copyOf(evidence));
   }
 
-  /** A requested item must be one unambiguous supported facility AND explicitly recommended. */
-
-  /**
-   * A requested item must be one unambiguous supported facility and must be explicitly recommended.
-   */
+  /** 신청 시설이 단일 지원시설이며 전문가 권장조치에도 명시된 경우만 신청 가능하다. */
   public boolean canApplyForFacility(
       String supportedFacilitiesJson, String requestedFacility, List<Action> recommendations) {
 
@@ -124,7 +120,7 @@ public class SupportFacilityMatcher {
       }
       return values;
     } catch (Exception ignored) {
-      // Unknown / malformed source data must not produce a positive facility match.
+      // 형식이 잘못된 원본 데이터로 긍정 매칭을 만들지 않는다.
       return List.of();
     }
   }
@@ -135,7 +131,7 @@ public class SupportFacilityMatcher {
     if (compact.endsWith("역류방지용밸브")) return "역류방지밸브";
     if (compact.endsWith("역류방지밸브")) return "역류방지밸브";
     if (compact.endsWith("물막이판")) return "물막이판";
-    // Do not treat 차수판 and 물막이판 as identical without explicit support data.
+    // 차수판과 물막이판은 지원 데이터에 명시되지 않으면 같은 시설로 간주하지 않는다.
     for (String name : FACILITIES) {
       if (compact.endsWith(name)) return name;
     }

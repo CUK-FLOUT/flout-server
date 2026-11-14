@@ -271,6 +271,76 @@ class OpenApiConfigTest {
   }
 
   @Test
+  void publicIssueReadApisDocumentSuccessAndDomainErrors() {
+    var api = new OpenAPI().paths(new Paths());
+    for (String path :
+        Set.of(
+            "/api/admin/public-issues",
+            "/api/admin/public-issues/status",
+            "/api/admin/public-issues/{publicIssueId}",
+            "/api/admin/public-issues/{publicIssueId}/resident-applications",
+            "/api/admin/map/public-issues")) {
+      api.getPaths().addPathItem(path, new PathItem().get(new Operation()));
+    }
+
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+
+    var list = api.getPaths().get("/api/admin/public-issues").getGet().getResponses();
+    assertThat(list.get("200").getContent().get("application/json").getExamples())
+        .containsKey("publicIssuesFound");
+    assertThat(list).containsKeys("200", "400", "401", "403", "406", "500");
+    assertExampleMessage(list, "403", "jurisdictionDenied", "본인 관할 지역의 점검만 조회할 수 있습니다.");
+
+    var detail =
+        api.getPaths().get("/api/admin/public-issues/{publicIssueId}").getGet().getResponses();
+    assertThat(detail.get("200").getContent().get("application/json").getExamples())
+        .containsKey("publicIssueDetailFound");
+    assertExampleMessage(detail, "404", "publicIssueNotFound", "공공시설 문제를 찾을 수 없습니다.");
+
+    var related =
+        api.getPaths()
+            .get("/api/admin/public-issues/{publicIssueId}/resident-applications")
+            .getGet()
+            .getResponses();
+    assertThat(related.get("200").getContent().get("application/json").getExamples())
+        .containsKey("relatedApplicationsFound");
+    assertExampleMessage(related, "403", "jurisdictionDenied", "본인 관할 지역의 점검만 변경할 수 있습니다.");
+  }
+
+  @Test
+  void aiApisDocumentSuccessFallbackAndExternalServiceErrors() {
+    var api = new OpenAPI().paths(new Paths());
+    api.getPaths()
+        .addPathItem("/api/resident/risk-assessments", new PathItem().post(new Operation()));
+    api.getPaths()
+        .addPathItem(
+            "/api/resident/risk-assessments/{assessmentId}/guide",
+            new PathItem().post(new Operation()));
+
+    new OpenApiConfig().authDocumentation(3600).customise(api);
+
+    var assessment = api.getPaths().get("/api/resident/risk-assessments").getPost().getResponses();
+    assertThat(assessment.get("201").getContent().get("application/json").getExamples())
+        .containsKey("riskAssessmentCreated");
+    assertThat(assessment)
+        .containsKeys("201", "400", "401", "403", "404", "422", "500", "502", "503");
+    assertExampleMessage(assessment, "422", "analysisUnavailable", "입력한 주소는 취약도 분석 대상 지역이 아닙니다.");
+    assertExampleMessage(assessment, "503", "aiServiceTimeout", "AI 취약도 분석 서비스 응답 시간이 초과되었습니다.");
+
+    var guide =
+        api.getPaths()
+            .get("/api/resident/risk-assessments/{assessmentId}/guide")
+            .getPost()
+            .getResponses();
+    assertThat(guide.get("200").getContent().get("application/json").getExamples())
+        .containsKey("preventionGuideGenerated");
+    assertThat(guide).containsKeys("200", "400", "401", "403", "404", "409", "500");
+    assertThat(guide).doesNotContainKeys("502", "503");
+    assertExampleMessage(
+        guide, "400", "unsupportedHousingType", "맞춤 예방 가이드는 반지하 또는 1층 거주자에게 제공됩니다.");
+  }
+
+  @Test
   void attachmentUploadExamplesMatchActualErrorCodesAndMessages() {
     String path = "/api/resident/applications/{applicationId}/attachments";
     var api = new OpenAPI().paths(new Paths());

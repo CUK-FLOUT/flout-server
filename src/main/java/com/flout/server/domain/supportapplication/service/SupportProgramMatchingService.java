@@ -55,15 +55,14 @@ public class SupportProgramMatchingService {
   @Value("${app.support.fallback-guidance.official-url:}")
   private String guidanceUrl;
 
+  /** DB 스냅샷을 먼저 확정하고 트랜잭션 밖에서 Gemini를 호출한 뒤 실제 DB 사업만 반환한다. */
   public SupportProgramMatchingResponse match(Long userId, Long applicationId) {
     if (applicationId == null || applicationId <= 0) {
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     }
 
-    // 서버 설정 오류는 사용자 입력 오류가 아니며, DB 조회 전에 발견한다.
     validateGuidance();
 
-    // DB 조회와 필요한 데이터 복사를 완료한 후 트랜잭션을 종료한다.
     TransactionTemplate transaction = new TransactionTemplate(transactionManager);
     transaction.setReadOnly(true);
     MatchingSnapshot snapshot = transaction.execute(status -> loadSnapshot(userId, applicationId));
@@ -71,17 +70,15 @@ public class SupportProgramMatchingService {
       throw new IllegalStateException("지원사업 조회 결과를 준비하지 못했습니다.");
     }
     if (snapshot.candidates().isEmpty()) {
-      // 성공 응답에는 반드시 실제 지원사업이 포함되어야 한다.
       throw new BaseException(SupportApplicationErrorCode.MATCHING_INPUT_INVALID);
     }
 
-    // 외부 네트워크 호출은 트랜잭션이 완전히 종료된 뒤에 수행한다.
     var decision = gemini.decide(snapshot.input());
     ProgramCandidate chosen =
         snapshot.candidates().stream()
             .filter(p -> p.id().equals(decision.programId()))
             .findFirst()
-            // Gemini가 규칙을 어겨도 실제 후보 중 하나를 반환해 programId를 보장한다.
+            // 모델이 허용된 후보 밖의 ID를 반환해도 실제 DB 후보만 노출한다.
             .orElse(snapshot.candidates().getFirst());
     boolean validDecision =
         "PROGRAM".equals(decision.itemType())
@@ -94,7 +91,7 @@ public class SupportProgramMatchingService {
         "DIRECT".equals(matchType)
             ? facilityMatcher.match(info.supportedFacilities(), snapshot.actions())
             : new SupportFacilityMatcher.MatchResult(true, List.of(), List.of());
-    // DIRECT means related to an expert-recommended facility. Do not claim a false match.
+    // DIRECT는 전문가 권장시설과 실제로 일치할 때만 유지한다.
     String reason = decision.reason();
     if ("DIRECT".equals(matchType)
         && facilityMatch.facilitiesKnown()

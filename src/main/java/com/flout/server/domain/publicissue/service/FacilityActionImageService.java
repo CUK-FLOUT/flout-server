@@ -7,7 +7,6 @@ import com.flout.server.domain.inspectionapplication.service.AttachmentCleanupSe
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.publicissue.dto.request.CompletePublicIssueActionRequest;
 import com.flout.server.domain.publicissue.dto.response.CompletePublicIssueActionResponse;
-import com.flout.server.domain.publicissue.dto.response.FacilityActionImageUploadResponse;
 import com.flout.server.domain.publicissue.entity.FacilityActionImage;
 import com.flout.server.domain.publicissue.entity.PublicIssueAction;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
@@ -66,6 +65,10 @@ public class FacilityActionImageService {
     transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
   }
 
+  /**
+   * 사진을 외부 저장소에 먼저 올린 뒤 새 조치·사진·문제 상태를 한 DB 트랜잭션으로 확정한다. 중간 실패 객체는 업로드 의도 레코드를 통해 정리하고, 외부 호출 중에는
+   * DB 잠금을 유지하지 않는다.
+   */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public CompletePublicIssueActionResponse complete(
       Long operatorId,
@@ -73,10 +76,8 @@ public class FacilityActionImageService {
       CompletePublicIssueActionRequest request,
       List<MultipartFile> files) {
 
-    // 1. 권한, 완료 여부, 검토 정보 확인
     transactions.executeWithoutResult(status -> checkAllowed(operatorId, publicIssueId));
 
-    // 2. 사진은 최소 한 장 필수
     if (files == null || files.isEmpty()) {
       throw new BaseException(PublicIssueErrorCode.EMPTY_ACTION_IMAGES);
     }
@@ -90,10 +91,8 @@ public class FacilityActionImageService {
             .toList();
 
     try {
-      // 3. 실패 시 정리할 수 있도록 객체 키 등록
       cleanup.register(keys);
 
-      // 4. S3 사진 업로드
       for (int i = 0; i < validated.size(); i++) {
         var file = validated.get(i);
 
@@ -102,7 +101,6 @@ public class FacilityActionImageService {
 
       var urls = keys.stream().map(storage::readUrl).toList();
 
-      // 5. 업로드 성공 후 DB 트랜잭션에서 완료 확정
       var result =
           transactions.execute(
               status -> {
@@ -132,7 +130,7 @@ public class FacilityActionImageService {
 
                 var uploadedAt = LocalDateTime.now();
 
-                List<FacilityActionImageUploadResponse.Image> saved = new ArrayList<>();
+                List<CompletePublicIssueActionResponse.Image> saved = new ArrayList<>();
 
                 for (int i = 0; i < keys.size(); i++) {
                   var image =
@@ -140,7 +138,7 @@ public class FacilityActionImageService {
                           FacilityActionImage.create(action, keys.get(i), uploadedAt));
 
                   saved.add(
-                      new FacilityActionImageUploadResponse.Image(
+                      new CompletePublicIssueActionResponse.Image(
                           image.getId(),
                           urls.get(i),
                           image
@@ -163,7 +161,6 @@ public class FacilityActionImageService {
 
     } catch (RuntimeException e) {
 
-      // 업로드 도중 실패했다면 객체 정리
       cleanup.reconcile(keys);
 
       if (e instanceof BaseException base) {
