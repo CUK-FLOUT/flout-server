@@ -27,7 +27,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/** Recovers an already committed response without relaxing validation for new submissions. */
+/** 신규 제출 검증을 유지하면서 이미 커밋된 응답을 복구한다. */
 @RestControllerAdvice(
     assignableTypes = {InspectionApplicationController.class, SupportApplicationController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)

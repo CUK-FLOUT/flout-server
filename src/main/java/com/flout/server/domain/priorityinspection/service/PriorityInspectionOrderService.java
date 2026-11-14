@@ -50,6 +50,7 @@ public class PriorityInspectionOrderService {
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PriorityInspectionOrderResponse save(Long operatorId, List<Long> applicationIds) {
+    // 지정·취소와 순서 저장이 겹치지 않도록 같은 관할 잠금을 사용한다.
     var operator = access.lockJurisdiction(operatorId);
     var requested = new HashSet<>(applicationIds);
     if (requested.size() != applicationIds.size())
@@ -73,6 +74,7 @@ public class PriorityInspectionOrderService {
             .collect(
                 Collectors.toMap(
                     designation -> designation.getApplicationId(), Function.identity()));
+    // 화면을 열어 둔 사이 대상이 바뀌면 기존 목록으로 순서를 덮어쓰지 못하게 한다.
     if (!requested.equals(current.keySet()))
       throw new BaseException(PriorityInspectionErrorCode.ORDER_LIST_CHANGED);
     var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);

@@ -9,7 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 class SupportStatusMigrationTest {
-  /** Upgrades pre-migration rows and verifies that persisted decisions and documents survive. */
+  /** 기존 데이터의 마이그레이션 후 심사 결과와 서류가 보존되는지 검증한다. */
   @Test
   void retiresLegacyStatusesWithoutLosingDecisionsOrDocuments() {
     var url =
@@ -87,10 +87,7 @@ class SupportStatusMigrationTest {
         "INSERT INTO support_applications(support_application_id,application_id,program_id,applicant_user_id,requested_facility,applicant_name,contact,address,occupancy_type,preferred_visit_date,preferred_visit_time,status,submitted_at) VALUES(1,1,1,1,'출입구 물막이판','검증주민','010-0000-0000','경기도 부천시 원미구 길주로 210','TENANT',CURRENT_DATE,'ANY','SUBMITTED',CURRENT_TIMESTAMP)");
   }
 
-  /**
-   * Exercises legacy state classification with incomplete evidence and checks that timestamps and
-   * consent survive.
-   */
+  /** 근거가 불완전한 기존 상태의 분류와 처리 시각·동의 정보 보존 여부를 검증한다. */
   @Test
   void migratesOnlySafelyClassifiedApplicationsAndPreservesLegacyTimesAndConsent() {
     var url =

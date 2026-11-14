@@ -24,6 +24,7 @@ public class ResidentNotificationQueryService {
   @Transactional(readOnly = true)
   public List<ResidentNotificationResponse> getAll(Long userId) {
     requireResident(userId);
+    // 생성 시각이 같은 알림은 ID 내림차순으로 정렬한다.
     return notifications.findAllByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
         .map(ResidentNotificationResponse::from)
         .toList();
@@ -39,6 +40,7 @@ public class ResidentNotificationQueryService {
   @Transactional
   public ReadAllNotificationsResponse readAll(Long userId) {
     requireResident(userId);
+    // 이번 요청으로 읽는 알림에 같은 시각 적용
     var readAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     int readCount = notifications.markAllUnreadAsRead(userId, readAt);
     return new ReadAllNotificationsResponse(

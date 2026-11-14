@@ -6,7 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 사진 저장과 같은 트랜잭션에서 완료되는 업로드 요청 기록. 성공 기록은 자동 만료하지 않는다. */
+/** 사진 저장과 같은 트랜잭션에서 업로드 요청을 완료 처리한다. 성공 기록은 자동 만료하지 않는다. */
 @Entity
 @Table(name = "construction_photo_uploads")
 @Getter

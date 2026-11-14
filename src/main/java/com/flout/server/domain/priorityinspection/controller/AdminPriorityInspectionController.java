@@ -71,7 +71,8 @@ public class AdminPriorityInspectionController {
           "관할 신청을 접수번호·주소만 검색합니다. 연결된 점검이 완료(COMPLETED)된 신청은 목록과 전체 건수·페이지 수에서 제외합니다. 지역·취약도·지정 여부 필터는 함께 적용되며 생략하면 전체입니다. page는 0부터, size는 1~100이며 기본 10건입니다. 우선점검 지정 항목을 먼저 표시하고 같은 지정 여부 안에서는 신청 ID 내림차순이며 페이지 분할 전에 정렬합니다. 저장된 선정 순서는 변경하지 않습니다. 인근 신청은 검색·필터·페이지와 무관하게 같은 관할에서 본인을 제외한 직선거리 1km 이내의 전체 신청 건수입니다.")
   public SuccessResponse<PriorityInspectionCandidatesResponse> candidates(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "접수번호·주소 검색어, 최대 255자") @RequestParam(defaultValue = "")
+      @Parameter(description = "접수번호·주소 검색어, 최대 255자", example = "000005")
+          @RequestParam(defaultValue = "")
           String keyword,
       @Parameter(description = "지역: 원미구·소사구·오정구. 생략 또는 빈 값이면 지역 전체", example = "원미구")
           @RequestParam(defaultValue = "")

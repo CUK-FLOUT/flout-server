@@ -128,7 +128,7 @@ class FcmDeliveryTest {
     verifyNoInteractions(gateway);
   }
 
-  // 같은 이벤트와 기기는 중복 발송 금지
+  // 동일 이벤트의 기기별 중복 발송 방지 검증
   @Test
   void deduplicatesStableEventId() {
     register(userId, "device");
@@ -203,7 +203,7 @@ class FcmDeliveryTest {
     verify(gateway, times(2)).send(anyString(), any(), anyLong(), anyString());
   }
 
-  // 세 차례 실패 후 무한 재시도 금지
+  // 세 차례 실패 후 재시도 중단 검증
   @Test
   void stopsAfterThreeAttempts() {
     register(userId, "device");

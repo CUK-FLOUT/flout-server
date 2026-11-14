@@ -88,7 +88,7 @@ public class InspectionApplicationService {
       throw new BaseException(InspectionApplicationErrorCode.GUIDE_NOT_FOUND);
     }
 
-    // 관할 및 분석 주소 비교에는 앞뒤 공백을 제거한 주소를 사용한다.
+    // 관할 확인과 분석 주소 비교에 앞뒤 공백을 제거한 주소를 사용한다.
     String normalizedAddress = request.address() == null ? null : request.address().strip();
 
     validateJurisdiction(normalizedAddress);

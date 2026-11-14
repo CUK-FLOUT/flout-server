@@ -49,7 +49,7 @@ class ResidentSupportProgressTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
-  /** Seeds a submitted application whose owner can be used to test schedule and document access. */
+  /** 일정과 서류의 열람 권한을 검증할 접수 신청을 준비한다. */
   @BeforeEach
   void setup() {
 
@@ -305,9 +305,7 @@ class ResidentSupportProgressTest {
         .hasMessageContaining("AWS_REGION and AWS_S3_BUCKET");
   }
 
-  /**
-   * Checks that an unauthorized caller cannot infer the application's state or access its files.
-   */
+  /** 권한 없는 호출자가 신청 상태를 알거나 파일을 열람할 수 없는지 검증한다. */
   @ParameterizedTest
   @ValueSource(strings = {"schedule", "attachments"})
   void authorizationAlwaysPrecedesDocumentAccessAndStateValidation(String view) throws Exception {
@@ -336,7 +334,7 @@ class ResidentSupportProgressTest {
     verifyNoInteractions(storage);
   }
 
-  /** Compares persisted rows before and after a read and checks that storage keys stay private. */
+  /** 조회 전후 데이터가 같고 저장소 키가 노출되지 않는지 검증한다. */
   @ParameterizedTest
   @ValueSource(strings = {"schedule", "attachments"})
   void queriesDoNotWriteOrExposeInternalKeys(String view) throws Exception {

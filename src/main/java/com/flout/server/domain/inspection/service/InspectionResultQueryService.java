@@ -15,7 +15,7 @@ public class InspectionResultQueryService {
   private final AttachmentStorage storage;
 
   /**
-   * DB 조회 트랜잭션 종료 후 현장사진의 임시 열람 URL을 발급하여 점검 결과를 반환합니다.
+   * DB 조회 트랜잭션 종료 후 현장사진의 임시 열람 URL을 발급하여 점검 결과를 반환한다.
    *
    * @param operatorId 조회하는 운영자 ID
    * @param inspectionId 현장점검 ID

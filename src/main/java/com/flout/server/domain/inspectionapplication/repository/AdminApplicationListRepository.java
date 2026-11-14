@@ -16,7 +16,7 @@ import org.springframework.stereotype.Repository;
 public class AdminApplicationListRepository {
   private static final String BUCHEON = "^(?:(?:경기도|경기)\\s+)?부천시";
 
-  // Use the same latest submitted support application as the support and construction detail tabs.
+  // 지원·시공 상세 탭과 동일하게 최신 접수 지원 신청을 사용한다.
   private static final String JURISDICTION_APPLICATIONS =
       """
       FROM (

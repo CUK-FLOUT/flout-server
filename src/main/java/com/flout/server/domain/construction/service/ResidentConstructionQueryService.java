@@ -59,8 +59,10 @@ public class ResidentConstructionQueryService {
             .toList();
     List<ResidentConstructionResultResponse.Photo> beforePhotos = List.of();
     List<ResidentConstructionResultResponse.Photo> completedPhotos = List.of();
+    // 시공 완료 후에만 사진 조회 URL을 발급한다.
     if (completed) {
       try {
+        // 주민에게 공개된 점검 사진을 시공 전 사진으로 사용한다.
         beforePhotos =
             inspections
                 .findByApplicationId(schedule.applicationId())
@@ -136,6 +138,7 @@ public class ResidentConstructionQueryService {
         constructions
             .findById(id)
             .orElseThrow(() -> new BaseException(ConstructionErrorCode.NOT_FOUND));
+    // 본인이 신청한 승인 건에 연결된 시공만 조회 허용
     var support = construction.getSupportApplication();
     if (!support.getApplicant().getId().equals(userId))
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);

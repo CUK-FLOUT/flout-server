@@ -41,7 +41,7 @@ class SupportDetailTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
-  /** Seeds the support and inspection data used to verify the operator detail views. */
+  /** 운영자 지원 상세 조회에 필요한 지원·점검 데이터를 준비한다. */
   @BeforeEach
   void setup() {
 

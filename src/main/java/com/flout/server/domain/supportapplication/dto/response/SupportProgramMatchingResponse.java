@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.List;
 
-/** 주민에게 노출하는 매칭 결과. Gemini가 만든 사업 메타데이터는 사용하지 않는다. */
+/** 주민에게 실제 사업 정보로 구성한 매칭 결과를 반환한다. */
 @Schema(description = "공개된 현장점검 결과와 실제 DB 지원사업을 비교한 안내")
 public record SupportProgramMatchingResponse(
     @Schema(description = "입력받은 현장점검 신청 ID", example = "12") Long supportApplicationId,

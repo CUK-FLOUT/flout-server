@@ -48,7 +48,8 @@ public class AdminInspectionListController {
           @RequestParam(required = false)
           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate visitDate,
-      @Parameter(description = "주소·접수번호 검색어, 최대 255자") @RequestParam(defaultValue = "")
+      @Parameter(description = "주소·접수번호 검색어, 최대 255자", example = "000005")
+          @RequestParam(defaultValue = "")
           String keyword,
       @Parameter(description = "0부터 시작하는 페이지", example = "0") @RequestParam(defaultValue = "0")
           int page,

@@ -17,7 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class FirebasePushGatewayTest {
-  /** 인증정보 읽기 실패를 재시도로 분류하고 이후 같은 게이트웨이에서 발송 가능한지 검증합니다. */
+  /** 인증정보 읽기 실패를 재시도로 분류하고 이후 같은 게이트웨이에서 발송 가능한지 검증한다. */
   @Test
   void credentialReadFailureIsRetryableAndDoesNotCloseGateway() throws Exception {
     var gateway = new FirebasePushGateway("");

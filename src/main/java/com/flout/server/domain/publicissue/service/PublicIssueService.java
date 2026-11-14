@@ -66,7 +66,7 @@ public class PublicIssueService {
     String address = request.address() == null ? source.address() : request.address();
     boolean same = normalize(address).equals(normalize(source.address()));
     var point = same ? point(source.latitude(), source.longitude()) : geocode(address);
-    // 외부 주소 조회 동안 DB 트랜잭션을 유지하지 않고, 저장 시 다시 접근 권한을 확인합니다.
+    // 외부 주소 조회는 DB 트랜잭션 밖에서 수행하고, 저장 시 접근 권한을 다시 확인한다.
     return transactions.execute(
         status -> {
           var inspection = authorize(operatorId, request.inspectionId());
