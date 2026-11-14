@@ -43,12 +43,14 @@ public class ResidentSupportDetailController {
       useReturnTypeSchema = true)
   @GetMapping(value = "/review", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "주민 지원 검토 상세 조회",
+      summary = "지원 검토 상세 조회",
       description =
-          "RESIDENT 본인 신청의 SUBMITTED 상태를 조회합니다. 신청일과 설치 희망 일정은 저장값을 사용합니다. 임대인 동의서 제출 여부는 첨부서류 조회에서 확인합니다.")
+          "본인의 SUBMITTED 지원 신청을 조회합니다. 다른 상태는 409를 반환합니다. 신청일과 설치 희망 일정은 저장값을 사용하며 확정 시공 일정이 아닙니다. 임대인 동의서 제출 여부는 첨부서류 조회에서 확인합니다.")
   public SuccessResponse<ResidentSupportReviewResponse> review(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "지원 신청 ID. 점검 ID와 다릅니다.") @PathVariable Long supportApplicationId) {
+      @Parameter(description = "본인의 지원 신청 ID. 점검 ID와 다릅니다.", example = "201", required = true)
+          @PathVariable
+          Long supportApplicationId) {
     return SuccessResponse.ok(service.review(Long.valueOf(jwt.getSubject()), supportApplicationId));
   }
 
@@ -58,12 +60,13 @@ public class ResidentSupportDetailController {
       useReturnTypeSchema = true)
   @GetMapping(value = "/approval", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "주민 지원 승인 상세 조회",
+      summary = "지원 승인 상세 조회",
       description =
           "RESIDENT 본인의 APPROVED 신청만 조회합니다. 승인 시각과 지원 범위는 DB 저장값을 사용하며, 신청 시설(requestedFacility)과 확정된 지원 범위(supportScope)는 구분합니다. scheduledConstructionDate/Time은 시공 일정 저장 API로 확정한 일정이며 미배정이면 null입니다. 희망 일정으로 대체하거나 시공 진행 상태를 추정하지 않습니다. 내부 관리 정보는 반환하지 않습니다.")
   public SuccessResponse<ResidentSupportApprovalResponse> approval(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "지원 신청 ID") @PathVariable Long supportApplicationId) {
+      @Parameter(description = "본인의 지원 신청 ID", example = "201", required = true) @PathVariable
+          Long supportApplicationId) {
     return SuccessResponse.ok(
         service.approval(Long.valueOf(jwt.getSubject()), supportApplicationId));
   }
@@ -74,12 +77,13 @@ public class ResidentSupportDetailController {
       useReturnTypeSchema = true)
   @GetMapping(value = "/rejection", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
-      summary = "주민 지원 미승인 상세 조회",
+      summary = "지원 미승인 상세 조회",
       description =
           "RESIDENT 본인의 REJECTED 신청만 조회합니다. 실제 저장된 미승인 사유와 처리 시각을 반환하며 임의의 사유를 생성하지 않습니다. 현장점검 결과 다시 보기용 inspectionId와 실제 PUBLISHED 결과 존재 여부를 반환합니다. 결과 내용과 파일은 이 API에 포함하지 않으며 점검 완료만으로 공개 여부를 판단하지 않습니다.")
   public SuccessResponse<ResidentSupportRejectionResponse> rejection(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "지원 신청 ID") @PathVariable Long supportApplicationId) {
+      @Parameter(description = "본인의 지원 신청 ID", example = "201", required = true) @PathVariable
+          Long supportApplicationId) {
     return SuccessResponse.ok(
         service.rejection(Long.valueOf(jwt.getSubject()), supportApplicationId));
   }

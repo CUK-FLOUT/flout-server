@@ -26,10 +26,11 @@ public class ResidentRecommendationsController {
   @Operation(
       summary = "전문가 권장 예방조치 조회",
       description =
-          "본인 신청의 공개된 현장점검 결과에서 운영자가 등록한 권장 예방조치를 원문과 등록 순서대로 반환합니다. 항목이 없으면 빈 배열을 반환합니다.")
+          "본인 신청의 공개된 현장점검 결과에서 운영자가 등록한 권장 예방조치를 원문과 표시 순서대로 반환합니다. 권장조치가 없으면 빈 배열이며, 점검이 없거나 결과가 공개되지 않았으면 APPLICATION_400_5를 반환합니다.")
   public SuccessResponse<ResidentRecommendationsResponse> get(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "현장점검 신청 ID") @PathVariable Long applicationId) {
+      @Parameter(description = "본인의 양수 현장점검 신청 ID", example = "101", required = true) @PathVariable
+          Long applicationId) {
     return SuccessResponse.of(
         service.get(Long.valueOf(jwt.getSubject()), applicationId),
         InspectionApplicationSuccessCode.RECOMMENDATIONS_FOUND);

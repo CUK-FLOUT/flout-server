@@ -20,6 +20,7 @@ import com.flout.server.domain.supportapplication.response.code.SupportApplicati
 import com.flout.server.domain.supportapplication.response.code.SupportApplicationSuccessCode;
 import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
 import com.flout.server.domain.supportapplication.response.code.SupportAttachmentErrorCode;
+import com.flout.server.domain.supportapplication.response.code.SupportDetailErrorCode;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.domain.user.response.code.UserSuccessCode;
 import com.flout.server.global.response.code.BaseResponseCode;
@@ -227,6 +228,33 @@ public class OpenApiConfig {
                                     .contains(path)) {
                               describeAdminSupportRead(operation, path);
                             }
+                            if (method == PathItem.HttpMethod.GET
+                                && path.equals("/api/resident/applications")) {
+                              addError(
+                                  operation,
+                                  "residentOnly",
+                                  GeneralErrorCode.ACCESS_DENIED_REQUEST,
+                                  null);
+                            }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
+                                        "/api/resident/applications",
+                                        "/api/admin/support-applications",
+                                        "/api/admin/support-applications/status",
+                                        "/api/admin/support-applications/{supportApplicationId}",
+                                        "/api/admin/support-applications/{supportApplicationId}/histories",
+                                        "/api/resident/support-applications/{supportApplicationId}/review",
+                                        "/api/resident/support-applications/{supportApplicationId}/approval",
+                                        "/api/resident/support-applications/{supportApplicationId}/rejection",
+                                        "/api/resident/support-applications/{supportApplicationId}/schedule",
+                                        "/api/resident/support-applications/{supportApplicationId}/attachments")
+                                    .contains(path)) {
+                              addError(
+                                  operation,
+                                  "unacceptableResponse",
+                                  GeneralErrorCode.NOT_ACCEPTABLE_ERROR,
+                                  null);
+                            }
                             if (path.equals(
                                     "/api/admin/support-applications/{supportApplicationId}/approve")
                                 && method == PathItem.HttpMethod.POST) {
@@ -271,6 +299,17 @@ public class OpenApiConfig {
                                     .contains(path)) {
                               describeResidentSupportDetail(
                                   operation, path.substring(path.lastIndexOf('/') + 1));
+                            }
+                            if (method == PathItem.HttpMethod.GET
+                                && Set.of(
+                                        "/api/resident/support-applications/{supportApplicationId}/review",
+                                        "/api/resident/support-applications/{supportApplicationId}/approval",
+                                        "/api/resident/support-applications/{supportApplicationId}/rejection",
+                                        "/api/resident/support-applications/{supportApplicationId}/schedule",
+                                        "/api/resident/support-applications/{supportApplicationId}/attachments")
+                                    .contains(path)) {
+                              describeResidentSupportReadErrors(
+                                  operation, path.endsWith("/attachments"));
                             }
                             if (path.equals("/api/resident/support-applications")
                                 && method == PathItem.HttpMethod.POST) {
@@ -545,7 +584,7 @@ public class OpenApiConfig {
               "title",
               "현장점검 신청이 접수됐어요",
               "address",
-              "경기도 부천시 원미구 길주로 210",
+              "경기도 부천시 원미구 지봉로 43",
               "detailAddress",
               "101호",
               "riskLevel",
@@ -576,7 +615,7 @@ public class OpenApiConfig {
               "assessmentId",
               1,
               "address",
-              "경기도 부천시 원미구 길주로 210",
+              "경기도 부천시 원미구 지봉로 43",
               "detailAddress",
               "101호",
               "status",
@@ -1618,7 +1657,8 @@ public class OpenApiConfig {
   }
 
   private void describeAddressSearch(Operation operation) {
-    operation.setDescription("행정안전부 API로 부천시 주소를 검색합니다. 필터링 후 빈 페이지에도 다음 페이지가 있을 수 있습니다.");
+    operation.setDescription(
+        "도로명, 지번, 건물명, 동 또는 구 이름으로 부천시 주소를 검색합니다. 부천시 단독 검색은 빈 결과를 반환합니다. 외부 검색은 페이지당 10건이며 필터링 후 빈 페이지에도 다음 페이지가 있을 수 있습니다.");
     ApiResponse success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(AddressSuccessCode.ADDRESS_SEARCH_SUCCESS.getMessage());
     addExample(
@@ -1635,7 +1675,7 @@ public class OpenApiConfig {
                         "roadAddress",
                         "경기도 부천시 원미구 지봉로 43",
                         "jibunAddress",
-                        "경기 부천시 원미구 역곡동 산 43-1",
+                        "경기도 부천시 원미구 역곡동 43-1",
                         "buildingName",
                         "가톨릭대학교 성심교정",
                         "zipCode",
@@ -1650,6 +1690,7 @@ public class OpenApiConfig {
                 2)));
     addError(
         operation, "keywordRequired", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, "검색어를 입력해주세요.");
+    addError(operation, "jusoInvalidQuery", GeneralErrorCode.BAD_REQUEST_ERROR, null);
     addError(operation, "jusoApiError", AddressErrorCode.JUSO_API_ERROR, null);
     addError(operation, "jusoApiTimeout", AddressErrorCode.JUSO_API_TIMEOUT, null);
     operation.getResponses().get("400").setDescription("검색어 누락 또는 잘못된 검색 조건");
@@ -1658,7 +1699,8 @@ public class OpenApiConfig {
   }
 
   private void describeAddressCoordinates(Operation operation) {
-    operation.setDescription("선택한 부천시 주소의 위도와 경도를 조회합니다.");
+    operation.setDescription(
+        "부천시 원미구·소사구·오정구의 건물번호가 포함된 주소로 좌표를 조회합니다. 주소와 직접 일치하는 결과를 우선하고 중복을 제거한 뒤 한 건으로 식별되는 경우 좌표를 반환합니다.");
     var code = AddressSuccessCode.ADDRESS_COORDINATES_SUCCESS;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
     success.setDescription(code.getMessage());
@@ -1984,6 +2026,16 @@ public class OpenApiConfig {
             : com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
                 .GUIDE_NOT_FOUND,
         null);
+    addError(
+        operation,
+        "guideReadFailed",
+        com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode
+            .GUIDE_SAVE_FAILED,
+        null);
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription(item ? "예방 가이드 항목을 찾을 수 없습니다." : "예방 가이드를 찾을 수 없습니다.");
     if (hasBody) {
       addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     }
@@ -2218,7 +2270,7 @@ public class OpenApiConfig {
     result.put("applicationId", 1);
     result.put("receiptNumber", "000001");
     result.put("applicant", Map.of("name", "김주민", "phone", "010-1234-1234"));
-    result.put("address", "경기도 부천시 원미구 길주로 53");
+    result.put("address", "경기도 부천시 원미구 지봉로 43");
     result.put("detailAddress", "101호");
     result.put("occupancyType", "TENANT");
     result.put("floodExperience", "YES");
@@ -2421,10 +2473,10 @@ public class OpenApiConfig {
       requestExample.put("preferredVisitDate", "2099-11-03");
       requestExample.put("preferredTimeSlot", "MORNING");
       requestExample.put("assessmentId", 5);
-      requestExample.put("address", "경기도 부천시 원미구 길주로 53");
+      requestExample.put("address", "경기도 부천시 원미구 지봉로 43");
       requestExample.put("detailAddress", "101호");
-      requestExample.put("latitude", 37.5);
-      requestExample.put("longitude", 126.7);
+      requestExample.put("latitude", 37.4874850);
+      requestExample.put("longitude", 126.7985672);
       operation
           .getRequestBody()
           .getContent()
@@ -2459,6 +2511,7 @@ public class OpenApiConfig {
         "assessmentIdRequired",
         GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
         "취약도 분석 결과 ID는 필수입니다.");
+    addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
         operation,
         "latitudeOutOfRange",
@@ -2476,6 +2529,19 @@ public class OpenApiConfig {
         "guideNotLinkedToAssessment",
         InspectionApplicationErrorCode.GUIDE_NOT_FOUND,
         null);
+    addError(operation, "invalidDraftId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(
+        operation,
+        "invalidAddress",
+        InspectionApplicationErrorCode.INVALID_APPLICATION_ADDRESS,
+        null);
+    addError(
+        operation,
+        "assessmentAddressMismatch",
+        InspectionApplicationErrorCode.ASSESSMENT_ADDRESS_MISMATCH,
+        null);
+    addError(operation, "formNotFound", FormDraftErrorCode.NOT_FOUND, null);
+    addError(operation, "formConflict", FormDraftErrorCode.CONFLICT, null);
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
@@ -2488,7 +2554,7 @@ public class OpenApiConfig {
     operation.getResponses().get("403").setDescription("취약도 분석 결과에 대한 접근 권한이 없습니다.");
     addError(
         operation, "assessmentNotFound", InspectionApplicationErrorCode.ASSESSMENT_NOT_FOUND, null);
-    operation.getResponses().get("404").setDescription("취약도 분석 결과를 찾을 수 없습니다.");
+    operation.getResponses().get("404").setDescription("취약도 분석 결과 또는 제출에 사용한 임시저장 폼을 찾을 수 없습니다.");
     addError(
         operation,
         "assessmentNotCompleted",
@@ -2507,7 +2573,7 @@ public class OpenApiConfig {
     operation
         .getResponses()
         .get("409")
-        .setDescription("취약도 분석이 완료되지 않았거나 이미 현장점검을 신청했거나 기존 임시 신청과 요청 내용이 다릅니다.");
+        .setDescription("취약도 분석 미완료, 중복 신청, 기존 임시 신청 내용 불일치 또는 폼 제출 충돌입니다.");
     addError(
         operation,
         "receiptNumberGenerationFailed",
@@ -2543,6 +2609,7 @@ public class OpenApiConfig {
                         "image/jpeg")))));
     addError(
         operation, "invalidAttachments", InspectionApplicationErrorCode.INVALID_ATTACHMENTS, null);
+    addError(operation, "invalidDraft", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(
         operation, "invalidApplicationId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
     addError(operation, "missingFiles", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
@@ -2607,6 +2674,9 @@ public class OpenApiConfig {
       addError(operation, error.name(), error, null);
     addError(operation, "invalidReason", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     operation.getResponses().get("400").setDescription("미승인 사유 누락·공백·길이·형식 또는 지원 신청 ID 오류");
     operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
     operation.getResponses().get("409").setDescription("이미 처리된 지원 신청입니다.");
@@ -2658,6 +2728,9 @@ public class OpenApiConfig {
       addError(operation, error.name(), error, null);
     addError(operation, "invalidRequest", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
     addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
+    addError(
+        operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     operation.getResponses().get("400").setDescription("필수값·지원 범위·검토 항목 오류 또는 임대인 동의서 미제출");
     operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
     operation.getResponses().get("409").setDescription("이미 처리된 지원 신청입니다.");
@@ -2723,10 +2796,7 @@ public class OpenApiConfig {
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponse", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
     operation.getResponses().get("404").setDescription("지원 신청을 찾을 수 없습니다.");
-    operation
-        .getResponses()
-        .get("409")
-        .setDescription("동일한 유형의 증빙서류를 이미 제출했습니다. 재제출·교체는 지원하지 않습니다.");
+    operation.getResponses().get("409").setDescription("동일 유형의 서류를 이미 제출했거나 신청이 임시 저장 상태가 아닙니다.");
   }
 
   private void describeSupportApplication(Operation operation) {
@@ -2773,29 +2843,33 @@ public class OpenApiConfig {
     var draftCode = SupportApplicationSuccessCode.DRAFT_CREATED;
     addExample(success, "draft", envelope(true, draftCode, draftCode.getMessage(), draft));
     addError(operation, "invalidBody", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
-    addError(
-        operation,
-        "preferredVisitDateRequired",
-        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
-        "preferredVisitDate는 필수입니다.");
-    addError(
-        operation,
-        "pastVisitDate",
-        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
-        "희망 방문일은 오늘 또는 미래여야 합니다.");
-    addError(
-        operation,
-        "invalidVisitTime",
-        GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY,
-        "방문 가능 시간은 MORNING, AFTERNOON, ANY 중 하나여야 합니다.");
-    for (var error : SupportApplicationErrorCode.values()) {
-      if (error != SupportApplicationErrorCode.MATCHED_PROGRAM_NOT_FOUND) {
-        addError(operation, error.name(), error, null);
-      }
-    }
+    addError(operation, "invalidDraftId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "invalidVisitTime", GeneralErrorCode.INVALID_HTTP_MESSAGE_BODY, null);
+    for (var error :
+        List.of(
+            SupportApplicationErrorCode.SOURCE_INFORMATION_UNAVAILABLE,
+            SupportApplicationErrorCode.RESULT_NOT_PUBLISHED,
+            SupportApplicationErrorCode.RESIDENT_ONLY,
+            SupportApplicationErrorCode.APPLICATION_ACCESS_DENIED,
+            SupportApplicationErrorCode.APPLICATION_NOT_FOUND,
+            SupportApplicationErrorCode.PROGRAM_NOT_FOUND,
+            SupportApplicationErrorCode.PROGRAM_NOT_ACCEPTING,
+            SupportApplicationErrorCode.PROGRAM_NOT_FACILITY_APPLICATION,
+            SupportApplicationErrorCode.PROGRAM_ELIGIBILITY_UNCONFIRMED,
+            SupportApplicationErrorCode.REQUESTED_FACILITY_NOT_SUPPORTED,
+            SupportApplicationErrorCode.DUPLICATE_APPLICATION))
+      addError(operation, error.name(), error, null);
+    addError(operation, "formNotFound", FormDraftErrorCode.NOT_FOUND, null);
+    addError(operation, "formConflict", FormDraftErrorCode.CONFLICT, null);
     operation.getResponses().get("403").setDescription("주민 권한이 없거나 본인 소유의 현장점검 신청이 아닙니다.");
-    operation.getResponses().get("404").setDescription("현장점검 신청 또는 지원사업을 찾을 수 없습니다.");
-    operation.getResponses().get("409").setDescription("중복 신청, 공식 접수 미확인 또는 신청 자격 정보 확인 불가.");
+    operation
+        .getResponses()
+        .get("404")
+        .setDescription("현장점검 신청, 지원사업 또는 제출에 사용한 임시저장 폼을 찾을 수 없습니다.");
+    operation
+        .getResponses()
+        .get("409")
+        .setDescription("중복 신청, 공식 접수 미확인, 신청 자격 정보 확인 불가 또는 폼 제출 충돌입니다.");
     addError(
         operation, "unsupportedContentType", GeneralErrorCode.UNSUPPORTED_MEDIA_TYPE_ERROR, null);
     addError(operation, "unacceptableResponseType", GeneralErrorCode.NOT_ACCEPTABLE_ERROR, null);
@@ -2851,7 +2925,7 @@ public class OpenApiConfig {
     result.put("receiptNo", String.format(java.util.Locale.ROOT, "%06d", applicationId));
     result.put(
         "applicantName", view.equals("review") ? "이주민" : view.equals("approval") ? "박주민" : "최주민");
-    result.put("address", "경기도 부천시 원미구 중동로 12");
+    result.put("address", "경기도 부천시 원미구 지봉로 43");
     result.put("detailAddress", "지하 101호");
     result.put("programName", "침수 예방시설 설치 지원");
     result.put(
@@ -2896,6 +2970,18 @@ public class OpenApiConfig {
               GeneralSuccessCode.SUCCESS_OK,
               GeneralSuccessCode.SUCCESS_OK.getMessage(),
               scheduled));
+    }
+  }
+
+  private void describeResidentSupportReadErrors(Operation operation, boolean attachments) {
+    addError(operation, "invalidId", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    addError(operation, "accessDenied", GeneralErrorCode.ACCESS_DENIED_REQUEST, null);
+    addError(operation, "supportNotFound", SupportDetailErrorCode.APPLICATION_NOT_FOUND, null);
+    if (attachments) {
+      addError(
+          operation, "attachmentReadFailed", SupportDetailErrorCode.ATTACHMENT_READ_FAILED, null);
+    } else {
+      addError(operation, "stateNotAvailable", SupportDetailErrorCode.STATE_NOT_AVAILABLE, null);
     }
   }
 
@@ -2971,7 +3057,7 @@ public class OpenApiConfig {
       result.put("receiptNo", "000002");
       result.put("applicantName", "김주민");
       result.put("contact", "010-1234-0002");
-      result.put("address", "경기도 부천시 원미구 길주로 53");
+      result.put("address", "경기도 부천시 원미구 지봉로 43");
       result.put("detailAddress", "101호");
       result.put("housingType", "SEMI_BASEMENT");
       result.put("occupancyType", "TENANT");
@@ -3010,5 +3096,11 @@ public class OpenApiConfig {
       }
     }
     addExample(success, "screenData", envelope(true, code, code.getMessage(), result));
+    addError(operation, "invalidParameter", GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER, null);
+    if (!path.equals("/api/admin/support-applications")) {
+      addError(operation, "supportNotFound", SupportDetailErrorCode.APPLICATION_NOT_FOUND, null);
+      addError(
+          operation, "attachmentReadFailed", SupportDetailErrorCode.ATTACHMENT_READ_FAILED, null);
+    }
   }
 }

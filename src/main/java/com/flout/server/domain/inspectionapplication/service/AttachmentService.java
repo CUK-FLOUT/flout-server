@@ -17,6 +17,7 @@ import com.flout.server.domain.notification.service.NotificationService;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Validator;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -234,7 +235,10 @@ public class AttachmentService {
     return new UploadResponse(inspectionId, saved);
   }
 
-  public record UploadResponse(Long inspectionId, List<AttachmentResult> attachments) {}
+  public record UploadResponse(
+      @Schema(description = "신청에 연결된 점검 ID", example = "12") Long inspectionId,
+      @Schema(description = "이번 요청으로 등록했거나 동일 요청 키로 재사용한 사진 목록")
+          List<AttachmentResult> attachments) {}
 
   /** 같은 요청 키의 저장 결과와 점검 ID를 하나의 트랜잭션에서 함께 재사용한다. */
   private UploadResponse findPrevious(Long applicationId, String key, String hash) {
@@ -358,5 +362,8 @@ public class AttachmentService {
       String filename, MultipartFile file, long size, String contentType, String hash) {}
 
   public record AttachmentResult(
-      Long attachmentId, String filename, long size, String contentType) {}
+      @Schema(description = "첨부파일 ID", example = "1") Long attachmentId,
+      @Schema(description = "원본 파일명", example = "출입구.jpg") String filename,
+      @Schema(description = "파일 크기(바이트)", example = "12345") long size,
+      @Schema(description = "이미지 MIME 유형", example = "image/jpeg") String contentType) {}
 }

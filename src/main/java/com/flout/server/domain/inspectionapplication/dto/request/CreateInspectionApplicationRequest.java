@@ -67,7 +67,7 @@ public record CreateInspectionApplicationRequest(
     @NotNull(message = "희망 방문일은 필수입니다.") @FutureOrPresent @Schema(
             description = "희망 방문일(오늘 이후)",
             format = "date",
-            example = "2026-11-03",
+            example = "2030-12-01",
             requiredMode = Schema.RequiredMode.REQUIRED)
         LocalDate preferredVisitDate,
     @NotNull(message = "희망 방문 시간대는 필수입니다.") @Schema(

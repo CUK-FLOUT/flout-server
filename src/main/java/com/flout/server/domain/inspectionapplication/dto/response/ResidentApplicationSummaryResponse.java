@@ -10,8 +10,8 @@ public record ResidentApplicationSummaryResponse(
     Long applicationId,
     @Schema(description = "표시용 접수번호. URL에는 숫자 applicationId를 사용합니다.", example = "000001")
         String receiptNumber,
-    String title,
-    String address,
+    @Schema(description = "진행 단계에 따른 신청 제목", example = "시공 · 출입구 물막이판") String title,
+    @Schema(description = "신청 주소", example = "경기도 부천시 원미구 지봉로 43") String address,
     ResidentApplicationStage stage,
     boolean closed,
     OffsetDateTime createdAt,

@@ -33,13 +33,15 @@ public record CreateSupportApplicationRequest(
         @Schema(
             type = "string",
             format = "date",
-            description = "지원시설 설치 희망 방문일 (오늘 이후, yyyy-MM-dd). 현장점검 일정과 별개")
+            description = "지원시설 설치 희망 방문일 (오늘 이후, yyyy-MM-dd). 현장점검 일정과 별개",
+            example = "2030-12-01")
         LocalDate preferredVisitDate,
     @NotNull @JsonDeserialize(using = StrictVisitTime.class)
         @Schema(
             description =
                 "지원시설 설치 희망 시간: MORNING=오전 9~12시, AFTERNOON=오후 13~18시, ANY=상관없음. 현장점검·확정 시공 일정과 별개",
-            allowableValues = {"MORNING", "AFTERNOON", "ANY"})
+            allowableValues = {"MORNING", "AFTERNOON", "ANY"},
+            example = "MORNING")
         PreferredTimeSlot preferredVisitTime) {
   public CreateSupportApplicationRequest {
     requestedFacility = strip(requestedFacility);

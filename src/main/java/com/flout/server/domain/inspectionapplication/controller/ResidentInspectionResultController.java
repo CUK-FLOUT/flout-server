@@ -23,10 +23,11 @@ public class ResidentInspectionResultController {
   @GetMapping(value = "/{applicationId}/result", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "현장점검 결과 상세 조회",
-      description = "로그인한 주민이 본인 신청의 공개된 결과와 현장사진 임시 URL을 조회합니다. 초안과 운영자 내부 메모는 제공하지 않습니다.")
+      description =
+          "로그인한 주민이 본인 신청의 공개된 점검 결과와 결과 사진의 임시 열람 URL을 조회합니다. 점검이 없거나 공개된 결과가 없으면 APPLICATION_400_5를 반환합니다. 초안과 운영자 내부 메모는 제공하지 않습니다.")
   public SuccessResponse<ResidentInspectionResultResponse> get(
       @AuthenticationPrincipal Jwt jwt,
-      @Parameter(description = "현장점검 신청 ID", example = "101", required = true) @PathVariable
+      @Parameter(description = "본인의 양수 현장점검 신청 ID", example = "101", required = true) @PathVariable
           Long applicationId) {
     return SuccessResponse.of(
         service.get(Long.valueOf(jwt.getSubject()), applicationId),
