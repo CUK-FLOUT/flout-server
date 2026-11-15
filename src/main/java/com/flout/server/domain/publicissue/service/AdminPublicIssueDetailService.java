@@ -13,7 +13,7 @@ import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
-import java.time.*;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.util.List;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AdminPublicIssueDetailService {
   private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-  private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
-
   private final UserRepository users;
   private final AdminPublicIssueDetailRepository details;
   private final AttachmentStorage storage;
@@ -83,15 +81,15 @@ public class AdminPublicIssueDetailService {
                         row.operatorName(),
                         row.actionDescription(),
                         PublicIssueActionStatus.valueOf(row.status()),
-                        seoul(row.createdAt()),
-                        seoul(row.completedAt()),
+                        SeoulDateTimes.toOffset(row.createdAt()),
+                        SeoulDateTimes.toOffset(row.completedAt()),
                         images.getOrDefault(row.actionId(), List.of()).stream()
                             .map(
                                 image ->
                                     new AdminPublicIssueDetailResponse.Image(
                                         image.imageId(),
                                         storage.readUrl(image.objectKey()),
-                                        seoul(image.uploadedAt())))
+                                        SeoulDateTimes.toOffset(image.uploadedAt())))
                             .toList()))
             .toList();
 
@@ -104,7 +102,7 @@ public class AdminPublicIssueDetailService {
         header.longitude(),
         header.description(),
         header.fieldFindings(),
-        seoul(header.createdAt()),
+        SeoulDateTimes.toOffset(header.createdAt()),
         new AdminPublicIssueDetailResponse.Source(
             header.inspectionId(),
             header.applicationId(),
@@ -128,7 +126,7 @@ public class AdminPublicIssueDetailService {
         header.reviewReason(),
         header.reviewerUserId(),
         header.reviewerName(),
-        seoul(header.reviewedAt()));
+        SeoulDateTimes.toOffset(header.reviewedAt()));
   }
 
   private AdminPublicIssueDetailResponse.PublicFacility facility(
@@ -141,11 +139,6 @@ public class AdminPublicIssueDetailService {
         header.facilityAddress(),
         header.facilityLatitude(),
         header.facilityLongitude());
-  }
-
-  private OffsetDateTime seoul(LocalDateTime value) {
-    if (value == null) return null;
-    return value.atZone(ZoneId.systemDefault()).withZoneSameInstant(SEOUL).toOffsetDateTime();
   }
 
   private void requireOperator(Long operatorId) {

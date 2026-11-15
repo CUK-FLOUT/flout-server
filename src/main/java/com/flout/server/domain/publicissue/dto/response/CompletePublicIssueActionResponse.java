@@ -4,9 +4,9 @@ import com.flout.server.domain.publicissue.entity.FacilityReviewStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueAction;
 import com.flout.server.domain.publicissue.entity.PublicIssueActionStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
+import com.flout.server.global.time.SeoulDateTimes;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.List;
 
 public record CompletePublicIssueActionResponse(
@@ -25,13 +25,7 @@ public record CompletePublicIssueActionResponse(
       PublicIssueAction action, List<Image> images) {
 
     OffsetDateTime completedAt =
-        action.getCompletedAt() == null
-            ? null
-            : action
-                .getCompletedAt()
-                .atZone(ZoneId.systemDefault())
-                .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-                .toOffsetDateTime();
+        action.getCompletedAt() == null ? null : SeoulDateTimes.toOffset(action.getCompletedAt());
 
     return new CompletePublicIssueActionResponse(
         action.getId(),

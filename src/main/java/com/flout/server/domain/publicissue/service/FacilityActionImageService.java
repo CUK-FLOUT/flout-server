@@ -15,8 +15,8 @@ import com.flout.server.domain.publicissue.repository.FacilityReviewRepository;
 import com.flout.server.domain.publicissue.repository.PublicIssueActionRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -141,11 +141,7 @@ public class FacilityActionImageService {
                       new CompletePublicIssueActionResponse.Image(
                           image.getId(),
                           urls.get(i),
-                          image
-                              .getUploadedAt()
-                              .atZone(ZoneId.systemDefault())
-                              .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-                              .toOffsetDateTime()));
+                          SeoulDateTimes.toOffset(image.getUploadedAt())));
 
                   cleanup.completed(keys.get(i));
                 }

@@ -1,7 +1,8 @@
 package com.flout.server.domain.supportapplication.dto.response;
 
 import com.flout.server.domain.supportapplication.entity.*;
-import java.time.*;
+import com.flout.server.global.time.SeoulDateTimes;
+import java.time.OffsetDateTime;
 
 public record ApproveSupportApplicationResponse(
     Long supportApplicationId,
@@ -17,11 +18,7 @@ public record ApproveSupportApplicationResponse(
         application.getStatus(),
         application.getSupportScope(),
         application.getApprovedBy().getId(),
-        application
-            .getApprovedAt()
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime(),
+        SeoulDateTimes.toOffset(application.getApprovedAt()),
         constructionId);
   }
 }
