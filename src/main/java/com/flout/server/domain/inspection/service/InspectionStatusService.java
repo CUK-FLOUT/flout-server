@@ -19,7 +19,7 @@ public class InspectionStatusService {
   private final Clock inspectionClock;
   private final NotificationService notifications;
 
-  /** 방문 시간이 된 예정 점검만 진행으로 변경하고 자동 전환 이력을 저장합니다. */
+  /** 방문 시간이 된 예정 점검만 진행으로 변경하고 자동 전환 이력을 저장한다. */
   @Transactional
   public boolean startIfDue(Long inspectionId) {
     var inspection = inspections.findForStatusUpdate(inspectionId).orElse(null);

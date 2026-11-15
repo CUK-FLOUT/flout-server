@@ -28,7 +28,7 @@ public class SupportProgram {
   @Column(name = "operating_status", length = 50)
   private String operatingStatus;
 
-  // V63: FACILITY / RELOCATION / INSURANCE. Null means legacy/unclassified.
+  // V63 사업 유형은 FACILITY, RELOCATION, INSURANCE이며 기존 미분류 값은 null로 둔다.
   @Column(name = "program_kind", length = 30)
   private String programKind;
 

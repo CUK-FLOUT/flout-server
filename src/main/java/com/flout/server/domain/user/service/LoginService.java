@@ -41,7 +41,7 @@ public class LoginService {
     if (user == null || !matches || user.getRole() != requiredRole) {
       throw new BaseException(UserErrorCode.LOGIN_FAILED);
     }
-    // 인증 도중 계정이 변경됐다면 토큰을 반환하지 않음
+    // 인증 중 계정이 변경되면 토큰을 반환하지 않는다.
     int updated =
         users.updateLoginTime(
             user.getId(), requiredRole, email, user.getPasswordHash(), LocalDateTime.now());

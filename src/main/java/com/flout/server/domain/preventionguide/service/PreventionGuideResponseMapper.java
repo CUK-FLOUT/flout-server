@@ -9,7 +9,7 @@ import com.flout.server.domain.preventionguide.repository.PreventionGuideItemRep
 import com.flout.server.domain.preventionguide.response.code.PreventionGuideErrorCode;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.global.exception.BaseException;
-import java.time.ZoneId;
+import com.flout.server.global.time.SeoulDateTimes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -75,10 +75,6 @@ public class PreventionGuideResponseMapper {
         items.size(),
         items,
         guide.getResolution(),
-        guide
-            .getGeneratedAt()
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime());
+        SeoulDateTimes.toOffset(guide.getGeneratedAt()));
   }
 }

@@ -45,11 +45,11 @@ public class PublishInspectionResultService {
   private final EntityManager entityManager;
   private final NotificationService notifications;
 
-  /** 선행 상태 변경 없이 결과를 공개하고 점검·신청 완료와 이력을 같은 트랜잭션으로 저장합니다. */
+  /** 선행 상태 변경 없이 결과를 공개하고 점검·신청 완료와 이력을 같은 트랜잭션으로 저장한다. */
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PublishInspectionResultResponse publish(
       Long operatorId, Long inspectionId, PublishInspectionResultRequest request) {
-    // 점검ID 검증
+    // 점검 ID 검증
     if (inspectionId == null || inspectionId <= 0) {
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     }
@@ -67,7 +67,7 @@ public class PublishInspectionResultService {
     // 선정 순서 저장과 동일하게 관할 → 점검 순서로 잠금
     if (operator.getJurisdiction() != null)
       entityManager.lock(operator.getJurisdiction(), LockModeType.PESSIMISTIC_WRITE);
-    // 점검 조회(동시 수정 방지)
+    // 동시 수정을 막기 위해 점검 행을 잠근다.
     Inspection inspection =
         inspections
             .findForStatusUpdate(inspectionId)
@@ -80,14 +80,14 @@ public class PublishInspectionResultService {
       throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
     }
 
-    // 이미 공개된 결과가 있는지 확인
+    // 기존 공개 결과 확인
     if (results
         .findByInspectionIdAndResultStatus(inspectionId, ResultStatus.PUBLISHED)
         .isPresent()) {
       throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
     }
 
-    // 공개할 초안에 등록된 현장사진이 있어야 함
+    // 공개 전 초안 사진 등록 여부 확인
     InspectionResult result =
         results
             .findByInspectionIdAndResultStatus(inspectionId, ResultStatus.DRAFT)

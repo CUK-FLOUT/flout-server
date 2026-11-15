@@ -179,7 +179,7 @@ class InspectionResultDraftTest {
         .isEqualTo("DRAFT");
   }
 
-  /** 결과 공개 시 별도 상태 API 없이 완료 상태와 이력을 저장하는지 검증합니다. */
+  /** 결과 공개 시 별도 상태 API 없이 완료 상태와 이력을 저장하는지 검증한다. */
   @ParameterizedTest
   @ValueSource(strings = {"RECEIVED", "SCHEDULED", "IN_PROGRESS"})
   void publishingCompletesInspectionWithoutStatusPatch(String previous) throws Exception {
@@ -245,7 +245,7 @@ class InspectionResultDraftTest {
     assertThat(count("application_status_histories")).isEqualTo(1);
   }
 
-  /** 내부 메모의 null·빈 문자열·공백 입력으로도 최종 공개할 수 있는지 검증합니다. */
+  /** 내부 메모의 null·빈 문자열·공백 입력으로도 최종 공개할 수 있는지 검증한다. */
   @ParameterizedTest
   @NullAndEmptySource
   @ValueSource(strings = {"   "})
@@ -269,7 +269,7 @@ class InspectionResultDraftTest {
         .isEqualTo(memo);
   }
 
-  /** 내부 메모를 생략한 최종 공개 요청은 null로 저장하는지 검증합니다. */
+  /** 내부 메모를 생략한 최종 공개 요청은 null로 저장하는지 검증한다. */
   @Test
   void publishesWithoutInternalMemo() throws Exception {
     completeInspection();
@@ -290,7 +290,7 @@ class InspectionResultDraftTest {
         .isNull();
   }
 
-  /** 선택 입력이어도 내부 메모의 최대 4000자 제한은 유지하는지 검증합니다. */
+  /** 선택 입력이어도 내부 메모의 최대 4000자 제한은 유지하는지 검증한다. */
   @Test
   void publishingRejectsInternalMemoOverMaximumLength() throws Exception {
     var body = new HashMap<String, Object>(full());

@@ -184,7 +184,7 @@ class InspectionStatusTest {
     assertThat(histories.count()).isEqualTo(1);
   }
 
-  /** 수동 상태 변경 API와 Swagger 경로 제거 검증 */
+  /** 수동 상태 변경 API와 Swagger 경로가 제거됐는지 검증한다. */
   @Test
   void statusEndpointIsRemoved() throws Exception {
     mvc.perform(

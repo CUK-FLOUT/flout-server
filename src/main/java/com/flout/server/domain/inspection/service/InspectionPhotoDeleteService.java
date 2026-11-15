@@ -60,6 +60,7 @@ public class InspectionPhotoDeleteService {
               if (operator.getJurisdiction() == null
                   || !"부천시".equals(operator.getJurisdiction().getName()))
                 throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+              // 결과 공개와 사진 삭제가 겹치지 않도록 점검 행을 잠근다.
               var inspection =
                   inspections
                       .findForStatusUpdate(inspectionId)
@@ -83,6 +84,7 @@ public class InspectionPhotoDeleteService {
               results.flush();
               return objectKey;
             });
+    // DB 삭제가 커밋된 뒤 저장소에서 사진을 정리한다.
     cleanup.reconcile(List.of(key));
     return new InspectionPhotoDeleteResponse(inspectionId, photoId);
   }

@@ -8,6 +8,7 @@ import com.flout.server.domain.user.entity.User;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.response.code.BaseResponseCode;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -30,14 +31,14 @@ public class PublicIssueAccess {
 
     validatePublicIssueId(publicIssueId);
 
-    User operator = authorize(operatorId);
+    User operator = requireWriter(operatorId);
 
     PublicIssue issue =
         issues
             .findForAction(publicIssueId)
             .orElseThrow(() -> new BaseException(PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND));
 
-    validateJurisdiction(issue);
+    requireWritableAddress(issue.getAddress());
 
     return new Access(operator, issue);
   }
@@ -47,14 +48,14 @@ public class PublicIssueAccess {
 
     validatePublicIssueId(publicIssueId);
 
-    authorize(operatorId);
+    requireWriter(operatorId);
 
     PublicIssue issue =
         issues
             .findById(publicIssueId)
             .orElseThrow(() -> new BaseException(PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND));
 
-    validateJurisdiction(issue);
+    requireWritableAddress(issue.getAddress());
 
     return issue;
   }
@@ -65,7 +66,25 @@ public class PublicIssueAccess {
     }
   }
 
-  private User authorize(Long operatorId) {
+  @Transactional(propagation = Propagation.MANDATORY)
+  public User requireWriter(Long operatorId) {
+    return requireOperator(operatorId, InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+  public User requireReader(Long operatorId) {
+    return requireOperator(operatorId, InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED);
+  }
+
+  public void requireWritableAddress(String address) {
+    requireAddress(address, InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+  }
+
+  public void requireReadableAddress(String address) {
+    requireAddress(address, InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED);
+  }
+
+  private User requireOperator(Long operatorId, BaseResponseCode jurisdictionError) {
     if (operatorId == null || operatorId <= 0) {
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     }
@@ -80,15 +99,15 @@ public class PublicIssueAccess {
     }
 
     if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName())) {
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+      throw new BaseException(jurisdictionError);
     }
 
     return operator;
   }
 
-  private void validateJurisdiction(PublicIssue issue) {
-    if (!BUCHEON.matcher(issue.getAddress().strip()).find()) {
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+  private void requireAddress(String address, BaseResponseCode jurisdictionError) {
+    if (address == null || !BUCHEON.matcher(address.strip()).find()) {
+      throw new BaseException(jurisdictionError);
     }
   }
 

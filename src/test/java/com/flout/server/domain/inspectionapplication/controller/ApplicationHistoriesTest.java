@@ -53,7 +53,7 @@ class ApplicationHistoriesTest {
   long constructionId = 900;
   String token, residentToken;
 
-  /** Seeds an application and related records with a controllable clock for event timestamps. */
+  /** 이력 시각을 제어할 수 있도록 기준 시계와 신청 관련 데이터를 준비한다. */
   @BeforeEach
   void setup() {
     reset(constructions);
@@ -111,7 +111,7 @@ class ApplicationHistoriesTest {
         supportId);
   }
 
-  /** Queries processing history with the supplied application ID and optional token. */
+  /** 지정한 신청 ID와 선택적으로 제공한 토큰으로 처리 이력을 조회한다. */
   ResultActions history(String id, String access) throws Exception {
     var request = get("/api/admin/applications/" + id + "/histories");
     if (access != null) request.header("Authorization", "Bearer " + access);
@@ -158,10 +158,7 @@ class ApplicationHistoriesTest {
         time);
   }
 
-  /**
-   * Checks that recorded inspection, support, and construction events form one timeline with no
-   * extra review event.
-   */
+  /** 점검·지원·시공 이력이 별도 검토 이벤트 없이 하나의 타임라인으로 조회되는지 검증한다. */
   @Test
   void fullTimelineUsesNineActualStagesInNewestFirstOrder() throws Exception {
     jdbc.update("UPDATE inspection_applications SET submitted_at='2030-01-01 10:00:00'");

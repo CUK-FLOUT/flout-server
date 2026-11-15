@@ -1,8 +1,9 @@
 package com.flout.server.domain.supportapplication.dto.response;
 
 import com.flout.server.domain.supportapplication.entity.*;
+import com.flout.server.global.time.SeoulDateTimes;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.*;
+import java.time.OffsetDateTime;
 
 public record SupportAttachmentResponse(
     @Schema(description = "첨부서류 ID", example = "1") Long attachmentId,
@@ -22,10 +23,7 @@ public record SupportAttachmentResponse(
         a.getOriginalFilename(),
         a.getFileSize(),
         a.getContentType(),
-        a.getSubmittedAt()
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime(),
+        SeoulDateTimes.toOffset(a.getSubmittedAt()),
         a.getApplication().getStatus());
   }
 }

@@ -47,7 +47,7 @@ class SupportProgramReferenceSeedMigrationTest {
         assertThat(rows.getString("program_kind")).isEqualTo("FACILITY");
       }
     }
-    // Flyway must not rerun the seed on repeated startup.
+    // 서버 재시작 시 Flyway 시드 재실행 방지 검증
     flyway.migrate();
     try (var connection = DriverManager.getConnection(url, "sa", "");
         var st = connection.createStatement();

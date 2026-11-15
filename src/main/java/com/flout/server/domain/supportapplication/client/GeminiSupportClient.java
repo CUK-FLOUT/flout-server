@@ -11,7 +11,6 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Gemini 모델의 ID/판정값만 받아온다. 사업명과 링크는 서비스에서 DB로 다시 조회한다. */
@@ -24,15 +23,18 @@ public class GeminiSupportClient {
   private final String model;
   private final String apiKey;
   private final int readTimeoutMillis;
+  private final GeminiSupportResponseParser responseParser;
 
   public GeminiSupportClient(
       ObjectMapper mapper,
+      GeminiSupportResponseParser responseParser,
       @Value("${app.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
       @Value("${app.gemini.model:gemini-2.5-flash}") String model,
       @Value("${app.gemini.api-key:}") String apiKey,
       @Value("${app.gemini.connect-timeout-millis:3000}") int connectTimeoutMillis,
       @Value("${app.gemini.read-timeout-millis:15000}") int readTimeoutMillis) {
     this.mapper = mapper;
+    this.responseParser = responseParser;
     this.baseUrl = baseUrl;
     this.model = model;
     this.apiKey = apiKey;
@@ -150,31 +152,7 @@ public class GeminiSupportClient {
         log.warn("Gemini 호출 실패: HTTP status={}", result.statusCode());
         throw retryRequired();
       }
-      JsonNode response = mapper.readTree(result.body());
-      String output =
-          response
-              .path("candidates")
-              .path(0)
-              .path("content")
-              .path("parts")
-              .path(0)
-              .path("text")
-              .asText("");
-      if (output.isBlank()) throw retryRequired();
-      JsonNode decision = mapper.readTree(output);
-      JsonNode recommendation = decision.path("recommendation");
-      Long programId =
-          recommendation.path("programId").isIntegralNumber()
-              ? recommendation.path("programId").longValue()
-              : null;
-      return new Decision(
-          decision.path("matchStatus").asText(""),
-          recommendation.path("itemType").asText(""),
-          programId,
-          recommendation.path("guidanceId").asText(null),
-          recommendation.path("matchType").asText(""),
-          recommendation.path("reason").asText(""),
-          readStrings(recommendation.path("missingInformation")));
+      return responseParser.parse(result.body());
     } catch (BaseException e) {
       throw e;
     } catch (InterruptedException e) {
@@ -186,13 +164,6 @@ public class GeminiSupportClient {
       log.warn("Gemini 응답 처리 실패: {}", e.getClass().getSimpleName());
       throw retryRequired();
     }
-  }
-
-  private java.util.List<String> readStrings(JsonNode node) {
-    if (!node.isArray()) return java.util.List.of();
-    java.util.List<String> values = new java.util.ArrayList<>();
-    for (JsonNode element : node) if (element.isTextual()) values.add(element.asText());
-    return java.util.List.copyOf(values);
   }
 
   private BaseException retryRequired() {

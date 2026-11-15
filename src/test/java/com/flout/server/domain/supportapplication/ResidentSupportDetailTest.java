@@ -36,7 +36,7 @@ class ResidentSupportDetailTest {
   long supportId, adminId, residentId;
   String token, residentToken;
 
-  /** Seeds a resident-owned application for the review, approval, and rejection detail views. */
+  /** 검토·승인·미승인 상세 조회를 검증할 주민 신청을 준비한다. */
   @BeforeEach
   void setup() {
 
@@ -212,7 +212,7 @@ class ResidentSupportDetailTest {
         .isEqualTo("SUBMITTED");
   }
 
-  /** Checks access for the owner, another resident, an operator, and an anonymous caller. */
+  /** 신청자, 다른 주민, 운영자, 미인증 요청의 접근 권한을 검증한다. */
   @ParameterizedTest
   @ValueSource(strings = {"review", "approval", "rejection"})
   void onlyTheResidentOwnerCanAccessEachView(String view) throws Exception {
@@ -303,10 +303,7 @@ class ResidentSupportDetailTest {
         .isEqualTo(before);
   }
 
-  /**
-   * Checks that each detail example matches its current state and that operator routes remain
-   * documented.
-   */
+  /** 상세 응답 예시가 각 상태와 일치하고 운영자 API 명세가 유지되는지 검증한다. */
   @Test
   void swaggerDocumentsAllThreeViewsAndKeepsExistingOperatorRoutes() throws Exception {
     var text =

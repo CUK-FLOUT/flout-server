@@ -220,17 +220,17 @@ public class ApplicationHistoriesService {
         List.copyOf(events));
   }
 
-  /** Older history rows without an operator retain an unknown actor. */
+  /** 운영자 정보가 없는 기존 이력의 처리자가 미상으로 남는지 검증한다. */
   private static ActorType actorType(User actor) {
     return actor == null ? ActorType.UNKNOWN : ActorType.ADMIN;
   }
 
-  /** Returns the stored actor ID when the history still references a user. */
+  /** 사용자 참조가 남은 이력의 처리자 ID가 반환되는지 검증한다. */
   private static Long userId(User actor) {
     return actor == null ? null : actor.getId();
   }
 
-  /** Keeps the actor name absent when no user can be attributed. */
+  /** 처리자를 확인할 수 없으면 이름이 비어 있는지 검증한다. */
   private static String userName(User actor) {
     return actor == null ? null : actor.getName();
   }

@@ -53,7 +53,7 @@ class InspectionPhotoDeleteTest {
   String token, residentToken;
   byte[] png, jpeg;
 
-  /** Seeds an inspection and operator with isolated photo metadata and cleanup intents. */
+  /** 사진 메타데이터와 정리 요청을 분리해 검증할 점검과 운영자를 준비한다. */
   @BeforeEach
   void setup() throws Exception {
     reset(photos);
@@ -138,7 +138,7 @@ class InspectionPhotoDeleteTest {
     return "/api/admin/inspections/" + inspectionId + "/attachments";
   }
 
-  /** Uploads the draft files through the API with optional authentication. */
+  /** 인증 정보의 유무를 지정해 API로 초안 사진을 등록한다. */
   org.springframework.test.web.servlet.ResultActions upload(
       String access, MockMultipartFile... files) throws Exception {
     var req = multipart(path());
@@ -183,7 +183,7 @@ class InspectionPhotoDeleteTest {
         "SELECT object_key FROM inspection_result_photos WHERE photo_id=?", String.class, id);
   }
 
-  /** Exercises deletion with caller-supplied IDs and optional authentication. */
+  /** 지정한 ID와 선택적으로 제공한 인증 정보로 사진 삭제를 요청한다. */
   org.springframework.test.web.servlet.ResultActions remove(
       String inspection, String photo, String access) throws Exception {
     var request = delete("/api/admin/inspections/" + inspection + "/attachments/" + photo);
@@ -400,9 +400,7 @@ class InspectionPhotoDeleteTest {
     }
   }
 
-  /**
-   * Races publication against deletion of the only draft photo to verify the publication invariant.
-   */
+  /** 결과 공개와 마지막 초안 사진 삭제가 겹쳐도 공개본에 사진이 남는지 검증한다. */
   @Test
   void concurrentPublicationCannotLoseItsRequiredPhoto() throws Exception {
     long id = addPhoto();

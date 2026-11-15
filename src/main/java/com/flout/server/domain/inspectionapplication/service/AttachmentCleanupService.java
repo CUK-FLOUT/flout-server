@@ -50,7 +50,7 @@ public class AttachmentCleanupService {
           "INSERT INTO attachment_upload_intents (object_key, created_at) VALUES (?, ?)", key, now);
   }
 
-  // Called inside the upload transaction. A reconciler must wait for its outcome.
+  // 업로드 트랜잭션 안에서 호출하므로 정리 작업은 트랜잭션이 끝날 때까지 기다린다.
   public void lock(String key) {
     if (jdbc.queryForList(
             "SELECT object_key FROM attachment_upload_intents WHERE object_key = ? FOR UPDATE",
@@ -61,7 +61,7 @@ public class AttachmentCleanupService {
     }
   }
 
-  // Removing the intent and saving the attachment commit atomically.
+  // 정리 기록 삭제와 첨부파일 저장을 같은 트랜잭션에서 커밋한다.
   public void completed(String key) {
     jdbc.update("DELETE FROM attachment_upload_intents WHERE object_key = ?", key);
   }
@@ -92,7 +92,7 @@ public class AttachmentCleanupService {
                       key);
               if (count == 0) {
                 storage.delete(key);
-                // A timed-out PUT may finish after the first DELETE. Repeat after the grace period.
+                // 타임아웃된 PUT이 첫 DELETE 이후 완료될 수 있으므로 유예 시간 뒤 다시 삭제한다.
                 if (created.getFirst().isAfter(LocalDateTime.now().minusHours(1))) return;
               }
               jdbc.update("DELETE FROM attachment_upload_intents WHERE object_key = ?", key);

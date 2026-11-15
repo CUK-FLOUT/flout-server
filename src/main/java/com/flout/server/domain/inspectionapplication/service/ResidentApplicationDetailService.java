@@ -32,6 +32,7 @@ public class ResidentApplicationDetailService {
             .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
     if (user.getRole() != UserRole.RESIDENT)
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
+    // 내 신청 목록에서는 임시 저장 건을 제외한다.
     var rows = applications.findResidentApplications(userId);
     var progress = progressReader.read(rows);
     return rows.stream()

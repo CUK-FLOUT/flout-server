@@ -28,7 +28,7 @@ public class InspectionResultReader {
   private final InspectionResultPhotoRepository photos;
 
   /**
-   * 운영자 권한과 관할을 검증하고 초안 우선으로 점검 결과와 사진 메타데이터를 조회합니다.
+   * 운영자 권한과 관할을 검증하고 초안 우선으로 점검 결과와 사진 메타데이터를 조회한다.
    *
    * @param operatorId 조회하는 운영자 ID
    * @param inspectionId 현장점검 ID

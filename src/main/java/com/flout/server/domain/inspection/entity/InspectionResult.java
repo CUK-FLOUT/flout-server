@@ -76,7 +76,7 @@ public class InspectionResult {
     this.internalMemo = internalMemo;
   }
 
-  // 목록만 바뀌거나 내용이 같아도 마지막 초안 저장 시각을 갱신합니다.
+  // 목록만 바뀌거나 내용이 같아도 초안 저장 시각을 갱신한다.
   public void updateDraftContent(String summary, String followUpType, String internalMemo) {
     if (resultStatus != ResultStatus.DRAFT) {
       throw new IllegalStateException("초안만 임시저장할 수 있습니다.");

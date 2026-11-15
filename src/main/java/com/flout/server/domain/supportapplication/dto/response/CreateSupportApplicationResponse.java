@@ -1,8 +1,9 @@
 package com.flout.server.domain.supportapplication.dto.response;
 
 import com.flout.server.domain.supportapplication.entity.*;
+import com.flout.server.global.time.SeoulDateTimes;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.*;
+import java.time.OffsetDateTime;
 import java.util.Locale;
 
 public record CreateSupportApplicationResponse(
@@ -18,7 +19,7 @@ public record CreateSupportApplicationResponse(
     @Schema(description = "지원 신청 생성 시각", example = "2026-11-03T14:00:00+09:00")
         OffsetDateTime createdAt) {
   public static CreateSupportApplicationResponse from(SupportApplication application) {
-    var submittedAt = toOffset(application.getSubmittedAt());
+    var submittedAt = SeoulDateTimes.toOffset(application.getSubmittedAt());
     return new CreateSupportApplicationResponse(
         application.getId(),
         application.getApplication().getId(),
@@ -28,15 +29,6 @@ public record CreateSupportApplicationResponse(
         String.format(Locale.ROOT, "%06d", application.getApplication().getId()),
         application.getApplicantName(),
         application.getProgram().getName(),
-        toOffset(application.getCreatedAt()));
-  }
-
-  private static OffsetDateTime toOffset(LocalDateTime value) {
-    return value == null
-        ? null
-        : value
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime();
+        SeoulDateTimes.toOffset(application.getCreatedAt()));
   }
 }

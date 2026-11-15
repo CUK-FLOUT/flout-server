@@ -68,7 +68,7 @@ public class SupportApplication {
   @Column(name = "rejection_reason", length = 500)
   private String rejectionReason;
 
-  // 기존 컬럼명을 유지하며 승인·미승인 결정의 처리자와 처리 시각으로 공용 사용한다.
+  // 기존 컬럼에 승인과 미승인의 처리자와 처리 시각을 저장한다.
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "approved_by_user_id")
   private User approvedBy;

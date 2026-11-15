@@ -248,6 +248,8 @@ class AdminPublicIssueListTest {
     for (var values :
         List.of(
             new String[] {"district", "중구"},
+            new String[] {"status", "INSPECTION_REQUIRED"},
+            new String[] {"status", "ACTION_IN_PROGRESS"},
             new String[] {"status", "UNKNOWN"},
             new String[] {"issueType", "UNKNOWN"},
             new String[] {"page", "-1"},
@@ -287,22 +289,6 @@ class AdminPublicIssueListTest {
         "검토 중",
         "UNDER_REVIEW");
     addIssue(
-        "부천시 원미구 중앙로 3",
-        37.5020000,
-        126.7600000,
-        "REPEATED_FLOODING",
-        "중앙 배수로 반복 침수",
-        "현장점검 필요",
-        "INSPECTION_REQUIRED");
-    addIssue(
-        "부천시 소사구 남부로 1",
-        37.4700000,
-        126.7900000,
-        "SEWAGE_BACKFLOW",
-        "하수 역류",
-        "조치 진행",
-        "ACTION_IN_PROGRESS");
-    addIssue(
         "부천시 오정구 북부로 1",
         37.5200000,
         126.7800000,
@@ -322,10 +308,9 @@ class AdminPublicIssueListTest {
     mvc.perform(get("/api/admin/public-issues/status").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("PUBLIC_ISSUE_200_6"))
-        .andExpect(jsonPath("$.result.length()").value(4))
-        .andExpect(jsonPath("$.result.registeredCount").value(5))
-        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(3))
-        .andExpect(jsonPath("$.result.actionInProgressCount").value(1))
+        .andExpect(jsonPath("$.result.length()").value(3))
+        .andExpect(jsonPath("$.result.registeredCount").value(3))
+        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(2))
         .andExpect(jsonPath("$.result.completedCount").value(1));
 
     mvc.perform(
@@ -335,9 +320,8 @@ class AdminPublicIssueListTest {
                 .param("issueType", "REPEATED_FLOODING")
                 .param("keyword", "  중앙  "))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.registeredCount").value(3))
-        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(3))
-        .andExpect(jsonPath("$.result.actionInProgressCount").value(0))
+        .andExpect(jsonPath("$.result.registeredCount").value(2))
+        .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(2))
         .andExpect(jsonPath("$.result.completedCount").value(0));
 
     mvc.perform(
@@ -347,7 +331,6 @@ class AdminPublicIssueListTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.registeredCount").value(0))
         .andExpect(jsonPath("$.result.pendingOrUnderReviewCount").value(0))
-        .andExpect(jsonPath("$.result.actionInProgressCount").value(0))
         .andExpect(jsonPath("$.result.completedCount").value(0));
   }
 
@@ -434,6 +417,8 @@ class AdminPublicIssueListTest {
     for (var values :
         List.of(
             new String[] {"district", "중구"},
+            new String[] {"status", "INSPECTION_REQUIRED"},
+            new String[] {"status", "ACTION_IN_PROGRESS"},
             new String[] {"status", "UNKNOWN"},
             new String[] {"issueType", "UNKNOWN"},
             new String[] {"keyword", "가".repeat(256)}))

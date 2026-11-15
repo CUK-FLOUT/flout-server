@@ -3,8 +3,8 @@ package com.flout.server.domain.publicissue.dto.response;
 import com.flout.server.domain.publicissue.entity.FacilityReview;
 import com.flout.server.domain.publicissue.entity.FacilityReviewStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 
 public record SaveFacilityReviewResponse(
     Long reviewId,
@@ -26,10 +26,6 @@ public record SaveFacilityReviewResponse(
         review.getInspectionNote(),
         review.getReviewReason(),
         review.getReviewer().getId(),
-        review
-            .getReviewedAt()
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime());
+        SeoulDateTimes.toOffset(review.getReviewedAt()));
   }
 }

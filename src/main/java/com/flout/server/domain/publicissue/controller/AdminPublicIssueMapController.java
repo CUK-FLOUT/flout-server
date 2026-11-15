@@ -33,9 +33,7 @@ public class AdminPublicIssueMapController {
       @Parameter(description = "원미구·소사구·오정구. 생략·빈 값이면 관할 전체", example = "원미구")
           @RequestParam(defaultValue = "")
           String district,
-      @Parameter(
-              description =
-                  "처리 상태. RECEIVED, UNDER_REVIEW, INSPECTION_REQUIRED, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
+      @Parameter(description = "처리 상태. RECEIVED, UNDER_REVIEW, COMPLETED. 생략·빈 값이면 전체")
           @RequestParam(required = false)
           String status,
       @Parameter(
