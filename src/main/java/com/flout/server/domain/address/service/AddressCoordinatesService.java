@@ -31,13 +31,7 @@ public class AddressCoordinatesService {
               .filter(Objects::nonNull)
               .filter(
                   d -> "ROAD_ADDR".equals(d.addressType()) || "REGION_ADDR".equals(d.addressType()))
-              .filter(
-                  d ->
-                      normalized.equals(normalize(d.addressName()))
-                          || (d.address() != null
-                              && normalized.equals(normalize(d.address().addressName())))
-                          || (d.roadAddress() != null
-                              && normalized.equals(normalize(d.roadAddress().addressName()))))
+              .filter(d -> matchesAddress(d, normalized))
               .toList();
       // 직접 일치하는 주소를 우선하고 중복 결과를 제거한 뒤 유일한 좌표만 반환한다.
       var direct =
@@ -45,14 +39,7 @@ public class AddressCoordinatesService {
       var preferred = direct.isEmpty() ? candidates : direct;
       var unique = new LinkedHashMap<String, Document>();
       for (var candidate : preferred) {
-        String identity = normalize(candidate.addressName());
-        if (identity.isEmpty()) {
-          identity =
-              "ROAD_ADDR".equals(candidate.addressType()) && candidate.roadAddress() != null
-                  ? normalize(candidate.roadAddress().addressName())
-                  : candidate.address() == null ? "" : normalize(candidate.address().addressName());
-        }
-        unique.putIfAbsent(identity, candidate);
+        unique.putIfAbsent(candidateIdentity(candidate), candidate);
       }
       var matches = unique.values().stream().toList();
       if (matches.size() != 1)
@@ -76,6 +63,25 @@ public class AddressCoordinatesService {
               ? AddressErrorCode.KAKAO_API_TIMEOUT
               : AddressErrorCode.KAKAO_API_ERROR);
     }
+  }
+
+  private boolean matchesAddress(Document document, String normalized) {
+    return normalized.equals(normalize(document.addressName()))
+        || (document.address() != null
+            && normalized.equals(normalize(document.address().addressName())))
+        || (document.roadAddress() != null
+            && normalized.equals(normalize(document.roadAddress().addressName())));
+  }
+
+  private String candidateIdentity(Document candidate) {
+    String identity = normalize(candidate.addressName());
+    if (identity.isEmpty()) {
+      identity =
+          "ROAD_ADDR".equals(candidate.addressType()) && candidate.roadAddress() != null
+              ? normalize(candidate.roadAddress().addressName())
+              : candidate.address() == null ? "" : normalize(candidate.address().addressName());
+    }
+    return identity;
   }
 
   private String normalize(String value) {
