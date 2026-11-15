@@ -185,8 +185,9 @@ class SupportApplicationTest {
 
     assertThat(result.path("supportApplicationId").asLong())
         .isEqualTo(((Number) row.get("SUPPORT_APPLICATION_ID")).longValue());
-    assertThat(java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toInstant())
-        .isEqualTo(((java.sql.Timestamp) row.get("CREATED_AT")).toInstant());
+    assertThat(
+            java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toLocalDateTime())
+        .isEqualTo(((java.sql.Timestamp) row.get("CREATED_AT")).toLocalDateTime());
     if ("TENANT".equals(occupancy)) {
       assertThat(row.get("SUBMITTED_AT")).isNull();
       assertThat(result.path("submittedAt").isNull()).isTrue();
