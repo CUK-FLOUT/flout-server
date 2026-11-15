@@ -12,7 +12,7 @@ public record SaveFacilityReviewRequest(
         @Schema(type = "string", description = "검토 대상", example = "빗물받이")
         String reviewTarget,
     @NotNull @Schema(
-            allowableValues = {"PENDING", "UNDER_REVIEW", "INSPECTION_REQUIRED"},
+            allowableValues = {"PENDING", "UNDER_REVIEW"},
             example = "UNDER_REVIEW")
         FacilityReviewStatus reviewStatus,
     @NotBlank @Size(max = 4000) @JsonDeserialize(using = CreatePublicIssueRequest.StrictString.class)

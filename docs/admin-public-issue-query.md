@@ -19,8 +19,7 @@ Swagger 그룹: `운영자-공공인프라`
 같은 조건으로 등록·검토·조치·완료 건수를 반환합니다.
 
 - `district`: 빈 값, `원미구`, `소사구`, `오정구`
-- `status`: `RECEIVED`, `UNDER_REVIEW`, `INSPECTION_REQUIRED`,
-  `ACTION_IN_PROGRESS`, `COMPLETED`
+- `status`: `RECEIVED`, `UNDER_REVIEW`, `COMPLETED`
 - `issueType`: `REPEATED_FLOODING`, `SEWAGE_BACKFLOW`,
   `POOR_ROAD_DRAINAGE`, `BLOCKED_STORM_DRAIN`
 - `keyword`: 주소·문제 상세·현장 확인 내용 부분 검색, 최대 255자
