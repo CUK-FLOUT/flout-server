@@ -23,7 +23,9 @@ public enum ConstructionErrorCode implements BaseResponseCode {
   PHOTO_UPLOAD_FAILED(500, "CONSTRUCTION_500_1", "시공 사진 업로드에 실패했습니다."),
   COMPLETION_PHOTO_REQUIRED(400, "CONSTRUCTION_400_4", "전체 완료하려면 시공 사진을 최소 1장 업로드해주세요."),
   ALREADY_COMPLETED(409, "CONSTRUCTION_409_4", "이미 전체 완료된 시공입니다."),
-  SCHEDULE_REQUIRED(409, "CONSTRUCTION_409_5", "시공 일정을 저장한 후 전체 완료할 수 있습니다.");
+  SCHEDULE_REQUIRED(409, "CONSTRUCTION_409_5", "시공 일정을 저장한 후 전체 완료할 수 있습니다."),
+  VISIT_NOT_STARTED(409, "CONSTRUCTION_409_8", "확정 시공 방문 시각 전에는 전체 완료할 수 없습니다."),
+  NOT_IN_PROGRESS(409, "CONSTRUCTION_409_9", "시공이 진행 중으로 전환된 후 전체 완료할 수 있습니다.");
 
   private final int status;
   private final String code;

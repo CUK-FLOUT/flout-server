@@ -1550,7 +1550,10 @@ class PriorityInspectionDesignationTest {
   void completionAndOrderShareJurisdictionLock(boolean completionFirst) throws Exception {
     var second = additionalApplication("부천시 길주로 211");
     bulk(List.of(applicationId, second), true).andExpect(status().isOk());
-    jdbc.update("UPDATE inspections SET status='IN_PROGRESS' WHERE inspection_id=?", inspectionId);
+    jdbc.update(
+        "UPDATE inspections SET status='IN_PROGRESS',inspector_user_id=?,scheduled_at='2020-01-01 10:00:00' WHERE inspection_id=?",
+        operatorId,
+        inspectionId);
     jdbc.update(
         "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
         inspectionId);

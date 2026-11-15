@@ -83,7 +83,9 @@ class InspectionResultDraftTest {
             Long.class,
             assessmentId);
     jdbc.update(
-        "INSERT INTO inspections(application_id,status) VALUES(?,'IN_PROGRESS')", applicationId);
+        "INSERT INTO inspections(application_id,status,inspector_user_id,scheduled_at) VALUES(?,'IN_PROGRESS',?,'2020-01-01 10:00:00')",
+        applicationId,
+        operatorId);
     inspectionId =
         jdbc.queryForObject(
             "SELECT inspection_id FROM inspections WHERE application_id=?",
@@ -181,11 +183,43 @@ class InspectionResultDraftTest {
 
   /** 결과 공개 시 별도 상태 API 없이 완료 상태와 이력을 저장하는지 검증한다. */
   @ParameterizedTest
-  @ValueSource(strings = {"RECEIVED", "SCHEDULED", "IN_PROGRESS"})
+  @ValueSource(
+      strings = {"RECEIVED", "SCHEDULED", "IN_PROGRESS", "UNASSIGNED", "NO_SCHEDULE", "FUTURE"})
   void publishingCompletesInspectionWithoutStatusPatch(String previous) throws Exception {
-    jdbc.update("UPDATE inspections SET status=? WHERE inspection_id=?", previous, inspectionId);
+    switch (previous) {
+      case "UNASSIGNED" ->
+          jdbc.update(
+              "UPDATE inspections SET inspector_user_id=NULL WHERE inspection_id=?", inspectionId);
+      case "NO_SCHEDULE" ->
+          jdbc.update(
+              "UPDATE inspections SET scheduled_at=NULL WHERE inspection_id=?", inspectionId);
+      case "FUTURE" ->
+          jdbc.update(
+              "UPDATE inspections SET scheduled_at='2099-01-01 10:00:00' WHERE inspection_id=?",
+              inspectionId);
+      default ->
+          jdbc.update(
+              "UPDATE inspections SET status=? WHERE inspection_id=?", previous, inspectionId);
+    }
     entityManager.clear();
     addPhoto();
+    if (!"IN_PROGRESS".equals(previous)) {
+      mvc.perform(
+              post("/api/admin/inspections/" + inspectionId + "/result")
+                  .header("Authorization", "Bearer " + token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(full())))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.code").value("INSPECTION_409_1"));
+      assertThat(count("inspection_status_histories")).isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT result_status FROM inspection_results WHERE inspection_id=?",
+                  String.class,
+                  inspectionId))
+          .isEqualTo("DRAFT");
+      return;
+    }
     mvc.perform(
             post("/api/admin/inspections/" + inspectionId + "/result")
                 .header("Authorization", "Bearer " + token)

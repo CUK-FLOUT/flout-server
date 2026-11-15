@@ -401,6 +401,10 @@ class ApplicationHistoriesTest {
     empty();
     long inspection = inspection();
     jdbc.update(
+        "UPDATE inspections SET inspector_user_id=?,scheduled_at='2020-01-01 10:00:00' WHERE inspection_id=?",
+        adminId,
+        inspection);
+    jdbc.update(
         "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
         inspection);
     long result = jdbc.queryForObject("SELECT result_id FROM inspection_results", Long.class);

@@ -415,6 +415,9 @@ class InspectionAssignmentTest {
   @Test
   void completionHistoryFailureRollsBackResultAndInspection() throws Exception {
     save(request()).andExpect(status().isOk());
+    when(inspectionClock.instant())
+        .thenReturn(LocalDateTime.of(2030, 1, 3, 14, 0).atZone(SEOUL).toInstant());
+    assertThat(service.startIfDue(inspectionId)).isTrue();
     jdbc.update(
         "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
         inspectionId);
@@ -430,7 +433,7 @@ class InspectionAssignmentTest {
                     "{\"summary\":\"결과\",\"vulnerabilities\":[{\"type\":\"ENTRANCE\",\"title\":\"출입구\",\"expertOpinion\":\"의견\"}],\"recommendedActions\":[{\"description\":\"조치\"}],\"followUpType\":\"INDIVIDUAL_HOUSE\"}"))
         .andExpect(status().isInternalServerError());
     assertThat(inspections.findById(inspectionId).orElseThrow().getStatus())
-        .isEqualTo(InspectionStatus.SCHEDULED);
+        .isEqualTo(InspectionStatus.IN_PROGRESS);
     assertThat(applications.findById(applicationId).orElseThrow().getStatus())
         .isEqualTo(InspectionApplicationStatus.RECEIVED);
     assertThat(
@@ -445,7 +448,7 @@ class InspectionAssignmentTest {
                 String.class,
                 inspectionId))
         .isNull();
-    assertThat(histories.count()).isEqualTo(1);
+    assertThat(histories.count()).isEqualTo(2);
   }
 
   /** 배정 이력 저장 실패 시 담당자·일정·상태가 모두 롤백되는지 검증한다. */

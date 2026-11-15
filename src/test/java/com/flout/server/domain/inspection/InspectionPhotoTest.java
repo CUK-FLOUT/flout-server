@@ -95,7 +95,9 @@ class InspectionPhotoTest {
             Long.class,
             assessment);
     jdbc.update(
-        "INSERT INTO inspections(application_id,status) VALUES(?,'IN_PROGRESS')", applicationId);
+        "INSERT INTO inspections(application_id,status,inspector_user_id,scheduled_at) VALUES(?,'IN_PROGRESS',?,'2020-01-01 10:00:00')",
+        applicationId,
+        adminId);
     inspectionId =
         jdbc.queryForObject(
             "SELECT inspection_id FROM inspections WHERE application_id=?",
