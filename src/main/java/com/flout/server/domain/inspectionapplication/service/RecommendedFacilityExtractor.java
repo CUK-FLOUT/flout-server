@@ -10,7 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
-/** 명시적인 시설명과 설치 구문만 인정하는 보수적 규칙. */
+/** 명시적인 시설명과 설치 구문만 인정한다. */
 @Component
 public class RecommendedFacilityExtractor {
   private static final Map<String, String> NAMES = names();

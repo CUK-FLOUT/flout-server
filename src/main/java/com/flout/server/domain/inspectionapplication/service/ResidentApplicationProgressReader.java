@@ -42,12 +42,14 @@ public class ResidentApplicationProgressReader {
     var resultByInspection =
         published.stream()
             .collect(Collectors.toMap(r -> r.getInspection().getId(), Function.identity()));
+    // 임시 저장을 제외하고 신청별 최신 접수 지원 건 선택
     var supportRows =
         supports.findByApplicationIdInAndStatusNotOrderBySubmittedAtDescIdDesc(
             ids, SupportApplicationStatus.DRAFT);
     Map<Long, SupportApplication> supportByApplication = new HashMap<>();
     for (var support : supportRows)
       supportByApplication.putIfAbsent(support.getApplication().getId(), support);
+    // 시공 조회 대상은 최신 지원이 승인된 건으로 제한
     var approvedIds =
         supportByApplication.values().stream()
             .filter(s -> s.getStatus() == SupportApplicationStatus.APPROVED)

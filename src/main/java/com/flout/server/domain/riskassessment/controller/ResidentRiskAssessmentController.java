@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/risk-assessments")
-@Tag(name = "주민-AI취약도 분석")
+@Tag(name = "주민-AI취약도 분석", description = "주민 주소 기반 침수 취약도 분석과 맞춤 예방 가이드")
 public class ResidentRiskAssessmentController {
   private final RiskAssessmentService service;
 

@@ -19,6 +19,7 @@ public class TokenRefreshService {
 
   @Transactional
   public LoginResponse refresh(String raw) {
+    // 기존 리프레시 토큰을 한 번만 사용할 수 있도록 재발급 전에 소비한다.
     Long userId = refreshTokens.consume(raw);
     var user =
         users

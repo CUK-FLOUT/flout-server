@@ -33,7 +33,6 @@ public class AdminPublicIssueController {
   private final AdminPublicIssueDetailService detailService;
   private final PublicIssueRelatedApplicationService relatedApplicationService;
 
-  // 지역·공공 문제 목록 조회
   @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역·공공 문제 목록 조회·검색",
@@ -44,9 +43,7 @@ public class AdminPublicIssueController {
       @Parameter(description = "원미구·소사구·오정구. 생략·빈 값이면 관할 전체", example = "원미구")
           @RequestParam(defaultValue = "")
           String district,
-      @Parameter(
-              description =
-                  "처리 상태. RECEIVED, UNDER_REVIEW, INSPECTION_REQUIRED, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
+      @Parameter(description = "처리 상태. RECEIVED, UNDER_REVIEW, COMPLETED. 생략·빈 값이면 전체")
           @RequestParam(required = false)
           String status,
       @Parameter(
@@ -68,12 +65,11 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.LIST_FOUND);
   }
 
-  // 지역·공공 문제 현황 조회
   @GetMapping(value = "/status", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역·공공 문제 현황 건수 조회",
       description =
-          "인증된 부천시 운영자의 지역·공공 문제 현황을 조회합니다. 등록 전체, 검토 대기·검토 중·현장점검 필요, 조치 진행, 조치 완료 건수를 반환하며 지역·문제 유형·검색어 조건을 동일하게 적용합니다.")
+          "인증된 부천시 운영자의 지역·공공 문제 현황을 조회합니다. 등록 전체, 검토 대기·검토 중, 조치 완료 건수를 반환하며 지역·문제 유형·검색어 조건을 동일하게 적용합니다.")
   public SuccessResponse<AdminPublicIssueStatusResponse> status(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "원미구·소사구·오정구. 생략·빈 값이면 관할 전체", example = "원미구")
@@ -93,7 +89,6 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.STATUS_FOUND);
   }
 
-  // 지역·공공 문제 상세 조회
   @GetMapping(value = "/{publicIssueId}", produces = MediaType.APPLICATION_JSON_VALUE)
   @Operation(
       summary = "지역 문제·참고 정보 상세 조회",
@@ -108,7 +103,6 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.DETAIL_FOUND);
   }
 
-  // 지역·공공 문제 등록
   @PostMapping(
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
@@ -124,13 +118,16 @@ public class AdminPublicIssueController {
         PublicIssueSuccessCode.REGISTERED);
   }
 
-  // 공공시설 관련 주민 신청 목록 조회 (PR #202)
   @GetMapping(
       value = "/{publicIssueId}/resident-applications",
       produces = MediaType.APPLICATION_JSON_VALUE)
-  @Operation(summary = "공공시설 관련 주민 신청 목록 조회", description = "공공시설 문제와 주소가 동일한 주민 신청 목록을 조회합니다.")
+  @Operation(
+      summary = "공공시설 관련 주민 신청 목록 조회",
+      description =
+          "인증된 부천시 운영자가 공공시설 문제 주소와 정규화된 주소가 같은 주민 신청을 조회합니다. 주소 앞뒤 공백·연속 공백과 '경기/경기도' 표기를 정규화하며 데이터를 변경하지 않습니다.")
   public SuccessResponse<RelatedApplicationsResponse> getRelatedApplications(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable Long publicIssueId) {
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "지역·공공 문제 ID", example = "1") @PathVariable Long publicIssueId) {
 
     return SuccessResponse.of(
         relatedApplicationService.getRelated(Long.valueOf(jwt.getSubject()), publicIssueId),

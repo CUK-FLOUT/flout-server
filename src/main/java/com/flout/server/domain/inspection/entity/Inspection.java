@@ -80,7 +80,7 @@ public class Inspection {
     this.updatedAt = now;
   }
 
-  /** 결과 공개와 같은 트랜잭션에서 점검을 완료합니다. */
+  /** 결과 공개와 같은 트랜잭션에서 점검을 완료한다. */
   public void complete(LocalDateTime now) {
     status = InspectionStatus.COMPLETED;
     updatedAt = now;

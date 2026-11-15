@@ -128,7 +128,7 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(errorResponse.getStatus()).body(errorResponse);
   }
 
-  // 연결이 종료된 비동기 요청에는 응답하지 않음
+  // 연결이 종료된 비동기 요청에는 응답하지 않는다.
   @ExceptionHandler(AsyncRequestNotUsableException.class)
   public void handleAsyncRequestNotUsableException(AsyncRequestNotUsableException e) {
     log.debug("AsyncRequestNotUsableException : 클라이언트 연결 종료 - {}", e.getMessage());
@@ -173,7 +173,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(ErrorResponse.from(code));
       }
     }
-    // 예외의 상세 사유는 응답에 노출하지 않음
+    // 예외의 상세 사유는 응답에 노출하지 않는다.
     String message = "요청 처리에 실패했습니다.";
     return ResponseEntity.status(status)
         .body(ErrorResponse.of(status, "COMMON_" + status + "_1", message));

@@ -411,7 +411,7 @@ class InspectionAssignmentTest {
                 .value("INSPECTION_409_1"));
   }
 
-  /** 완료 이력 저장 실패 시 공개 내용과 신청·점검 상태가 모두 롤백되는지 검증합니다. */
+  /** 완료 이력 저장 실패 시 공개 내용과 신청·점검 상태가 모두 롤백되는지 검증한다. */
   @Test
   void completionHistoryFailureRollsBackResultAndInspection() throws Exception {
     save(request()).andExpect(status().isOk());
@@ -448,7 +448,7 @@ class InspectionAssignmentTest {
     assertThat(histories.count()).isEqualTo(1);
   }
 
-  /** 배정 이력 저장 실패 시 담당자·일정·상태가 모두 롤백되는지 검증합니다. */
+  /** 배정 이력 저장 실패 시 담당자·일정·상태가 모두 롤백되는지 검증한다. */
   @Test
   void assignmentHistoryFailureRollsBackAssignmentAndStatus() throws Exception {
     doThrow(new IllegalStateException("history failure")).when(histories).saveAndFlush(any());

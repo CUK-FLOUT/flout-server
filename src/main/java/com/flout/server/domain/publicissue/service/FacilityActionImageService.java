@@ -1,13 +1,9 @@
 package com.flout.server.domain.publicissue.service;
 
-import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
-import com.flout.server.domain.inspection.service.InspectionPhotoValidator;
-import com.flout.server.domain.inspection.service.InspectionPhotoValidator.ValidatedPhoto;
 import com.flout.server.domain.inspectionapplication.service.AttachmentCleanupService;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.publicissue.dto.request.CompletePublicIssueActionRequest;
 import com.flout.server.domain.publicissue.dto.response.CompletePublicIssueActionResponse;
-import com.flout.server.domain.publicissue.dto.response.FacilityActionImageUploadResponse;
 import com.flout.server.domain.publicissue.entity.FacilityActionImage;
 import com.flout.server.domain.publicissue.entity.PublicIssueAction;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
@@ -16,8 +12,8 @@ import com.flout.server.domain.publicissue.repository.FacilityReviewRepository;
 import com.flout.server.domain.publicissue.repository.PublicIssueActionRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -40,7 +36,7 @@ public class FacilityActionImageService {
   private final FacilityActionImageRepository images;
   private final AttachmentStorage storage;
   private final AttachmentCleanupService cleanup;
-  private final InspectionPhotoValidator validator;
+  private final PublicIssueActionImageValidator validator;
   private final TransactionTemplate transactions;
 
   public FacilityActionImageService(
@@ -50,7 +46,7 @@ public class FacilityActionImageService {
       FacilityActionImageRepository images,
       AttachmentStorage storage,
       AttachmentCleanupService cleanup,
-      InspectionPhotoValidator validator,
+      PublicIssueActionImageValidator validator,
       PlatformTransactionManager manager) {
 
     this.access = access;
@@ -66,6 +62,10 @@ public class FacilityActionImageService {
     transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
   }
 
+  /**
+   * 사진을 외부 저장소에 먼저 올린 뒤 새 조치·사진·문제 상태를 한 DB 트랜잭션으로 확정한다. 중간 실패 객체는 업로드 의도 레코드를 통해 정리하고, 외부 호출 중에는
+   * DB 잠금을 유지하지 않는다.
+   */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public CompletePublicIssueActionResponse complete(
       Long operatorId,
@@ -73,15 +73,13 @@ public class FacilityActionImageService {
       CompletePublicIssueActionRequest request,
       List<MultipartFile> files) {
 
-    // 1. 권한, 완료 여부, 검토 정보 확인
     transactions.executeWithoutResult(status -> checkAllowed(operatorId, publicIssueId));
 
-    // 2. 사진은 최소 한 장 필수
     if (files == null || files.isEmpty()) {
       throw new BaseException(PublicIssueErrorCode.EMPTY_ACTION_IMAGES);
     }
 
-    var validated = files.stream().map(this::validate).toList();
+    var validated = files.stream().map(validator::validate).toList();
 
     // actionId는 아직 생성 전이므로 UUID 기반 객체 키 사용
     var keys =
@@ -90,19 +88,16 @@ public class FacilityActionImageService {
             .toList();
 
     try {
-      // 3. 실패 시 정리할 수 있도록 객체 키 등록
       cleanup.register(keys);
 
-      // 4. S3 사진 업로드
       for (int i = 0; i < validated.size(); i++) {
         var file = validated.get(i);
 
-        storage.upload(keys.get(i), bytesForUpload(file), file.contentType());
+        storage.upload(keys.get(i), validator.bytesForUpload(file), file.contentType());
       }
 
       var urls = keys.stream().map(storage::readUrl).toList();
 
-      // 5. 업로드 성공 후 DB 트랜잭션에서 완료 확정
       var result =
           transactions.execute(
               status -> {
@@ -132,7 +127,7 @@ public class FacilityActionImageService {
 
                 var uploadedAt = LocalDateTime.now();
 
-                List<FacilityActionImageUploadResponse.Image> saved = new ArrayList<>();
+                List<CompletePublicIssueActionResponse.Image> saved = new ArrayList<>();
 
                 for (int i = 0; i < keys.size(); i++) {
                   var image =
@@ -140,14 +135,10 @@ public class FacilityActionImageService {
                           FacilityActionImage.create(action, keys.get(i), uploadedAt));
 
                   saved.add(
-                      new FacilityActionImageUploadResponse.Image(
+                      new CompletePublicIssueActionResponse.Image(
                           image.getId(),
                           urls.get(i),
-                          image
-                              .getUploadedAt()
-                              .atZone(ZoneId.systemDefault())
-                              .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-                              .toOffsetDateTime()));
+                          SeoulDateTimes.toOffset(image.getUploadedAt())));
 
                   cleanup.completed(keys.get(i));
                 }
@@ -163,7 +154,6 @@ public class FacilityActionImageService {
 
     } catch (RuntimeException e) {
 
-      // 업로드 도중 실패했다면 객체 정리
       cleanup.reconcile(keys);
 
       if (e instanceof BaseException base) {
@@ -192,35 +182,5 @@ public class FacilityActionImageService {
     }
 
     return authorized;
-  }
-
-  private ValidatedPhoto validate(MultipartFile file) {
-    try {
-      return validator.validate(file);
-
-    } catch (BaseException e) {
-      if (e.getBaseResponseCode() == InspectionErrorCode.EMPTY_PHOTOS) {
-        throw new BaseException(PublicIssueErrorCode.EMPTY_ACTION_IMAGES);
-      }
-
-      if (e.getBaseResponseCode() == InspectionErrorCode.INVALID_PHOTOS) {
-        throw new BaseException(PublicIssueErrorCode.INVALID_ACTION_IMAGES);
-      }
-
-      throw e;
-    }
-  }
-
-  private byte[] bytesForUpload(ValidatedPhoto file) {
-    try {
-      return validator.bytesForUpload(file);
-
-    } catch (BaseException e) {
-      if (e.getBaseResponseCode() == InspectionErrorCode.INVALID_PHOTOS) {
-        throw new BaseException(PublicIssueErrorCode.INVALID_ACTION_IMAGES);
-      }
-
-      throw e;
-    }
   }
 }

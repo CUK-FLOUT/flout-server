@@ -5,6 +5,7 @@ import com.flout.server.domain.preventionguide.response.code.PreventionGuideSucc
 import com.flout.server.domain.preventionguide.service.PreventionGuideService;
 import com.flout.server.global.response.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/resident/risk-assessments")
-@Tag(name = "주민-AI취약도 분석")
+@Tag(name = "주민-AI취약도 분석", description = "주민 주소 기반 침수 취약도 분석과 맞춤 예방 가이드")
 public class ResidentPreventionGuideController {
   private final PreventionGuideService service;
 
@@ -47,7 +48,9 @@ public class ResidentPreventionGuideController {
       description = "반지하 또는 1층이 아닌 거주층",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<PreventionGuideResponse> generate(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable Long assessmentId) {
+      @AuthenticationPrincipal Jwt jwt,
+      @Parameter(description = "본인 소유의 완료된 취약도 분석 ID", example = "1") @PathVariable
+          Long assessmentId) {
     return SuccessResponse.of(
         service.generate(Long.valueOf(jwt.getSubject()), assessmentId),
         PreventionGuideSuccessCode.GUIDE_GENERATED);

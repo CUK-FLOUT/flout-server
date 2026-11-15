@@ -150,7 +150,7 @@ class CommonResponseTest {
 
   @RestController
   static class TestController {
-    // XML 변환기 존재 여부와 무관하게 JSON API의 406 처리를 검증
+    // XML 변환기 유무와 무관한 JSON API의 406 응답 검증
     @GetMapping(value = "/success", produces = MediaType.APPLICATION_JSON_VALUE)
     SuccessResponse<String> success() {
       return SuccessResponse.ok("hello");

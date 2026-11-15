@@ -34,7 +34,7 @@ public class PriorityInspectionDesignationService {
   private final Clock inspectionClock;
   private final InspectionRepository inspections;
 
-  // 전체 검증 후 일괄 변경하며 실패 시 모두 롤백
+  // 전체 검증을 마친 뒤 일괄 변경하고, 실패하면 모두 롤백한다.
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PriorityInspectionDesignationsResponse designateAll(
       Long operatorId, List<Long> applicationIds, boolean designated) {
@@ -77,7 +77,7 @@ public class PriorityInspectionDesignationService {
       for (Long id : applicationIds) {
         if (current.containsKey(id)) continue;
         var item = PriorityInspectionDesignation.designated(found.get(id), operator, now);
-        // 완료된 신청의 신규 지정은 미완료 대상 순위를 차지하지 않습니다.
+        // 완료된 신청을 새로 지정해도 미완료 대상의 순위에는 포함하지 않는다.
         item.changeOrder(completed.contains(id) ? lastOrder + 1 : ++lastOrder, operator, now);
         current.put(id, designations.saveAndFlush(item));
       }

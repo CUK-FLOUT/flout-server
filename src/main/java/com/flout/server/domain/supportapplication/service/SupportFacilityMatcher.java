@@ -61,7 +61,7 @@ public class SupportFacilityMatcher {
 
     String compact = requestedFacility.replaceAll("\\s+", "").replace("역류방지용밸브", "역류방지밸브");
 
-    // 명시적인 복합시설 신청은 차단한다.
+    // 명시적인 복합시설 신청 차단
     if (compact.contains("및")
         || compact.contains(",")
         || compact.contains("/")

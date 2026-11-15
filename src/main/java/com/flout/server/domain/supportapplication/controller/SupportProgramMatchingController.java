@@ -30,7 +30,7 @@ public class SupportProgramMatchingController {
       summary = "지원사업 AI 매칭",
       description =
           "현장점검 신청 ID를 받아 공개된 점검 결과, 주민·주택 정보 및 DB 사업목록을 비교해 최대 1개 사업을 안내합니다. "
-              + "적합한 사업이 없으면 서버에 등록된 공식 상담 안내를 반환하며, Gemini 호출 실패는 503 재시도 오류로 구분합니다. "
+              + "직접 일치하지 않으면 가장 관련 있는 실제 DB 사업을 참고용으로 안내하며, Gemini 호출 실패는 503 재시도 오류로 구분합니다. "
               + "매칭은 지원 승인·공식 접수가 아닙니다. 개인정보 보호를 위해 상세주소·연락처·좌표를 모델에 전송하지 않습니다.")
   public SuccessResponse<SupportProgramMatchingResponse> match(
       @AuthenticationPrincipal Jwt jwt,

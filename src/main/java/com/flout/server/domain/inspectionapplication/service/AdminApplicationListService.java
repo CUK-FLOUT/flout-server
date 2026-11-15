@@ -42,6 +42,7 @@ public class AdminApplicationListService {
   @Transactional(readOnly = true)
   public AdminApplicationStatsResponse stats(Long operatorId) {
     requireOperator(operatorId);
+    // 목록의 검색 조건과 별개로 관할 전체 건수를 집계한다.
     return applications.stats();
   }
 
@@ -53,6 +54,7 @@ public class AdminApplicationListService {
       RiskLevel riskLevel,
       ApplicationProcessingStage processingStatus) {
     validateSearch(operatorId, district, keyword);
+    // 목록과 같은 검색 조건으로 지도 마커 조회
     return applications.markers(district, keyword.strip(), riskLevel, processingStatus);
   }
 

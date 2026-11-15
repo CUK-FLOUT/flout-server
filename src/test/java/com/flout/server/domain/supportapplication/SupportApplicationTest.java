@@ -179,10 +179,15 @@ class SupportApplicationTest {
         .isEqualTo(
             jdbc.queryForObject(
                 "SELECT name FROM support_programs WHERE program_id=?", String.class, programId));
+    System.out.println("API createdAt: " + result.path("createdAt").asString());
+    System.out.println("DB createdAt: " + row.get("CREATED_AT"));
+    System.out.println("JVM timezone: " + java.time.ZoneId.systemDefault());
+
     assertThat(result.path("supportApplicationId").asLong())
         .isEqualTo(((Number) row.get("SUPPORT_APPLICATION_ID")).longValue());
-    assertThat(java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toInstant())
-        .isEqualTo(((java.sql.Timestamp) row.get("CREATED_AT")).toInstant());
+    assertThat(
+            java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toLocalDateTime())
+        .isEqualTo(((java.sql.Timestamp) row.get("CREATED_AT")).toLocalDateTime());
     if ("TENANT".equals(occupancy)) {
       assertThat(row.get("SUBMITTED_AT")).isNull();
       assertThat(result.path("submittedAt").isNull()).isTrue();
@@ -492,7 +497,7 @@ class SupportApplicationTest {
             .getTokenValue();
     send(body(), expired).andExpect(status().isUnauthorized());
     jdbc.update("UPDATE users SET role='ADMIN' WHERE user_id=?", residentId);
-    // DB 역할과 JWT 역할이 달라진 기존 토큰은 공통 인증 정책에 따라 무효화됩니다.
+    // DB 역할과 JWT 역할이 다를 때 기존 토큰 무효화 검증
     send(body(), token).andExpect(status().isUnauthorized());
     send(body(), jwt.issue(users.findById(residentId).orElseThrow()).accessToken())
         .andExpect(status().isForbidden());

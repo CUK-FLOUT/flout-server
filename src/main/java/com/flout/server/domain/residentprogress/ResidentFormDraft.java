@@ -3,7 +3,7 @@ package com.flout.server.domain.residentprogress;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-/** JPA mapping also creates the table in test profiles that do not run Flyway. */
+/** Flyway를 실행하지 않는 테스트 프로필에서는 JPA 매핑으로 테이블을 생성한다. */
 @Entity
 @Table(name = "resident_form_drafts")
 public class ResidentFormDraft {

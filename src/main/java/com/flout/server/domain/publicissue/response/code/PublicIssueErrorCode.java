@@ -13,7 +13,6 @@ public enum PublicIssueErrorCode implements BaseResponseCode {
   EMPTY_ACTION_IMAGES(400, "PUBLIC_ISSUE_400_4", "업로드할 조치 사진을 선택해 주세요."),
   INVALID_ACTION_IMAGES(400, "PUBLIC_ISSUE_400_5", "JPG, JPEG, PNG 형식의 유효한 조치 사진만 업로드할 수 있습니다."),
   PUBLIC_ISSUE_NOT_FOUND(404, "PUBLIC_ISSUE_404_1", "공공시설 문제를 찾을 수 없습니다."),
-  ACTION_NOT_FOUND(404, "PUBLIC_ISSUE_404_3", "공공시설 조치를 찾을 수 없습니다."),
   ACTION_NOT_ALLOWED(409, "PUBLIC_ISSUE_409_1", "이미 완료된 공공시설 문제입니다."),
   REVIEW_REQUIRED(409, "PUBLIC_ISSUE_409_2", "공공시설 검토 내용을 먼저 저장해 주세요."),
   REVIEW_NOT_ALLOWED(409, "PUBLIC_ISSUE_409_3", "완료된 공공시설 문제의 검토 내용은 변경할 수 없습니다."),

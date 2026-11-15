@@ -736,7 +736,9 @@ class InspectionApplicationFlowTest {
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.createdAt").value("2020-01-01T00:00:00"))
-        .andExpect(jsonPath("$.result.submittedAt").value(submittedAt.toString()));
+        .andExpect(
+            jsonPath("$.result.submittedAt")
+                .value(submittedAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
     mvc.perform(
             multipart("/api/resident/applications/{id}/attachments", applicationId)
                 .file(png())
