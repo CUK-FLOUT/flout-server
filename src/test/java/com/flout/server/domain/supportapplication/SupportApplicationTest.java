@@ -179,6 +179,10 @@ class SupportApplicationTest {
         .isEqualTo(
             jdbc.queryForObject(
                 "SELECT name FROM support_programs WHERE program_id=?", String.class, programId));
+    System.out.println("API createdAt: " + result.path("createdAt").asString());
+    System.out.println("DB createdAt: " + row.get("CREATED_AT"));
+    System.out.println("JVM timezone: " + java.time.ZoneId.systemDefault());
+
     assertThat(result.path("supportApplicationId").asLong())
         .isEqualTo(((Number) row.get("SUPPORT_APPLICATION_ID")).longValue());
     assertThat(java.time.OffsetDateTime.parse(result.path("createdAt").asString()).toInstant())
