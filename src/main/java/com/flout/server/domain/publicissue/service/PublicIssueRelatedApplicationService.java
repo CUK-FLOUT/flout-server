@@ -27,7 +27,7 @@ public class PublicIssueRelatedApplicationService {
                 app ->
                     new ApplicationItem(
                         app.getId(),
-                        app.getReceiptNo(),
+                        String.format(java.util.Locale.ROOT, "%06d", app.getId()),
                         app.getAddress(),
                         app.getAssessment().getRiskLevel(),
                         app.getRequestReason()))
