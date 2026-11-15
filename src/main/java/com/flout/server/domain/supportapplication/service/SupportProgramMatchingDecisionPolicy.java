@@ -7,7 +7,6 @@ import com.flout.server.domain.supportapplication.dto.response.SupportProgramMat
 import com.flout.server.domain.supportapplication.dto.response.SupportProgramMatchingResponse.Recommendation;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class SupportProgramMatchingDecisionPolicy {
-  private static final Set<String> PROGRAM_MATCH_TYPES = Set.of("DIRECT", "COMPLEMENTARY");
   private final SupportFacilityMatcher facilityMatcher;
 
   public SupportProgramMatchingResponse resolve(
@@ -28,23 +26,25 @@ public class SupportProgramMatchingDecisionPolicy {
             .findFirst()
             // 모델이 허용된 후보 밖의 ID를 반환해도 실제 DB 후보만 노출한다.
             .orElse(snapshot.candidates().getFirst());
+    var modelMatchType = SupportProgramMatchType.fromModel(decision.matchType()).orElse(null);
     boolean validDecision =
-        "PROGRAM".equals(decision.itemType())
+        SupportProgramRecommendationType.PROGRAM.name().equals(decision.itemType())
             && chosen.id().equals(decision.programId())
-            && PROGRAM_MATCH_TYPES.contains(decision.matchType());
-    String matchType = validDecision ? decision.matchType() : "COMPLEMENTARY";
+            && modelMatchType != null;
+    SupportProgramMatchType matchType =
+        validDecision ? modelMatchType : SupportProgramMatchType.COMPLEMENTARY;
 
     ProgramInfo info = chosen.info();
     var facilityMatch =
-        "DIRECT".equals(matchType)
+        matchType == SupportProgramMatchType.DIRECT
             ? facilityMatcher.match(info.supportedFacilities(), snapshot.actions())
             : emptyFacilityMatch();
     // DIRECT는 전문가 권장시설과 실제로 일치할 때만 유지한다.
     String reason = decision.reason();
-    if ("DIRECT".equals(matchType)
+    if (matchType == SupportProgramMatchType.DIRECT
         && facilityMatch.facilitiesKnown()
         && !facilityMatch.hasMatch()) {
-      matchType = "COMPLEMENTARY";
+      matchType = SupportProgramMatchType.COMPLEMENTARY;
       facilityMatch = emptyFacilityMatch();
       reason = "권장시설과 직접 일치하지 않지만 참고할 수 있는 지원사업입니다.";
       validDecision = false;
@@ -52,7 +52,7 @@ public class SupportProgramMatchingDecisionPolicy {
       reason = "가장 관련 있는 지원사업을 참고용으로 안내합니다.";
     }
     List<String> missing = new ArrayList<>(decision.missingInformation());
-    if ("DIRECT".equals(matchType) && !facilityMatch.facilitiesKnown()) {
+    if (matchType == SupportProgramMatchType.DIRECT && !facilityMatch.facilitiesKnown()) {
       missing.add("지원시설 정보 확인 필요");
     }
     if (!"OPEN".equalsIgnoreCase(String.valueOf(info.applicationStatus()))) {
@@ -67,25 +67,27 @@ public class SupportProgramMatchingDecisionPolicy {
     if (snapshot.region() == null) {
       missing.add("대상 지역 확인 필요");
     }
-    String matchStatus =
-        validDecision && missing.isEmpty() && "MATCHED".equals(decision.matchStatus())
-            ? "MATCHED"
-            : "NEEDS_CONFIRMATION";
+    SupportProgramMatchStatus matchStatus =
+        validDecision
+                && missing.isEmpty()
+                && SupportProgramMatchStatus.MATCHED.name().equals(decision.matchStatus())
+            ? SupportProgramMatchStatus.MATCHED
+            : SupportProgramMatchStatus.NEEDS_CONFIRMATION;
 
     List<Evidence> evidence = evidence(info, snapshot, facilityMatch);
     var recommendation =
         new Recommendation(
-            "PROGRAM",
+            SupportProgramRecommendationType.PROGRAM.name(),
             chosen.id(),
             null,
-            matchType,
+            matchType.name(),
             safeReason(reason, "현장점검 결과와 관련된 사업으로 검토되었습니다."),
             facilityMatch.matchedActionIds(),
             evidence,
             missing.stream().distinct().toList(),
             info,
             null);
-    return new SupportProgramMatchingResponse(applicationId, matchStatus, recommendation);
+    return new SupportProgramMatchingResponse(applicationId, matchStatus.name(), recommendation);
   }
 
   private List<Evidence> evidence(
