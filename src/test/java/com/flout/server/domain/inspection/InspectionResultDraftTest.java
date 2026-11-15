@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -183,10 +184,21 @@ class InspectionResultDraftTest {
 
   /** 결과 공개 시 별도 상태 API 없이 완료 상태와 이력을 저장하는지 검증한다. */
   @ParameterizedTest
-  @ValueSource(
-      strings = {"RECEIVED", "SCHEDULED", "IN_PROGRESS", "UNASSIGNED", "NO_SCHEDULE", "FUTURE"})
-  void publishingCompletesInspectionWithoutStatusPatch(String previous) throws Exception {
+  @CsvSource({
+    "RECEIVED, INSPECTION_409_7, 점검 담당자를 먼저 배정해 주세요.",
+    "SCHEDULED, INSPECTION_409_10, 점검 상태가 ‘진행 중’으로 바뀌면 결과를 공개할 수 있습니다.",
+    "UNASSIGNED, INSPECTION_409_7, 점검 담당자를 먼저 배정해 주세요.",
+    "NO_SCHEDULE, INSPECTION_409_8, 확정 방문 일시를 먼저 저장해 주세요.",
+    "FUTURE, INSPECTION_409_9, 확정 방문 시각이 아직 되지 않았습니다. 방문 시각이 되어 점검이 ‘진행 중’으로 바뀌면 결과를 공개할 수 있습니다.",
+    "IN_PROGRESS, , "
+  })
+  void publishingCompletesInspectionWithoutStatusPatch(
+      String previous, String errorCode, String errorMessage) throws Exception {
     switch (previous) {
+      case "RECEIVED" ->
+          jdbc.update(
+              "UPDATE inspections SET status='RECEIVED', inspector_user_id=NULL, scheduled_at=NULL WHERE inspection_id=?",
+              inspectionId);
       case "UNASSIGNED" ->
           jdbc.update(
               "UPDATE inspections SET inspector_user_id=NULL WHERE inspection_id=?", inspectionId);
@@ -195,7 +207,7 @@ class InspectionResultDraftTest {
               "UPDATE inspections SET scheduled_at=NULL WHERE inspection_id=?", inspectionId);
       case "FUTURE" ->
           jdbc.update(
-              "UPDATE inspections SET scheduled_at='2099-01-01 10:00:00' WHERE inspection_id=?",
+              "UPDATE inspections SET status='SCHEDULED', scheduled_at='2099-01-01 10:00:00' WHERE inspection_id=?",
               inspectionId);
       default ->
           jdbc.update(
@@ -203,14 +215,15 @@ class InspectionResultDraftTest {
     }
     entityManager.clear();
     addPhoto();
-    if (!"IN_PROGRESS".equals(previous)) {
+    if (errorCode != null) {
       mvc.perform(
               post("/api/admin/inspections/" + inspectionId + "/result")
                   .header("Authorization", "Bearer " + token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(mapper.writeValueAsString(full())))
           .andExpect(status().isConflict())
-          .andExpect(jsonPath("$.code").value("INSPECTION_409_1"));
+          .andExpect(jsonPath("$.code").value(errorCode))
+          .andExpect(jsonPath("$.message").value(errorMessage));
       assertThat(count("inspection_status_histories")).isZero();
       assertThat(
               jdbc.queryForObject(
@@ -275,7 +288,9 @@ class InspectionResultDraftTest {
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(full())))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("INSPECTION_409_6"))
+        .andExpect(jsonPath("$.message").value("이미 주민에게 공개된 점검 결과입니다."));
     assertThat(count("application_status_histories")).isEqualTo(1);
   }
 

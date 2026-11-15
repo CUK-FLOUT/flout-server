@@ -13,6 +13,8 @@ import com.flout.server.global.response.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -109,6 +111,13 @@ public class AdminInspectionResultController {
               + "공개할 초안에 현장사진이 최소 1장 등록되어 있어야 합니다. 주민 신청 첨부사진은 포함하지 않습니다. "
               + "별도 상태 변경 요청 없이 공개 성공 시 점검을 COMPLETED로 변경하고 완료 이력을 저장합니다. "
               + "배정과 일정이 있는 기존 완료 점검도 아직 공개된 결과가 없으면 공개할 수 있습니다. 이미 공개된 결과는 재공개할 수 없습니다.")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "INSPECTION_409_6: 이미 공개됨, INSPECTION_409_7: 담당자 미배정, "
+              + "INSPECTION_409_8: 확정 일정 미저장, INSPECTION_409_9: 확정 방문 시각 전, "
+              + "INSPECTION_409_10: 공개할 수 있는 점검 상태 아님",
+      content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<PublishInspectionResultResponse> publish(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable Long inspectionId,

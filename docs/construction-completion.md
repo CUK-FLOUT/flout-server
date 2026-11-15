@@ -20,14 +20,14 @@ POST `/api/admin/constructions` — 운영자-시공관리
 result: `constructionId`, `supportApplicationId`, `applicationId`, `receiptNo`, `applicantName`, `status`(COMPLETED), `finalInstallationResult`, `completedAt`(한국 시간 +09:00).
 
 - 400 COMMON_400_2: 본문·필수 값 누락, 잘못된 JSON, 양수가 아닌 ID, 결과 공백·4000자 초과.
-- 400 CONSTRUCTION_400_4: 전체 완료하려면 시공 사진을 최소 1장 업로드해주세요.
+- 400 CONSTRUCTION_400_4: 전체 완료하려면 시공 사진을 최소 1장 첨부해 주세요.
 - 401: 인증 토큰 누락·만료·유효하지 않음.
 - 403 COMMON_403_1: 운영자 권한·관할 없음.
 - 403 CONSTRUCTION_403_1: 관할 지역의 시공 건만 변경할 수 있습니다.
 - 404 CONSTRUCTION_404_1: 시공 건을 찾을 수 없습니다.
 - 409 CONSTRUCTION_409_1: 지원 승인된 신청만 시공 업무를 처리할 수 있습니다.
-- 409 CONSTRUCTION_409_4: 이미 전체 완료된 시공입니다.
-- 409 CONSTRUCTION_409_5: 시공 일정을 저장한 후 전체 완료할 수 있습니다.
-- 409 CONSTRUCTION_409_8: 확정 시공 방문 시각 전에는 전체 완료할 수 없습니다.
-- 409 CONSTRUCTION_409_9: 시공이 진행 중으로 전환된 후 전체 완료할 수 있습니다.
+- 409 CONSTRUCTION_409_4: 이미 전체 완료된 시공입니다. 완료 결과를 확인해 주세요.
+- 409 CONSTRUCTION_409_5: 확정 시공 방문 일시를 먼저 저장해 주세요.
+- 409 CONSTRUCTION_409_8: 확정 시공 방문 시각이 아직 되지 않았습니다. 방문 시각이 되어 시공이 ‘진행 중’으로 바뀌면 전체 완료할 수 있습니다.
+- 409 CONSTRUCTION_409_9: 시공 상태가 ‘진행 중’으로 바뀌면 전체 완료할 수 있습니다.
 - 500: 공통 서버 오류. 결과·상태·완료 시각은 함께 롤백됩니다.

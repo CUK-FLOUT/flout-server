@@ -18,7 +18,14 @@ public enum InspectionErrorCode implements BaseResponseCode {
   RESULT_PHOTO_REQUIRED(400, "INSPECTION_400_5", "점검 결과를 공개하려면 현장사진을 최소 1장 등록해주세요."),
   PHOTO_UPLOAD_FAILED(500, "INSPECTION_500_1", "현장점검 사진 등록에 실패했습니다."),
   PHOTO_NOT_FOUND(404, "INSPECTION_404_2", "현장점검 사진을 찾을 수 없습니다."),
-  PUBLISHED_PHOTO_NOT_DELETABLE(409, "INSPECTION_409_5", "공개된 현장점검 사진은 삭제할 수 없습니다.");
+  PUBLISHED_PHOTO_NOT_DELETABLE(409, "INSPECTION_409_5", "공개된 현장점검 사진은 삭제할 수 없습니다."),
+  RESULT_ALREADY_PUBLISHED(409, "INSPECTION_409_6", "이미 주민에게 공개된 점검 결과입니다."),
+  RESULT_INSPECTOR_REQUIRED(409, "INSPECTION_409_7", "점검 담당자를 먼저 배정해 주세요."),
+  RESULT_SCHEDULE_REQUIRED(409, "INSPECTION_409_8", "확정 방문 일시를 먼저 저장해 주세요."),
+  RESULT_VISIT_TIME_NOT_REACHED(
+      409, "INSPECTION_409_9", "확정 방문 시각이 아직 되지 않았습니다. 방문 시각이 되어 점검이 ‘진행 중’으로 바뀌면 결과를 공개할 수 있습니다."),
+  RESULT_INSPECTION_NOT_IN_PROGRESS(
+      409, "INSPECTION_409_10", "점검 상태가 ‘진행 중’으로 바뀌면 결과를 공개할 수 있습니다.");
 
   private final int status;
   private final String code;
