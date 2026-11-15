@@ -45,7 +45,7 @@ public class PublishInspectionResultService {
   private final EntityManager entityManager;
   private final NotificationService notifications;
 
-  /** 선행 상태 변경 없이 결과를 공개하고 점검·신청 완료와 이력을 같은 트랜잭션으로 저장한다. */
+  /** 진행 중인 점검 결과의 공개와 완료 처리를 같은 트랜잭션에서 수행한다. */
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PublishInspectionResultResponse publish(
       Long operatorId, Long inspectionId, PublishInspectionResultRequest request) {
@@ -87,6 +87,15 @@ public class PublishInspectionResultService {
       throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
     }
 
+    LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
+    var previous = inspection.getStatus();
+    if ((previous != InspectionStatus.IN_PROGRESS && previous != InspectionStatus.COMPLETED)
+        || inspection.getInspector() == null
+        || inspection.getScheduledAt() == null
+        || inspection.getScheduledAt().isAfter(now)) {
+      throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
+    }
+
     // 공개 전 초안 사진 등록 여부 확인
     InspectionResult result =
         results
@@ -125,10 +134,8 @@ public class PublishInspectionResultService {
       recommendations.save(PreventionRecommendation.create(result, item.description(), i));
     }
 
-    LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     result.publish(now, operator);
 
-    var previous = inspection.getStatus();
     if (previous != InspectionStatus.COMPLETED) {
       inspection.complete(now);
       inspectionStatusHistories.saveAndFlush(

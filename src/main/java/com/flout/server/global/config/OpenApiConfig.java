@@ -1364,6 +1364,8 @@ public class OpenApiConfig {
                 "publishedAt", "2026-10-21T14:30:00+09:00",
                 "supportStatus", "NOT_APPLIED")));
     addError(operation, "resultPhotoRequired", InspectionErrorCode.RESULT_PHOTO_REQUIRED, null);
+    addError(
+        operation, "invalidStatusTransition", InspectionErrorCode.INVALID_STATUS_TRANSITION, null);
   }
 
   private void describeInspectionResultDraft(Operation operation) {

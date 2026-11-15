@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flout.server.domain.construction.repository.ConstructionRepository;
+import com.flout.server.domain.construction.service.ConstructionStatusService;
 import com.flout.server.domain.notification.entity.NotificationType;
 import com.flout.server.domain.notification.service.FcmDeliveryStore;
 import com.flout.server.domain.notification.service.PushNotificationRequested;
@@ -46,6 +47,7 @@ class ConstructionCompletionTest {
   @Autowired UserRepository users;
   @Autowired JwtService jwt;
   @Autowired ObjectMapper mapper;
+  @Autowired ConstructionStatusService constructionStatus;
 
   @MockitoBean(name = "inspectionClock")
   Clock clock;
@@ -105,7 +107,7 @@ class ConstructionCompletionTest {
         constructionId,
         supportId);
     jdbc.update(
-        "UPDATE constructions SET status='SCHEDULED',scheduled_at='2030-01-01 10:00:00',manager_user_id=?",
+        "UPDATE constructions SET status='IN_PROGRESS',scheduled_at='2030-01-01 10:00:00',manager_user_id=?",
         adminId);
     jdbc.update(
         "INSERT INTO construction_photos(construction_id,object_key,original_filename,file_size,content_type,created_at) VALUES(?,'construction-test-photo','완료.jpg',100,'image/jpeg',CURRENT_TIMESTAMP)",
@@ -148,13 +150,41 @@ class ConstructionCompletionTest {
   }
 
   @Test
+  void requiresVisitTimeAndAutomaticStartBeforeCompletion() throws Exception {
+    jdbc.update(
+        "UPDATE constructions SET scheduled_at=? WHERE construction_id=?",
+        NOW.plusSeconds(1),
+        constructionId);
+    var before = jdbc.queryForList("SELECT * FROM constructions");
+    complete(body(), token)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_8"));
+    assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
+
+    jdbc.update(
+        "UPDATE constructions SET status='SCHEDULED', scheduled_at=? WHERE construction_id=?",
+        NOW,
+        constructionId);
+    var scheduled = jdbc.queryForList("SELECT * FROM constructions");
+    complete(body(), token)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_9"));
+    assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(scheduled);
+
+    assertThat(constructionStatus.startIfDue(constructionId)).isTrue();
+    complete(body(), token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.status").value("COMPLETED"));
+  }
+
+  @Test
   void rejectsNoPhotosAndPhotosOnlyOnAnotherConstruction() throws Exception {
     jdbc.update("DELETE FROM construction_photos");
     complete(body(), token)
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("CONSTRUCTION_400_4"));
     assertThat(jdbc.queryForObject("SELECT status FROM constructions", String.class))
-        .isEqualTo("SCHEDULED");
+        .isEqualTo("IN_PROGRESS");
     assertThat(jdbc.queryForObject("SELECT completed_at FROM constructions", Object.class))
         .isNull();
   }
@@ -226,7 +256,7 @@ class ConstructionCompletionTest {
                 "SELECT final_installation_result FROM constructions", String.class))
         .isNull();
     assertThat(jdbc.queryForObject("SELECT status FROM constructions", String.class))
-        .isEqualTo("SCHEDULED");
+        .isEqualTo("IN_PROGRESS");
   }
 
   @Test

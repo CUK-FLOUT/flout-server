@@ -257,6 +257,10 @@ class ResidentApplicationDetailTest {
         "INSERT INTO users(email,password_hash,name,role,jurisdiction_id) VALUES('recommendations-admin@example.com','hash','운영자','ADMIN',(SELECT jurisdiction_id FROM jurisdictions WHERE name='부천시'))");
     var admin = users.findByEmail("recommendations-admin@example.com").orElseThrow();
     jdbc.update(
+        "UPDATE inspections SET status='IN_PROGRESS',inspector_user_id=?,scheduled_at='2020-01-01 10:00:00' WHERE inspection_id=?",
+        admin.getId(),
+        inspectionId);
+    jdbc.update(
         "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
         inspectionId);
     Long resultId =
