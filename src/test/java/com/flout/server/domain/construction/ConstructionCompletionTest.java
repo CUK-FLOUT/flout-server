@@ -146,7 +146,8 @@ class ConstructionCompletionTest {
     assertThat(jdbc.queryForList("SELECT * FROM support_applications")).isEqualTo(before);
     complete(body().replace("설치 완료", "변경"), token)
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_4"));
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_4"))
+        .andExpect(jsonPath("$.message").value("이미 전체 완료된 시공입니다. 완료 결과를 확인해 주세요."));
   }
 
   @Test
@@ -158,7 +159,10 @@ class ConstructionCompletionTest {
     var before = jdbc.queryForList("SELECT * FROM constructions");
     complete(body(), token)
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_8"));
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_8"))
+        .andExpect(
+            jsonPath("$.message")
+                .value("확정 시공 방문 시각이 아직 되지 않았습니다. 방문 시각이 되어 시공이 ‘진행 중’으로 바뀌면 전체 완료할 수 있습니다."));
     assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
 
     jdbc.update(
@@ -168,7 +172,8 @@ class ConstructionCompletionTest {
     var scheduled = jdbc.queryForList("SELECT * FROM constructions");
     complete(body(), token)
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_9"));
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_9"))
+        .andExpect(jsonPath("$.message").value("시공 상태가 ‘진행 중’으로 바뀌면 전체 완료할 수 있습니다."));
     assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(scheduled);
 
     assertThat(constructionStatus.startIfDue(constructionId)).isTrue();
@@ -182,7 +187,8 @@ class ConstructionCompletionTest {
     jdbc.update("DELETE FROM construction_photos");
     complete(body(), token)
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("CONSTRUCTION_400_4"));
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_400_4"))
+        .andExpect(jsonPath("$.message").value("전체 완료하려면 시공 사진을 최소 1장 첨부해 주세요."));
     assertThat(jdbc.queryForObject("SELECT status FROM constructions", String.class))
         .isEqualTo("IN_PROGRESS");
     assertThat(jdbc.queryForObject("SELECT completed_at FROM constructions", Object.class))
@@ -225,7 +231,8 @@ class ConstructionCompletionTest {
     jdbc.update("UPDATE constructions SET status='PENDING',scheduled_at=NULL");
     complete(body(), token)
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_5"));
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_5"))
+        .andExpect(jsonPath("$.message").value("확정 시공 방문 일시를 먼저 저장해 주세요."));
     jdbc.update("UPDATE support_applications SET status='REJECTED'");
     complete(body(), token)
         .andExpect(status().isConflict())

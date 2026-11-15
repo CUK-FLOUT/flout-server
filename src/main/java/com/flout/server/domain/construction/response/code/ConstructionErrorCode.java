@@ -21,11 +21,14 @@ public enum ConstructionErrorCode implements BaseResponseCode {
   INVALID_PHOTOS(400, "CONSTRUCTION_400_3", "JPG, JPEG, PNG 형식의 유효한 사진만 업로드할 수 있습니다."),
   PHOTOS_NOT_EDITABLE(409, "CONSTRUCTION_409_3", "전체 완료된 시공에는 사진을 추가할 수 없습니다."),
   PHOTO_UPLOAD_FAILED(500, "CONSTRUCTION_500_1", "시공 사진 업로드에 실패했습니다."),
-  COMPLETION_PHOTO_REQUIRED(400, "CONSTRUCTION_400_4", "전체 완료하려면 시공 사진을 최소 1장 업로드해주세요."),
-  ALREADY_COMPLETED(409, "CONSTRUCTION_409_4", "이미 전체 완료된 시공입니다."),
-  SCHEDULE_REQUIRED(409, "CONSTRUCTION_409_5", "시공 일정을 저장한 후 전체 완료할 수 있습니다."),
-  VISIT_NOT_STARTED(409, "CONSTRUCTION_409_8", "확정 시공 방문 시각 전에는 전체 완료할 수 없습니다."),
-  NOT_IN_PROGRESS(409, "CONSTRUCTION_409_9", "시공이 진행 중으로 전환된 후 전체 완료할 수 있습니다.");
+  COMPLETION_PHOTO_REQUIRED(400, "CONSTRUCTION_400_4", "전체 완료하려면 시공 사진을 최소 1장 첨부해 주세요."),
+  ALREADY_COMPLETED(409, "CONSTRUCTION_409_4", "이미 전체 완료된 시공입니다. 완료 결과를 확인해 주세요."),
+  SCHEDULE_REQUIRED(409, "CONSTRUCTION_409_5", "확정 시공 방문 일시를 먼저 저장해 주세요."),
+  VISIT_NOT_STARTED(
+      409,
+      "CONSTRUCTION_409_8",
+      "확정 시공 방문 시각이 아직 되지 않았습니다. 방문 시각이 되어 시공이 ‘진행 중’으로 바뀌면 전체 완료할 수 있습니다."),
+  NOT_IN_PROGRESS(409, "CONSTRUCTION_409_9", "시공 상태가 ‘진행 중’으로 바뀌면 전체 완료할 수 있습니다.");
 
   private final int status;
   private final String code;
