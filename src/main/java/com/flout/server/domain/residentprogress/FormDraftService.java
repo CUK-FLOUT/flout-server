@@ -365,72 +365,86 @@ public class FormDraftService {
       if (rows.isEmpty()) throw new BaseException(FormDraftErrorCode.NOT_FOUND);
     }
     if (rows.isEmpty()) {
-      if (request.version() != null) throw new BaseException(FormDraftErrorCode.CONFLICT);
-      if (type.equals("INSPECTION")) {
-        var existing =
-            jdbc.queryForList(
-                "SELECT status FROM inspection_applications WHERE assessment_id=? FOR UPDATE",
-                source);
-        if (!existing.isEmpty()) {
-          throw new BaseException(
-              "DRAFT".equals(existing.get(0).get("status").toString())
-                  ? FormDraftErrorCode.INSPECTION_DRAFT_EXISTS
-                  : FormDraftErrorCode.INSPECTION_EXISTS);
-        }
-      } else {
-        var existing =
-            jdbc.queryForList(
-                "SELECT status FROM support_applications WHERE application_id=? FOR UPDATE",
-                source);
-        if (!existing.isEmpty()) {
-          throw new BaseException(
-              "DRAFT".equals(existing.get(0).get("status").toString())
-                  ? FormDraftErrorCode.SUPPORT_DRAFT_EXISTS
-                  : FormDraftErrorCode.SUPPORT_EXISTS);
-        }
-        publicationValidator.requirePublished(source);
-      }
-      if (!jdbc.queryForList(
-              "SELECT draft_id FROM resident_form_drafts WHERE user_id=? AND draft_type=? AND source_id=? AND form_state='EDITING'",
-              userId,
-              type,
-              source)
-          .isEmpty()) {
-        throw new BaseException(FormDraftErrorCode.EDITING_EXISTS);
-      }
-      try {
-        jdbc.update(
-            "INSERT INTO resident_form_drafts(draft_id,user_id,draft_type,source_id,form_state,fields_json,version,created_at,updated_at) VALUES(?,?,?,?,'EDITING',?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
-            id.toString(),
-            userId,
-            type,
-            source,
-            json);
-      } catch (DataIntegrityViolationException e) {
-        throw new BaseException(FormDraftErrorCode.CONFLICT);
+      insertDraft(userId, type, id, request, source, json);
+    } else {
+      return updateDraft(userId, type, id, request, source, json, rows.get(0));
+    }
+    return one(userId, type, id.toString(), false);
+  }
+
+  private void insertDraft(
+      Long userId, String type, UUID id, SaveRequest request, Long source, String json) {
+    if (request.version() != null) throw new BaseException(FormDraftErrorCode.CONFLICT);
+    if (type.equals("INSPECTION")) {
+      var existing =
+          jdbc.queryForList(
+              "SELECT status FROM inspection_applications WHERE assessment_id=? FOR UPDATE",
+              source);
+      if (!existing.isEmpty()) {
+        throw new BaseException(
+            "DRAFT".equals(existing.get(0).get("status").toString())
+                ? FormDraftErrorCode.INSPECTION_DRAFT_EXISTS
+                : FormDraftErrorCode.INSPECTION_EXISTS);
       }
     } else {
-      var row = rows.get(0);
-      if (((Number) row.get("user_id")).longValue() != userId
-          || !row.get("draft_type").equals(type))
-        throw new BaseException(FormDraftErrorCode.NOT_FOUND);
-      // 최초 저장 응답을 받지 못한 재시도는 내용이 동일할 때만 기존 결과를 반환한다.
-      if (request.version() == null
-          && ((Number) row.get("source_id")).longValue() == source
-          && "EDITING".equals(row.get("form_state"))
-          && ((Number) row.get("version")).longValue() == 1
-          && Objects.equals(row.get("fields_json"), json))
-        return one(userId, type, id.toString(), false);
-      if (((Number) row.get("source_id")).longValue() != source
-          || !row.get("form_state").equals("EDITING")
-          || request.version() == null
-          || ((Number) row.get("version")).longValue() != request.version())
-        throw new BaseException(FormDraftErrorCode.CONFLICT);
-      jdbc.update(
-          "UPDATE resident_form_drafts SET fields_json=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-          json,
-          id.toString());
+      var existing =
+          jdbc.queryForList(
+              "SELECT status FROM support_applications WHERE application_id=? FOR UPDATE", source);
+      if (!existing.isEmpty()) {
+        throw new BaseException(
+            "DRAFT".equals(existing.get(0).get("status").toString())
+                ? FormDraftErrorCode.SUPPORT_DRAFT_EXISTS
+                : FormDraftErrorCode.SUPPORT_EXISTS);
+      }
+      publicationValidator.requirePublished(source);
     }
+    if (!jdbc.queryForList(
+            "SELECT draft_id FROM resident_form_drafts WHERE user_id=? AND draft_type=? AND source_id=? AND form_state='EDITING'",
+            userId,
+            type,
+            source)
+        .isEmpty()) {
+      throw new BaseException(FormDraftErrorCode.EDITING_EXISTS);
+    }
+    try {
+      jdbc.update(
+          "INSERT INTO resident_form_drafts(draft_id,user_id,draft_type,source_id,form_state,fields_json,version,created_at,updated_at) VALUES(?,?,?,?,'EDITING',?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+          id.toString(),
+          userId,
+          type,
+          source,
+          json);
+    } catch (DataIntegrityViolationException e) {
+      throw new BaseException(FormDraftErrorCode.CONFLICT);
+    }
+  }
+
+  private Draft updateDraft(
+      Long userId,
+      String type,
+      UUID id,
+      SaveRequest request,
+      Long source,
+      String json,
+      Map<String, Object> row) {
+    if (((Number) row.get("user_id")).longValue() != userId || !row.get("draft_type").equals(type))
+      throw new BaseException(FormDraftErrorCode.NOT_FOUND);
+    // 최초 저장 응답을 받지 못한 재시도는 내용이 동일할 때만 기존 결과를 반환한다.
+    if (request.version() == null
+        && ((Number) row.get("source_id")).longValue() == source
+        && "EDITING".equals(row.get("form_state"))
+        && ((Number) row.get("version")).longValue() == 1
+        && Objects.equals(row.get("fields_json"), json))
+      return one(userId, type, id.toString(), false);
+    if (((Number) row.get("source_id")).longValue() != source
+        || !row.get("form_state").equals("EDITING")
+        || request.version() == null
+        || ((Number) row.get("version")).longValue() != request.version())
+      throw new BaseException(FormDraftErrorCode.CONFLICT);
+    jdbc.update(
+        "UPDATE resident_form_drafts SET fields_json=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
+        json,
+        id.toString());
     return one(userId, type, id.toString(), false);
   }
 
