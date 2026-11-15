@@ -1,6 +1,5 @@
 package com.flout.server.domain.publicissue.service;
 
-import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspectionapplication.entity.FloodExperience;
 import com.flout.server.domain.inspectionapplication.entity.InflowLocation;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
@@ -9,13 +8,10 @@ import com.flout.server.domain.publicissue.entity.*;
 import com.flout.server.domain.publicissue.repository.AdminPublicIssueDetailRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import com.flout.server.global.time.SeoulDateTimes;
 import java.util.List;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,22 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AdminPublicIssueDetailService {
-  private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-  private final UserRepository users;
+  private final PublicIssueAccess access;
   private final AdminPublicIssueDetailRepository details;
   private final AttachmentStorage storage;
 
   @Transactional(readOnly = true)
   public AdminPublicIssueDetailResponse detail(Long operatorId, Long publicIssueId) {
-    requireOperator(operatorId);
+    access.requireReader(operatorId);
     if (publicIssueId == null || publicIssueId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     var header =
         details
             .findHeader(publicIssueId)
             .orElseThrow(() -> new BaseException(PublicIssueErrorCode.PUBLIC_ISSUE_NOT_FOUND));
-    if (!BUCHEON.matcher(header.address().strip()).find())
-      throw new BaseException(InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED);
+    access.requireReadableAddress(header.address());
 
     var relatedRows = details.findRelatedApplications(header.latitude(), header.longitude());
     var inflows =
@@ -139,16 +133,5 @@ public class AdminPublicIssueDetailService {
         header.facilityAddress(),
         header.facilityLatitude(),
         header.facilityLongitude());
-  }
-
-  private void requireOperator(Long operatorId) {
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN)
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED);
   }
 }
