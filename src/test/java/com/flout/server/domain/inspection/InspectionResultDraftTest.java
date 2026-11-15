@@ -664,7 +664,8 @@ class InspectionResultDraftTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    var paths = mapper.readTree(response).get("paths");
+    var document = mapper.readTree(response);
+    var paths = document.get("paths");
     for (String suffix : List.of("/result/draft", "/result")) {
       var operation =
           paths
@@ -687,6 +688,38 @@ class InspectionResultDraftTest {
       assertThat(action.has("relatedTarget")).isFalse();
       assertThat(example.get("followUpType").asText()).isEqualTo("INDIVIDUAL_HOUSE");
     }
+
+    var publishResponses =
+        paths.path("/api/admin/inspections/{inspectionId}/result").path("post").path("responses");
+    var success = publishResponses.path("200");
+    var content = success.path("content").path("application/json");
+    assertThat(success.path("description").asText()).isEqualTo("점검 결과 공개 성공");
+    var schemaRef = content.path("schema").path("$ref").asText();
+    assertThat(schemaRef).startsWith("#/components/schemas/");
+    var schema = document.at(schemaRef.substring(1));
+    assertThat(schema.path("properties").path("result").path("$ref").asText())
+        .isEqualTo("#/components/schemas/PublishInspectionResultResponse");
+    assertThat(
+            content
+                .path("examples")
+                .path("resultPublished")
+                .path("value")
+                .path("result")
+                .path("resultStatus")
+                .asText())
+        .isEqualTo("PUBLISHED");
+
+    var conflict = publishResponses.path("409").path("content").path("application/json");
+    assertThat(conflict.path("schema").path("$ref").asText())
+        .isEqualTo("#/components/schemas/CommonErrorResponse");
+    assertThat(conflict.path("examples").properties())
+        .extracting(example -> example.getValue().path("value").path("code").asText())
+        .containsExactlyInAnyOrder(
+            "INSPECTION_409_6",
+            "INSPECTION_409_7",
+            "INSPECTION_409_8",
+            "INSPECTION_409_9",
+            "INSPECTION_409_10");
   }
 
   @Test

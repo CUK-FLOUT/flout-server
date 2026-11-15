@@ -111,6 +111,7 @@ public class AdminInspectionResultController {
               + "공개할 초안에 현장사진이 최소 1장 등록되어 있어야 합니다. 주민 신청 첨부사진은 포함하지 않습니다. "
               + "별도 상태 변경 요청 없이 공개 성공 시 점검을 COMPLETED로 변경하고 완료 이력을 저장합니다. "
               + "배정과 일정이 있는 기존 완료 점검도 아직 공개된 결과가 없으면 공개할 수 있습니다. 이미 공개된 결과는 재공개할 수 없습니다.")
+  @ApiResponse(responseCode = "200", description = "점검 결과 공개 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "409",
       description =
