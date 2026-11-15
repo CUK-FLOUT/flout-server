@@ -93,8 +93,6 @@ public class AdminPublicIssueListRepository {
         SELECT COUNT(*) AS registered_count,
           COUNT(CASE WHEN p.status IN ('RECEIVED','UNDER_REVIEW') THEN 1 END)
             AS pending_or_under_review_count,
-          COUNT(CASE WHEN p.status = 'ACTION_IN_PROGRESS' THEN 1 END)
-            AS action_in_progress_count,
           COUNT(CASE WHEN p.status = 'COMPLETED' THEN 1 END) AS completed_count
         FROM public_issues p
         WHERE REGEXP_LIKE(TRIM(p.address), :region)
@@ -108,7 +106,6 @@ public class AdminPublicIssueListRepository {
             new AdminPublicIssueStatusResponse(
                 rs.getLong("registered_count"),
                 rs.getLong("pending_or_under_review_count"),
-                rs.getLong("action_in_progress_count"),
                 rs.getLong("completed_count")));
   }
 

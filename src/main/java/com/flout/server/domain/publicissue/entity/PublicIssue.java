@@ -46,9 +46,7 @@ public class PublicIssue {
   private String fieldFindings;
 
   @Enumerated(EnumType.STRING)
-  @Column(
-      nullable = false,
-      columnDefinition = "enum('RECEIVED','UNDER_REVIEW','ACTION_IN_PROGRESS','COMPLETED')")
+  @Column(nullable = false, columnDefinition = "enum('RECEIVED','UNDER_REVIEW','COMPLETED')")
   private PublicIssueStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -88,7 +86,6 @@ public class PublicIssue {
         switch (reviewStatus) {
           case PENDING -> PublicIssueStatus.RECEIVED;
           case UNDER_REVIEW -> PublicIssueStatus.UNDER_REVIEW;
-          case ACTION_IN_PROGRESS -> PublicIssueStatus.ACTION_IN_PROGRESS;
           case COMPLETED -> PublicIssueStatus.COMPLETED;
         };
   }

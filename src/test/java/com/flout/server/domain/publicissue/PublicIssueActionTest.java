@@ -267,6 +267,9 @@ class PublicIssueActionTest {
     postReview(reviewBody("INSPECTION_REQUIRED"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("COMMON_400_2"));
+    postReview(reviewBody("ACTION_IN_PROGRESS"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON_400_2"));
     var request = reviewBody("COMPLETED");
     postReview(request)
         .andExpect(status().isBadRequest())
