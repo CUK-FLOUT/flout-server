@@ -29,7 +29,7 @@ public class AdminConstructionCompletionController {
   @Operation(
       summary = "시공 결과 확인 후 전체 완료",
       description =
-          "부천시 관할 ADMIN이 일정 저장된 시공을 전체 완료합니다. 사진 업로드 API로 먼저 시공 사진을 최소 1장 저장해야 합니다. 최종 설치 결과는 필수이며 주민 공개용으로 저장됩니다. 지원 승인 상태는 유지합니다. 이미 완료된 시공은 다시 완료할 수 없습니다.")
+          "부천시 관할 ADMIN이 한국 시간 기준 확정 방문 시각이 도래한 시공을 전체 완료합니다. 사진 업로드 API로 먼저 시공 사진을 최소 1장 저장해야 합니다. 최종 설치 결과는 필수이며 주민 공개용으로 저장됩니다. 지원 승인 상태는 유지합니다. 이미 완료된 시공은 다시 완료할 수 없습니다.")
   @ApiResponse(
       responseCode = "200",
       description = "CONSTRUCTION_200_3: 시공 결과 공개·전체 완료",
@@ -49,7 +49,7 @@ public class AdminConstructionCompletionController {
   @ApiResponse(
       responseCode = "409",
       description =
-          "CONSTRUCTION_409_1: 지원 미승인, CONSTRUCTION_409_4: 이미 완료, CONSTRUCTION_409_5: 일정 미저장",
+          "CONSTRUCTION_409_1: 지원 미승인, CONSTRUCTION_409_4: 이미 완료, CONSTRUCTION_409_5: 일정 미저장, CONSTRUCTION_409_8: 확정 방문 시각 전",
       content = @Content(schema = @Schema(ref = "#/components/schemas/CommonErrorResponse")))
   public SuccessResponse<ConstructionCompletionResponse> complete(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CompleteConstructionRequest request) {

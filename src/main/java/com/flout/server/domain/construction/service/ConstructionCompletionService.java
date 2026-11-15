@@ -58,11 +58,12 @@ public class ConstructionCompletionService {
     if (construction.getStatus() == ConstructionStatus.PENDING
         || construction.getScheduledAt() == null)
       throw new BaseException(ConstructionErrorCode.SCHEDULE_REQUIRED);
+    var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
+    if (construction.getScheduledAt().isAfter(now))
+      throw new BaseException(ConstructionErrorCode.VISIT_NOT_STARTED);
     if (!photos.existsByConstructionId(id))
       throw new BaseException(ConstructionErrorCode.COMPLETION_PHOTO_REQUIRED);
-    construction.complete(
-        request.finalInstallationResult().strip(),
-        LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS));
+    construction.complete(request.finalInstallationResult().strip(), now);
     histories.saveAndFlush(
         ConstructionStatusHistory.changed(construction, operator, construction.getCompletedAt()));
     constructions.flush();

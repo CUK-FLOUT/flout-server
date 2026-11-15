@@ -148,6 +148,25 @@ class ConstructionCompletionTest {
   }
 
   @Test
+  void rejectsCompletionBeforeVisitAndAllowsItAtVisitTime() throws Exception {
+    jdbc.update(
+        "UPDATE constructions SET scheduled_at=? WHERE construction_id=?",
+        NOW.plusSeconds(1),
+        constructionId);
+    var before = jdbc.queryForList("SELECT * FROM constructions");
+    complete(body(), token)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONSTRUCTION_409_8"));
+    assertThat(jdbc.queryForList("SELECT * FROM constructions")).isEqualTo(before);
+
+    jdbc.update(
+        "UPDATE constructions SET scheduled_at=? WHERE construction_id=?", NOW, constructionId);
+    complete(body(), token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.status").value("COMPLETED"));
+  }
+
+  @Test
   void rejectsNoPhotosAndPhotosOnlyOnAnotherConstruction() throws Exception {
     jdbc.update("DELETE FROM construction_photos");
     complete(body(), token)
