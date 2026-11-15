@@ -1,8 +1,5 @@
 package com.flout.server.domain.publicissue.service;
 
-import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
-import com.flout.server.domain.inspection.service.InspectionPhotoValidator;
-import com.flout.server.domain.inspection.service.InspectionPhotoValidator.ValidatedPhoto;
 import com.flout.server.domain.inspectionapplication.service.AttachmentCleanupService;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
 import com.flout.server.domain.publicissue.dto.request.CompletePublicIssueActionRequest;
@@ -15,8 +12,8 @@ import com.flout.server.domain.publicissue.repository.FacilityReviewRepository;
 import com.flout.server.domain.publicissue.repository.PublicIssueActionRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,7 +36,7 @@ public class FacilityActionImageService {
   private final FacilityActionImageRepository images;
   private final AttachmentStorage storage;
   private final AttachmentCleanupService cleanup;
-  private final InspectionPhotoValidator validator;
+  private final PublicIssueActionImageValidator validator;
   private final TransactionTemplate transactions;
 
   public FacilityActionImageService(
@@ -49,7 +46,7 @@ public class FacilityActionImageService {
       FacilityActionImageRepository images,
       AttachmentStorage storage,
       AttachmentCleanupService cleanup,
-      InspectionPhotoValidator validator,
+      PublicIssueActionImageValidator validator,
       PlatformTransactionManager manager) {
 
     this.access = access;
@@ -82,7 +79,7 @@ public class FacilityActionImageService {
       throw new BaseException(PublicIssueErrorCode.EMPTY_ACTION_IMAGES);
     }
 
-    var validated = files.stream().map(this::validate).toList();
+    var validated = files.stream().map(validator::validate).toList();
 
     // actionId는 아직 생성 전이므로 UUID 기반 객체 키 사용
     var keys =
@@ -96,7 +93,7 @@ public class FacilityActionImageService {
       for (int i = 0; i < validated.size(); i++) {
         var file = validated.get(i);
 
-        storage.upload(keys.get(i), bytesForUpload(file), file.contentType());
+        storage.upload(keys.get(i), validator.bytesForUpload(file), file.contentType());
       }
 
       var urls = keys.stream().map(storage::readUrl).toList();
@@ -141,11 +138,7 @@ public class FacilityActionImageService {
                       new CompletePublicIssueActionResponse.Image(
                           image.getId(),
                           urls.get(i),
-                          image
-                              .getUploadedAt()
-                              .atZone(ZoneId.systemDefault())
-                              .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-                              .toOffsetDateTime()));
+                          SeoulDateTimes.toOffset(image.getUploadedAt())));
 
                   cleanup.completed(keys.get(i));
                 }
@@ -189,35 +182,5 @@ public class FacilityActionImageService {
     }
 
     return authorized;
-  }
-
-  private ValidatedPhoto validate(MultipartFile file) {
-    try {
-      return validator.validate(file);
-
-    } catch (BaseException e) {
-      if (e.getBaseResponseCode() == InspectionErrorCode.EMPTY_PHOTOS) {
-        throw new BaseException(PublicIssueErrorCode.EMPTY_ACTION_IMAGES);
-      }
-
-      if (e.getBaseResponseCode() == InspectionErrorCode.INVALID_PHOTOS) {
-        throw new BaseException(PublicIssueErrorCode.INVALID_ACTION_IMAGES);
-      }
-
-      throw e;
-    }
-  }
-
-  private byte[] bytesForUpload(ValidatedPhoto file) {
-    try {
-      return validator.bytesForUpload(file);
-
-    } catch (BaseException e) {
-      if (e.getBaseResponseCode() == InspectionErrorCode.INVALID_PHOTOS) {
-        throw new BaseException(PublicIssueErrorCode.INVALID_ACTION_IMAGES);
-      }
-
-      throw e;
-    }
   }
 }

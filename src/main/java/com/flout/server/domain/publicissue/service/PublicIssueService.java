@@ -10,13 +10,10 @@ import com.flout.server.domain.publicissue.dto.response.CreatePublicIssueRespons
 import com.flout.server.domain.publicissue.entity.*;
 import com.flout.server.domain.publicissue.repository.PublicIssueRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -26,20 +23,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PublicIssueService {
-  private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-  private final UserRepository users;
+  private final PublicIssueAccess access;
   private final InspectionRepository inspections;
   private final PublicIssueRepository issues;
   private final AddressCoordinatesService coordinates;
   private final TransactionTemplate transactions;
 
   public PublicIssueService(
-      UserRepository users,
+      PublicIssueAccess access,
       InspectionRepository inspections,
       PublicIssueRepository issues,
       AddressCoordinatesService coordinates,
       PlatformTransactionManager manager) {
-    this.users = users;
+    this.access = access;
     this.inspections = inspections;
     this.issues = issues;
     this.coordinates = coordinates;
@@ -92,20 +88,12 @@ public class PublicIssueService {
   private Inspection authorize(Long operatorId, Long inspectionId) {
     if (inspectionId == null || inspectionId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN)
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    access.requireWriter(operatorId);
     var source =
         inspections
             .findById(inspectionId)
             .orElseThrow(() -> new BaseException(InspectionErrorCode.INSPECTION_NOT_FOUND));
-    if (!BUCHEON.matcher(source.getApplication().getAddress().strip()).find())
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    access.requireWritableAddress(source.getApplication().getAddress());
     return source;
   }
 

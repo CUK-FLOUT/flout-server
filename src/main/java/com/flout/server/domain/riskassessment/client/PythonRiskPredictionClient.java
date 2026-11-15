@@ -1,13 +1,10 @@
 package com.flout.server.domain.riskassessment.client;
 
-import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.domain.riskassessment.response.code.RiskAssessmentErrorCode;
 import com.flout.server.global.exception.BaseException;
-import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
-import java.util.List;
-import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -18,12 +15,13 @@ import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class PythonRiskPredictionClient implements RiskPredictionClient {
-  private static final String EXPECTED_RISK_TYPE = "REGIONAL_RELATIVE_VULNERABILITY";
-
   private final RestClient client;
   private final String predictPath;
+  private final RiskPredictionResponseParser responseParser;
 
+  @Autowired
   public PythonRiskPredictionClient(
+      RiskPredictionResponseParser responseParser,
       @Value("${app.ai.base-url}") String baseUrl,
       @Value("${app.ai.predict-path}") String predictPath,
       @Value("${app.ai.connect-timeout-millis}") long connectTimeoutMillis,
@@ -33,6 +31,17 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
     factory.setReadTimeout(Duration.ofMillis(readTimeoutMillis));
     this.client = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
     this.predictPath = predictPath;
+    this.responseParser = responseParser;
+  }
+
+  public PythonRiskPredictionClient(
+      String baseUrl, String predictPath, long connectTimeoutMillis, long readTimeoutMillis) {
+    this(
+        new RiskPredictionResponseParser(),
+        baseUrl,
+        predictPath,
+        connectTimeoutMillis,
+        readTimeoutMillis);
   }
 
   @Override
@@ -49,8 +58,8 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
                           .queryParam("lon", longitude)
                           .build())
               .retrieve()
-              .body(PredictionResponse.class);
-      return validate(response);
+              .body(PythonPredictionResponse.class);
+      return responseParser.parse(response);
     } catch (RestClientResponseException e) {
       if (e.getStatusCode().value() == 422) {
         throw new BaseException(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE);
@@ -66,44 +75,6 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
     }
   }
 
-  private RiskPrediction validate(PredictionResponse response) {
-    if (response != null && "분석 불가".equals(response.status())) {
-      throw new BaseException(RiskAssessmentErrorCode.ANALYSIS_UNAVAILABLE);
-    }
-    if (response == null
-        || !"OK".equals(response.status())
-        || !EXPECTED_RISK_TYPE.equals(response.riskType())
-        || response.cellId() == null
-        || !response.cellId().matches("r-?\\d+c-?\\d+")
-        || response.score() == null
-        || response.score().compareTo(BigDecimal.ZERO) < 0
-        || response.score().compareTo(BigDecimal.ONE) > 0
-        || response.grade() == null
-        || response.floodRecord() == null
-        || response.floodRecord().isBlank()
-        || response.disclaimer() == null
-        || response.disclaimer().isBlank()) {
-      throw new BaseException(RiskAssessmentErrorCode.INVALID_AI_RESPONSE);
-    }
-    return new RiskPrediction(
-        response.riskType(),
-        response.cellId(),
-        response.score(),
-        parseRiskLevel(response.grade()),
-        List.of(),
-        response.floodRecord(),
-        response.disclaimer());
-  }
-
-  private RiskLevel parseRiskLevel(String grade) {
-    return switch (grade.strip().toUpperCase(Locale.ROOT)) {
-      case "HIGH", "높음" -> RiskLevel.HIGH;
-      case "CAUTION", "보통", "주의" -> RiskLevel.CAUTION;
-      case "LOW", "낮음" -> RiskLevel.LOW;
-      default -> throw new BaseException(RiskAssessmentErrorCode.INVALID_AI_RESPONSE);
-    };
-  }
-
   private boolean hasCause(Throwable throwable, Class<? extends Throwable> type) {
     Throwable current = throwable;
     while (current != null) {
@@ -112,14 +83,4 @@ public class PythonRiskPredictionClient implements RiskPredictionClient {
     }
     return false;
   }
-
-  private record PredictionResponse(
-      String riskType,
-      String status,
-      String cellId,
-      BigDecimal score,
-      String grade,
-      String floodRecord,
-      String disclaimer,
-      String message) {}
 }

@@ -1,8 +1,8 @@
 package com.flout.server.domain.publicissue.dto.response;
 
 import com.flout.server.domain.publicissue.entity.*;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 
 public record CreatePublicIssueResponse(
     Long publicIssueId,
@@ -22,10 +22,6 @@ public record CreatePublicIssueResponse(
         issue.getDescription(),
         issue.getFieldFindings(),
         issue.getStatus(),
-        issue
-            .getCreatedAt()
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime());
+        SeoulDateTimes.toOffset(issue.getCreatedAt()));
   }
 }

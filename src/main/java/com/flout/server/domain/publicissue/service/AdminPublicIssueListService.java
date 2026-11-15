@@ -1,14 +1,11 @@
 package com.flout.server.domain.publicissue.service;
 
-import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueListResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueMapResponse;
 import com.flout.server.domain.publicissue.dto.response.AdminPublicIssueStatusResponse;
 import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.entity.PublicIssueType;
 import com.flout.server.domain.publicissue.repository.AdminPublicIssueListRepository;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.Arrays;
@@ -31,7 +28,7 @@ public class AdminPublicIssueListService {
           .map(Enum::name)
           .collect(Collectors.toUnmodifiableSet());
 
-  private final UserRepository users;
+  private final PublicIssueAccess access;
   private final AdminPublicIssueListRepository publicIssues;
 
   @Transactional(readOnly = true)
@@ -68,7 +65,7 @@ public class AdminPublicIssueListService {
   }
 
   private void validateCommon(Long operatorId, String district, String issueType, String keyword) {
-    requireOperator(operatorId);
+    access.requireReader(operatorId);
     if (district == null
         || keyword == null
         || keyword.length() > 255
@@ -83,16 +80,5 @@ public class AdminPublicIssueListService {
     if (!allowed.contains(normalized))
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     return normalized;
-  }
-
-  private void requireOperator(Long operatorId) {
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN)
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(InspectionErrorCode.JURISDICTION_READ_ACCESS_DENIED);
   }
 }

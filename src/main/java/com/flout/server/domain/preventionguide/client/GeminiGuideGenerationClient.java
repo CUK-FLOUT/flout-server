@@ -9,7 +9,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class GeminiGuideGenerationClient implements GuideGenerationClient {
-  private static final Pattern BANNED = Pattern.compile("확률|퍼센트|%|\\d+\\s*배|안전해요|침수돼요|침수되지 않아요");
   private static final String SYSTEM_PROMPT =
       """
       너는 침수 예방 서비스 FLOUT의 체크리스트 작성자다.
@@ -57,9 +56,12 @@ public class GeminiGuideGenerationClient implements GuideGenerationClient {
   private final ObjectMapper objectMapper;
   private final String model;
   private final String apiKey;
+  private final GeminiGuideResponseParser responseParser;
 
+  @Autowired
   public GeminiGuideGenerationClient(
       ObjectMapper objectMapper,
+      GeminiGuideResponseParser responseParser,
       @Value("${app.gemini.base-url}") String baseUrl,
       @Value("${app.gemini.model}") String model,
       @Value("${app.gemini.api-key:}") String apiKey,
@@ -70,8 +72,26 @@ public class GeminiGuideGenerationClient implements GuideGenerationClient {
     factory.setReadTimeout(Duration.ofMillis(readTimeoutMillis));
     this.client = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
     this.objectMapper = objectMapper;
+    this.responseParser = responseParser;
     this.model = model;
     this.apiKey = apiKey;
+  }
+
+  public GeminiGuideGenerationClient(
+      ObjectMapper objectMapper,
+      String baseUrl,
+      String model,
+      String apiKey,
+      long connectTimeoutMillis,
+      long readTimeoutMillis) {
+    this(
+        objectMapper,
+        new GeminiGuideResponseParser(objectMapper),
+        baseUrl,
+        model,
+        apiKey,
+        connectTimeoutMillis,
+        readTimeoutMillis);
   }
 
   @Override
@@ -88,7 +108,7 @@ public class GeminiGuideGenerationClient implements GuideGenerationClient {
               .body(request(riskLevel, housingType))
               .retrieve()
               .body(String.class);
-      return validate(parse(response), riskLevel, housingType);
+      return responseParser.parseAndValidate(response, riskLevel, housingType);
     } catch (BaseException e) {
       throw e;
     } catch (ResourceAccessException e) {
@@ -122,78 +142,6 @@ public class GeminiGuideGenerationClient implements GuideGenerationClient {
             new ResponseFormat(new TextResponseFormat("APPLICATION_JSON", responseSchema())), 0.2));
   }
 
-  private GeneratedGuide parse(String rawResponse) throws Exception {
-    if (!StringUtils.hasText(rawResponse)) {
-      throw new BaseException(PreventionGuideErrorCode.INVALID_AI_RESPONSE);
-    }
-    var json =
-        objectMapper
-            .readTree(rawResponse)
-            .path("candidates")
-            .path(0)
-            .path("content")
-            .path("parts")
-            .path(0)
-            .path("text")
-            .asText(null);
-    if (!StringUtils.hasText(json)) {
-      throw new BaseException(PreventionGuideErrorCode.INVALID_AI_RESPONSE);
-    }
-    var output = objectMapper.readTree(json);
-    var itemsNode = output.path("items");
-    var items =
-        java.util.stream.IntStream.range(0, itemsNode.size())
-            .mapToObj(
-                index -> {
-                  var item = itemsNode.path(index);
-                  return new GeneratedGuideItem(
-                      item.path("ruleId").asText(null),
-                      item.path("title").asText(null),
-                      item.path("description").asText(null));
-                })
-            .toList();
-    return new GeneratedGuide(
-        GuideGenerationSource.AI, output.path("subtitle").asText(null), items);
-  }
-
-  private GeneratedGuide validate(
-      GeneratedGuide guide, RiskLevel riskLevel, HousingType housingType) {
-    var expectedIds = GuideRuleCatalog.priorityIds(riskLevel, housingType);
-    if (guide == null
-        || !hasLength(guide.subtitle(), 30)
-        || guide.items() == null
-        || guide.items().size() != 4
-        || !guide.items().stream().map(GeneratedGuideItem::ruleId).toList().equals(expectedIds)
-        || guide.items().stream()
-            .anyMatch(
-                item ->
-                    item == null
-                        || !hasLength(item.ruleId(), 30)
-                        || !hasLength(item.title(), 18)
-                        || !hasLength(item.description(), 60))
-        || BANNED.matcher(joinText(guide)).find()) {
-      throw new BaseException(PreventionGuideErrorCode.INVALID_AI_RESPONSE);
-    }
-    return new GeneratedGuide(
-        GuideGenerationSource.AI,
-        guide.subtitle().strip(),
-        guide.items().stream()
-            .map(
-                item ->
-                    new GeneratedGuideItem(
-                        item.ruleId(), item.title().strip(), item.description().strip()))
-            .toList());
-  }
-
-  private String joinText(GeneratedGuide guide) {
-    var text = new StringBuilder(guide.subtitle());
-    guide
-        .items()
-        .forEach(
-            item -> text.append(' ').append(item.title()).append(' ').append(item.description()));
-    return text.toString();
-  }
-
   private String writeJson(Object value) {
     try {
       return objectMapper.writeValueAsString(value);
@@ -224,10 +172,6 @@ public class GeminiGuideGenerationClient implements GuideGenerationClient {
     schema.put("required", List.of("subtitle", "items"));
     schema.put("additionalProperties", false);
     return schema;
-  }
-
-  private boolean hasLength(String value, int maxLength) {
-    return value != null && !value.isBlank() && value.strip().length() <= maxLength;
   }
 
   private boolean hasCause(Throwable throwable, Class<? extends Throwable> type) {
