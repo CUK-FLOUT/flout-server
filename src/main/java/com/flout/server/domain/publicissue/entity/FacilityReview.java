@@ -34,8 +34,7 @@ public class FacilityReview {
   @Enumerated(EnumType.STRING)
   @Column(
       name = "review_status",
-      columnDefinition =
-          "enum('PENDING','UNDER_REVIEW','INSPECTION_REQUIRED','ACTION_IN_PROGRESS','COMPLETED')")
+      columnDefinition = "enum('PENDING','UNDER_REVIEW','ACTION_IN_PROGRESS','COMPLETED')")
   private FacilityReviewStatus reviewStatus;
 
   @Column(name = "review_reason", columnDefinition = "TEXT")

@@ -48,8 +48,7 @@ public class PublicIssue {
   @Enumerated(EnumType.STRING)
   @Column(
       nullable = false,
-      columnDefinition =
-          "enum('RECEIVED','UNDER_REVIEW','INSPECTION_REQUIRED','ACTION_IN_PROGRESS','COMPLETED')")
+      columnDefinition = "enum('RECEIVED','UNDER_REVIEW','ACTION_IN_PROGRESS','COMPLETED')")
   private PublicIssueStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -89,7 +88,6 @@ public class PublicIssue {
         switch (reviewStatus) {
           case PENDING -> PublicIssueStatus.RECEIVED;
           case UNDER_REVIEW -> PublicIssueStatus.UNDER_REVIEW;
-          case INSPECTION_REQUIRED -> PublicIssueStatus.INSPECTION_REQUIRED;
           case ACTION_IN_PROGRESS -> PublicIssueStatus.ACTION_IN_PROGRESS;
           case COMPLETED -> PublicIssueStatus.COMPLETED;
         };

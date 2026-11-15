@@ -35,7 +35,7 @@ public class AdminPublicIssueMapController {
           String district,
       @Parameter(
               description =
-                  "처리 상태. RECEIVED, UNDER_REVIEW, INSPECTION_REQUIRED, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
+                  "처리 상태. RECEIVED, UNDER_REVIEW, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
           @RequestParam(required = false)
           String status,
       @Parameter(

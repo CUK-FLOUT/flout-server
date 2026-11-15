@@ -45,7 +45,7 @@ public class AdminPublicIssueController {
           String district,
       @Parameter(
               description =
-                  "처리 상태. RECEIVED, UNDER_REVIEW, INSPECTION_REQUIRED, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
+                  "처리 상태. RECEIVED, UNDER_REVIEW, ACTION_IN_PROGRESS, COMPLETED. 생략·빈 값이면 전체")
           @RequestParam(required = false)
           String status,
       @Parameter(
@@ -71,7 +71,7 @@ public class AdminPublicIssueController {
   @Operation(
       summary = "지역·공공 문제 현황 건수 조회",
       description =
-          "인증된 부천시 운영자의 지역·공공 문제 현황을 조회합니다. 등록 전체, 검토 대기·검토 중·현장점검 필요, 조치 진행, 조치 완료 건수를 반환하며 지역·문제 유형·검색어 조건을 동일하게 적용합니다.")
+          "인증된 부천시 운영자의 지역·공공 문제 현황을 조회합니다. 등록 전체, 검토 대기·검토 중, 조치 진행, 조치 완료 건수를 반환하며 지역·문제 유형·검색어 조건을 동일하게 적용합니다.")
   public SuccessResponse<AdminPublicIssueStatusResponse> status(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "원미구·소사구·오정구. 생략·빈 값이면 관할 전체", example = "원미구")

@@ -19,10 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FacilityReviewService {
   private static final EnumSet<FacilityReviewStatus> SAVABLE_STATUSES =
-      EnumSet.of(
-          FacilityReviewStatus.PENDING,
-          FacilityReviewStatus.UNDER_REVIEW,
-          FacilityReviewStatus.INSPECTION_REQUIRED);
+      EnumSet.of(FacilityReviewStatus.PENDING, FacilityReviewStatus.UNDER_REVIEW);
   private final PublicIssueAccess access;
   private final FacilityReviewRepository reviews;
 

@@ -248,14 +248,14 @@ class PublicIssueActionTest {
         .andExpect(jsonPath("$.result.reviewerUserId").value(adminId))
         .andExpect(jsonPath("$.result.reviewedAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
     long savedReviewId = jdbc.queryForObject("SELECT review_id FROM facility_review", Long.class);
-    var update = reviewBody("INSPECTION_REQUIRED");
+    var update = reviewBody("UNDER_REVIEW");
     update.put("inspectionNotes", " 현장 재확인 필요 ");
     update.put("reviewReason", null);
     postReview(update)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.reviewId").value(savedReviewId))
-        .andExpect(jsonPath("$.result.reviewStatus").value("INSPECTION_REQUIRED"))
-        .andExpect(jsonPath("$.result.publicIssueStatus").value("INSPECTION_REQUIRED"))
+        .andExpect(jsonPath("$.result.reviewStatus").value("UNDER_REVIEW"))
+        .andExpect(jsonPath("$.result.publicIssueStatus").value("UNDER_REVIEW"))
         .andExpect(jsonPath("$.result.inspectionNotes").value("현장 재확인 필요"))
         .andExpect(jsonPath("$.result.reviewReason").doesNotExist());
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM facility_review", Integer.class))
@@ -264,6 +264,9 @@ class PublicIssueActionTest {
 
   @Test
   void validatesFacilityReviewRequest() throws Exception {
+    postReview(reviewBody("INSPECTION_REQUIRED"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON_400_2"));
     var request = reviewBody("COMPLETED");
     postReview(request)
         .andExpect(status().isBadRequest())

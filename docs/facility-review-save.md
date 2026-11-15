@@ -16,7 +16,7 @@
 ```
 
 - `reviewTarget`: 화면의 검토 대상, 필수 문자열, 앞뒤 공백 제거 후 1~100자
-- `reviewStatus`: `PENDING`, `UNDER_REVIEW`, `INSPECTION_REQUIRED` 중 하나
+- `reviewStatus`: `PENDING`, `UNDER_REVIEW` 중 하나
 - `inspectionNotes`: 필수, 앞뒤 공백 제거 후 1~4000자
 - `reviewReason`: 선택, 입력 시 앞뒤 공백 제거 후 최대 4000자
 
