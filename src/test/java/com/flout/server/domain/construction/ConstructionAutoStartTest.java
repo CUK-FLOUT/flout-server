@@ -220,7 +220,7 @@ class ConstructionAutoStartTest {
   }
 
   @Test
-  void completionWinsRegardlessOfAutomaticStartOrder() throws Exception {
+  void completionCanSucceedOnlyAfterAutomaticStart() throws Exception {
     var pool = Executors.newFixedThreadPool(2);
     var start = new CountDownLatch(1);
     try {
@@ -230,23 +230,28 @@ class ConstructionAutoStartTest {
                 start.await();
                 return service.startIfDue(constructionId);
               });
+      Callable<Integer> complete =
+          () ->
+              mvc.perform(
+                      post("/api/admin/constructions")
+                          .header("Authorization", "Bearer " + token)
+                          .contentType(MediaType.APPLICATION_JSON)
+                          .content(
+                              "{\"constructionId\":900,\"finalInstallationResult\":\"Installation completed\"}"))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
       var completion =
           pool.submit(
               () -> {
                 start.await();
-                return mvc.perform(
-                        post("/api/admin/constructions")
-                            .header("Authorization", "Bearer " + token)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(
-                                "{\"constructionId\":900,\"finalInstallationResult\":\"Installation completed\"}"))
-                    .andReturn()
-                    .getResponse()
-                    .getStatus();
+                return complete.call();
               });
       start.countDown();
-      automatic.get(30, TimeUnit.SECONDS);
-      assertThat(completion.get(30, TimeUnit.SECONDS)).isEqualTo(200);
+      assertThat(automatic.get(30, TimeUnit.SECONDS)).isTrue();
+      int status = completion.get(30, TimeUnit.SECONDS);
+      assertThat(status).isIn(200, 409);
+      if (status == 409) assertThat(complete.call()).isEqualTo(200);
       assertThat(service.startIfDue(constructionId)).isFalse();
       assertThat(jdbc.queryForObject("SELECT status FROM constructions", String.class))
           .isEqualTo("COMPLETED");

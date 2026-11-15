@@ -61,6 +61,8 @@ public class ConstructionCompletionService {
     var now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
     if (construction.getScheduledAt().isAfter(now))
       throw new BaseException(ConstructionErrorCode.VISIT_NOT_STARTED);
+    if (construction.getStatus() != ConstructionStatus.IN_PROGRESS)
+      throw new BaseException(ConstructionErrorCode.NOT_IN_PROGRESS);
     if (!photos.existsByConstructionId(id))
       throw new BaseException(ConstructionErrorCode.COMPLETION_PHOTO_REQUIRED);
     construction.complete(request.finalInstallationResult().strip(), now);
