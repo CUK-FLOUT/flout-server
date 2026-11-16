@@ -497,8 +497,8 @@ class PublicIssueActionTest {
                 .doesNotExist())
         .andExpect(
             jsonPath(
-                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.requestBody.content['multipart/form-data']")
-                .exists())
+                    "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.requestBody.content['multipart/form-data'].encoding.request.contentType")
+                .value("application/json"))
         .andExpect(
             jsonPath(
                     "$.paths['/api/admin/public-issues/{publicIssueId}/actions'].post.responses['200'].content['application/json'].examples.publicIssueActionCompleted.value.code")

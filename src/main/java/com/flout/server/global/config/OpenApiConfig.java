@@ -1049,6 +1049,14 @@ public class OpenApiConfig {
   }
 
   private void describePublicIssueActionCompletion(Operation operation) {
+    var requestBody = operation.getRequestBody();
+    if (requestBody != null && requestBody.getContent() != null) {
+      var multipart = requestBody.getContent().get("multipart/form-data");
+      if (multipart != null) {
+        multipart.addEncoding("request", new Encoding().contentType(JSON));
+      }
+    }
+
     var code = PublicIssueSuccessCode.ACTION_COMPLETED;
     var success = operation.getResponses().computeIfAbsent("200", key -> new ApiResponse());
 
