@@ -4,6 +4,7 @@ import com.flout.server.domain.inspectionapplication.repository.InspectionApplic
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderListResponse;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionOrderResponse;
+import com.flout.server.domain.priorityinspection.entity.PriorityInspectionDesignation;
 import com.flout.server.domain.priorityinspection.repository.PriorityInspectionCandidateRepository;
 import com.flout.server.domain.priorityinspection.repository.PriorityInspectionDesignationRepository;
 import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
@@ -26,19 +27,17 @@ public class PriorityInspectionOrderService {
   private final PriorityInspectionAccess access;
   private final InspectionApplicationRepository applications;
   private final PriorityInspectionDesignationRepository designations;
+  private final PriorityInspectionDesignationReader reader;
   private final Clock inspectionClock;
   private final PriorityInspectionCandidateRepository candidates;
 
   @Transactional(readOnly = true)
   public PriorityInspectionOrderListResponse get(Long operatorId) {
     access.requireJurisdiction(operatorId);
-    var ordered =
-        designations.findActiveOrder().stream()
-            .filter(designation -> access.includes(designation.getApplication().getAddress()))
-            .toList();
+    var ordered = reader.findActiveOrder();
     var counts =
         candidates.nearbyCounts(
-            ordered.stream().map(designation -> designation.getApplicationId()).toList());
+            ordered.stream().map(PriorityInspectionDesignation::getApplicationId).toList());
     return new PriorityInspectionOrderListResponse(
         ordered.stream()
             .map(
@@ -58,22 +57,15 @@ public class PriorityInspectionOrderService {
     var found = applications.findAllById(applicationIds);
     if (found.size() != applicationIds.size())
       throw new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND);
-    if (found.stream().anyMatch(application -> !access.includes(application.getAddress())))
-      throw new BaseException(PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    var designated =
-        designations.findAllByOrderBySelectionOrderAscApplicationIdAsc().stream()
-            .filter(designation -> access.includes(designation.getApplication().getAddress()))
-            .collect(
-                Collectors.toMap(
-                    designation -> designation.getApplicationId(), Function.identity()));
+    found.forEach(application -> access.requireIncludedAddress(application.getAddress()));
+    var designated = reader.findAllByApplicationId();
     if (!designated.keySet().containsAll(requested))
       throw new BaseException(PriorityInspectionErrorCode.NOT_DESIGNATED);
     var current =
-        designations.findAllWithoutCompletedInspections().stream()
-            .filter(designation -> access.includes(designation.getApplication().getAddress()))
+        reader.findWithoutCompletedInspections().stream()
             .collect(
                 Collectors.toMap(
-                    designation -> designation.getApplicationId(), Function.identity()));
+                    PriorityInspectionDesignation::getApplicationId, Function.identity()));
     // 화면을 열어 둔 사이 대상이 바뀌면 기존 목록으로 순서를 덮어쓰지 못하게 한다.
     if (!requested.equals(current.keySet()))
       throw new BaseException(PriorityInspectionErrorCode.ORDER_LIST_CHANGED);

@@ -4,7 +4,6 @@ import com.flout.server.domain.inspectionapplication.repository.InspectionApplic
 import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.priorityinspection.dto.response.PriorityInspectionDetailResponse;
 import com.flout.server.domain.priorityinspection.repository.PriorityInspectionCandidateRepository;
-import com.flout.server.domain.priorityinspection.response.code.PriorityInspectionErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.List;
@@ -30,8 +29,7 @@ public class PriorityInspectionDetailService {
             .findForPriorityDetail(applicationId)
             .orElseThrow(
                 () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
-    if (!access.includes(application.getAddress()))
-      throw new BaseException(PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    access.requireIncludedAddress(application.getAddress());
     var count = candidates.nearbyCounts(List.of(applicationId)).getOrDefault(applicationId, 0L);
     return PriorityInspectionDetailResponse.from(application, count);
   }
