@@ -24,6 +24,7 @@ import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,6 +35,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
@@ -46,6 +48,7 @@ class RiskAssessmentRepositoryTest {
   @Autowired RiskAssessmentRepository riskAssessments;
   @Autowired UserRepository users;
   @Autowired MockMvc mvc;
+  @Autowired ObjectMapper mapper;
   @Autowired JwtService jwt;
   @MockitoBean AddressCoordinatesService coordinatesService;
   @MockitoBean RiskPredictionClient predictionClient;
@@ -130,12 +133,36 @@ class RiskAssessmentRepositoryTest {
 
   @Test
   void documentsAssessmentPostUnderResidentAiGroup() throws Exception {
-    mvc.perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.paths['/api/resident/risk-assessments'].post.tags[0]").value("주민-AI취약도 분석"))
-        .andExpect(
-            jsonPath("$.paths['/api/resident/risk-assessments'].post.responses['201']").exists());
+    var response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.paths['/api/resident/risk-assessments'].post.responses['201']")
+                    .exists())
+            .andReturn()
+            .getResponse();
+    var paths = mapper.readTree(response.getContentAsString()).path("paths");
+    var assessmentPaths =
+        paths.properties().stream()
+            .filter(
+                path ->
+                    path.getValue().properties().stream()
+                        .anyMatch(
+                            method ->
+                                "주민-AI취약도 분석"
+                                    .equals(method.getValue().path("tags").path(0).asText())))
+            .map(Map.Entry::getKey)
+            .toList();
+    assertThat(assessmentPaths)
+        .containsExactly(
+            "/api/resident/addresses/search",
+            "/api/resident/addresses/coordinates",
+            "/api/resident/risk-assessments",
+            "/api/resident/risk-assessments/{assessmentId}",
+            "/api/resident/risk-assessments/{assessmentId}/guide",
+            "/api/resident/prevention-guides/{guideId}",
+            "/api/resident/guide-items/{itemId}/progress",
+            "/api/resident/prevention-guides/{guideId}/resolution");
   }
 
   @Test

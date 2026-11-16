@@ -387,6 +387,27 @@ class LoginTest {
             .getResponse()
             .getContentAsString();
     var document = mapper.readTree(response);
+    var authPaths =
+        document.path("paths").properties().stream()
+            .filter(
+                path ->
+                    path.getValue().properties().stream()
+                        .anyMatch(
+                            method ->
+                                "인증/인가".equals(method.getValue().path("tags").path(0).asText())))
+            .map(java.util.Map.Entry::getKey)
+            .toList();
+    assertThat(authPaths)
+        .containsExactly(
+            "/api/auth/signup",
+            "/api/auth/login",
+            "/api/resident/consents",
+            "/api/auth/refresh",
+            "/api/auth/google",
+            "/api/auth/admin/login",
+            "/api/auth/admin/google",
+            "/api/admin/me",
+            "/api/auth/logout");
     var consent = document.path("paths").path("/api/resident/consents").path("post");
     assertThat(consent.path("tags").toString())
         .contains("인증/인가")

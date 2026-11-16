@@ -301,7 +301,21 @@ class ConstructionCompletionTest {
     var root =
         mapper.readTree(
             mvc.perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString());
-    var op = root.path("paths").path("/api/admin/constructions").path("post");
+    var paths = root.path("paths");
+    var list = paths.path("/api/admin/constructions");
+    var detail = paths.path("/api/admin/constructions/{constructionId}");
+    var schedule = paths.path("/api/admin/constructions/{constructionId}/schedule");
+    var photos = paths.path("/api/admin/constructions/{constructionId}/photos");
+    var op = list.path("post");
+    assertThat(
+            List.of(
+                list.path("get"),
+                detail.path("get"),
+                schedule.path("post"),
+                photos.path("post"),
+                op))
+        .extracting(operation -> operation.path("x-flout-display-order").asInt())
+        .containsExactly(1, 2, 3, 4, 5);
     assertThat(op.path("requestBody").path("required").asBoolean()).isTrue();
     for (var code : List.of("200", "400", "401", "403", "404", "409"))
       assertThat(op.path("responses").has(code)).isTrue();

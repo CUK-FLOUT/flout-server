@@ -8,7 +8,6 @@ import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,10 +32,10 @@ public class SignupService {
     if (!request.password().equals(request.passwordConfirm())) {
       throw new BaseException(UserErrorCode.PASSWORD_MISMATCH);
     }
-    if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+    if (!UserCredentials.isPasswordWithinBcryptLimit(request.password())) {
       throw new BaseException(UserErrorCode.PASSWORD_TOO_LONG);
     }
-    String email = request.email().strip().toLowerCase(Locale.ROOT);
+    String email = UserCredentials.normalizeEmail(request.email());
     if (users.existsByEmail(email)) {
       throw new BaseException(UserErrorCode.EMAIL_ALREADY_EXISTS);
     }

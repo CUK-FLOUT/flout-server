@@ -21,13 +21,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ResidentApplicationProgressReader {
+  private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
   private final InspectionRepository inspections;
   private final InspectionResultRepository results;
   private final SupportApplicationRepository supports;
   private final ConstructionRepository constructions;
 
-  public Map<Long, ResidentApplicationProgressResponse> read(
-      List<InspectionApplication> applications) {
+  public Map<Long, Snapshot> read(List<InspectionApplication> applications) {
     if (applications.isEmpty()) return Map.of();
     var ids = applications.stream().map(InspectionApplication::getId).toList();
     var inspectionRows = inspections.findByApplicationIdIn(ids);
@@ -62,14 +63,17 @@ public class ResidentApplicationProgressReader {
     var constructionBySupport =
         constructionRows.stream()
             .collect(Collectors.toMap(c -> c.getSupportApplication().getId(), Function.identity()));
-    Map<Long, ResidentApplicationProgressResponse> progress = new HashMap<>();
+    Map<Long, Snapshot> progress = new HashMap<>();
     for (var application : applications) {
       var inspection = inspectionByApplication.get(application.getId());
       var result = inspection == null ? null : resultByInspection.get(inspection.getId());
       var support = supportByApplication.get(application.getId());
       var construction = support == null ? null : constructionBySupport.get(support.getId());
       progress.put(
-          application.getId(), map(application, inspection, result, support, construction));
+          application.getId(),
+          new Snapshot(
+              inspection == null ? null : inspection.getStatus(),
+              map(application, inspection, result, support, construction)));
     }
     return progress;
   }
@@ -196,6 +200,9 @@ public class ResidentApplicationProgressReader {
   }
 
   private static OffsetDateTime time(LocalDateTime value) {
-    return value == null ? null : value.atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime();
+    return value == null ? null : value.atZone(SEOUL).toOffsetDateTime();
   }
+
+  public record Snapshot(
+      InspectionStatus inspectionStatus, ResidentApplicationProgressResponse progress) {}
 }

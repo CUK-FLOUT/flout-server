@@ -5,10 +5,7 @@ import com.flout.server.domain.inspectionapplication.dto.response.AdminApplicati
 import com.flout.server.domain.inspectionapplication.dto.response.AdminApplicationStatsResponse;
 import com.flout.server.domain.inspectionapplication.entity.ApplicationProcessingStage;
 import com.flout.server.domain.inspectionapplication.repository.AdminApplicationListRepository;
-import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.Set;
@@ -21,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminApplicationListService {
   private static final Set<String> DISTRICTS = Set.of("", "원미구", "소사구", "오정구");
 
-  private final UserRepository users;
+  private final AdminApplicationAccess access;
   private final AdminApplicationListRepository applications;
 
   @Transactional(readOnly = true)
@@ -41,7 +38,7 @@ public class AdminApplicationListService {
 
   @Transactional(readOnly = true)
   public AdminApplicationStatsResponse stats(Long operatorId) {
-    requireOperator(operatorId);
+    access.requireReadOperator(operatorId);
     // 목록의 검색 조건과 별개로 관할 전체 건수를 집계한다.
     return applications.stats();
   }
@@ -59,19 +56,8 @@ public class AdminApplicationListService {
   }
 
   private void validateSearch(Long operatorId, String district, String keyword) {
-    requireOperator(operatorId);
+    access.requireReadOperator(operatorId);
     if (!DISTRICTS.contains(district) || keyword.length() > 255)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
-  }
-
-  private void requireOperator(Long operatorId) {
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN)
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED);
   }
 }

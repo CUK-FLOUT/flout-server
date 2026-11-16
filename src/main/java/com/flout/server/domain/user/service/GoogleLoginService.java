@@ -2,13 +2,13 @@ package com.flout.server.domain.user.service;
 
 import com.flout.server.domain.user.dto.request.GoogleLoginRequest;
 import com.flout.server.domain.user.dto.response.LoginResponse;
-import com.flout.server.domain.user.entity.*;
-import com.flout.server.domain.user.repository.*;
+import com.flout.server.domain.user.entity.User;
+import com.flout.server.domain.user.entity.UserRole;
+import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.GoogleTokenVerifier;
 import com.flout.server.global.security.JwtService;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -38,47 +38,66 @@ public class GoogleLoginService {
   @Transactional
   public LoginResponse login(GoogleLoginRequest request, UserRole requiredRole) {
     Jwt identity = verifier.verify(request.idToken());
-    String email = identity.getClaimAsString("email").strip().toLowerCase(Locale.ROOT);
     User user = users.findByGoogleSubject(identity.getSubject()).orElse(null);
     if (user == null) {
-      user = users.findForGoogleByEmail(email).orElse(null);
-      if (user != null) {
-        if (user.getRole() != requiredRole)
-          throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
-        if (user.getGoogleSubject() != null
-            && !user.getGoogleSubject().equals(identity.getSubject())) {
-          throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
-        }
-        if (user.getGoogleSubject() == null) {
-          if (requiredRole == UserRole.RESIDENT) {
-            throw new BaseException(UserErrorCode.EMAIL_LOGIN_REQUIRED);
-          }
-          // 기존 주민 계정 자동 연결 차단
-          // 사전 승인된 Gmail·Workspace 운영자만 최초 연결
-          String domain = identity.getClaimAsString("hd");
-          boolean authoritative =
-              email.endsWith("@gmail.com") || (domain != null && !domain.isBlank());
-          if (requiredRole != UserRole.ADMIN || !authoritative) {
-            throw new BaseException(UserErrorCode.GOOGLE_LINK_REQUIRED);
-          }
-          user.connectGoogle(identity.getSubject());
-        }
-      } else {
-        if (requiredRole == UserRole.ADMIN)
-          throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
-        String name = identity.getClaimAsString("name");
-        if (name == null || name.isBlank()) name = "주민";
-        name = name.strip();
-        if (name.length() > 50) name = name.substring(0, 50);
-        user = User.resident(email, passwords.encode(UUID.randomUUID().toString()), name);
-        user.connectGoogle(identity.getSubject());
-        persistNew(user);
-      }
+      user = resolveAccountByEmail(identity, requiredRole);
+    } else {
+      requireRole(user, requiredRole);
     }
-    if (user.getRole() != requiredRole) throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
     user.recordLogin();
     persist(user);
     return tokens.issue(user);
+  }
+
+  private User resolveAccountByEmail(Jwt identity, UserRole requiredRole) {
+    String email = UserCredentials.normalizeEmail(identity.getClaimAsString("email"));
+    User user = users.findForGoogleByEmail(email).orElse(null);
+    if (user == null) {
+      if (requiredRole != UserRole.RESIDENT) {
+        throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
+      }
+      return registerResident(identity, email);
+    }
+
+    requireRole(user, requiredRole);
+    String existingSubject = user.getGoogleSubject();
+    if (existingSubject != null) {
+      if (!existingSubject.equals(identity.getSubject())) {
+        throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
+      }
+      return user;
+    }
+    if (requiredRole == UserRole.RESIDENT) {
+      throw new BaseException(UserErrorCode.EMAIL_LOGIN_REQUIRED);
+    }
+
+    // 사전 승인된 Gmail·Workspace 운영자만 최초 연결
+    String domain = identity.getClaimAsString("hd");
+    boolean authoritativeEmail =
+        email.endsWith("@gmail.com") || (domain != null && !domain.isBlank());
+    if (requiredRole != UserRole.ADMIN || !authoritativeEmail) {
+      throw new BaseException(UserErrorCode.GOOGLE_LINK_REQUIRED);
+    }
+    user.connectGoogle(identity.getSubject());
+    return user;
+  }
+
+  private static void requireRole(User user, UserRole requiredRole) {
+    if (user.getRole() != requiredRole) {
+      throw new BaseException(UserErrorCode.GOOGLE_LOGIN_DENIED);
+    }
+  }
+
+  private User registerResident(Jwt identity, String email) {
+    String name = identity.getClaimAsString("name");
+    name = name == null || name.isBlank() ? "주민" : name.strip();
+    if (name.length() > 50) {
+      name = name.substring(0, 50);
+    }
+    User user = User.resident(email, passwords.encode(UUID.randomUUID().toString()), name);
+    user.connectGoogle(identity.getSubject());
+    persistNew(user);
+    return user;
   }
 
   private void persistNew(User user) {

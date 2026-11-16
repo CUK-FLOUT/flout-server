@@ -351,8 +351,24 @@ class SupportDetailTest {
     var operation = paths.get("/api/admin/support-applications/{supportApplicationId}").get("get");
     assertThat(operation.get("summary").asString()).isEqualTo("지원 신청 상세 조회");
     assertThat(operation.get("responses").has("404")).isTrue();
-    assertThat(paths.has("/api/admin/support-applications")).isTrue();
-    assertThat(paths.has("/api/admin/support-applications/status")).isTrue();
+    var supportPaths =
+        paths.properties().stream()
+            .filter(
+                path ->
+                    path.getValue().properties().stream()
+                        .anyMatch(
+                            method ->
+                                "운영자-지원관리".equals(method.getValue().path("tags").path(0).asText())))
+            .map(Map.Entry::getKey)
+            .toList();
+    assertThat(supportPaths)
+        .containsExactly(
+            "/api/admin/support-applications",
+            "/api/admin/support-applications/status",
+            "/api/admin/support-applications/{supportApplicationId}",
+            "/api/admin/support-applications/{supportApplicationId}/histories",
+            "/api/admin/support-applications/{supportApplicationId}/approve",
+            "/api/admin/support-applications/{supportApplicationId}/reject");
     assertThat(
             paths
                 .get("/api/admin/support-applications/{supportApplicationId}/histories")

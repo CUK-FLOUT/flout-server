@@ -44,4 +44,10 @@ public class PriorityInspectionAccess {
   public boolean includes(String address) {
     return address != null && BUCHEON_ADDRESS.matcher(address.strip()).find();
   }
+
+  void requireIncludedAddress(String address) {
+    if (!includes(address)) {
+      throw new BaseException(PriorityInspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    }
+  }
 }

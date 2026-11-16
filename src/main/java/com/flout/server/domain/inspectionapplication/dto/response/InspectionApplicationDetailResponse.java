@@ -59,7 +59,7 @@ public record InspectionApplicationDetailResponse(
       InspectionApplication application, List<InflowLocation> inflowLocations) {
     return new InspectionApplicationDetailResponse(
         application.getId(),
-        String.format(Locale.ROOT, "%06d", application.getId()),
+        formatReceiptNo(application.getId()),
         application.getApplicantName(),
         application.getContact(),
         application.getAddress(),
@@ -73,5 +73,9 @@ public record InspectionApplicationDetailResponse(
         application.getPreferredVisitDate(),
         application.getRequestReason(),
         application.getPreferredTimeSlot());
+  }
+
+  public static String formatReceiptNo(long applicationId) {
+    return String.format(Locale.ROOT, "%06d", applicationId);
   }
 }

@@ -164,10 +164,33 @@ class FcmTokenControllerTest {
   // Swagger 엔드포인트 및 인증·오류 명세 생성 검증
   @Test
   void documentsApi() throws Exception {
-    mvc.perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.paths['/api/notifications/tokens'].put.responses['200']").exists())
-        .andExpect(jsonPath("$.paths['/api/notifications/tokens'].put.responses['400']").exists())
-        .andExpect(jsonPath("$.paths['/api/notifications/tokens'].put.responses['401']").exists());
+    var response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.paths['/api/notifications/tokens'].put.responses['200']").exists())
+            .andExpect(
+                jsonPath("$.paths['/api/notifications/tokens'].put.responses['400']").exists())
+            .andExpect(
+                jsonPath("$.paths['/api/notifications/tokens'].put.responses['401']").exists())
+            .andReturn()
+            .getResponse();
+    var paths = mapper.readTree(response.getContentAsString()).path("paths");
+    var notificationPaths =
+        paths.properties().stream()
+            .filter(
+                path ->
+                    path.getValue().properties().stream()
+                        .anyMatch(
+                            method ->
+                                "주민-알림".equals(method.getValue().path("tags").path(0).asText())))
+            .map(Map.Entry::getKey)
+            .toList();
+    assertThat(notificationPaths)
+        .containsExactly(
+            "/api/resident/notifications",
+            "/api/resident/notifications/unread-status",
+            "/api/resident/notifications/read-all",
+            "/api/notifications/tokens");
   }
 }

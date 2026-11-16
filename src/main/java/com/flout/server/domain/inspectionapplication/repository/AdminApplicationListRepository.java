@@ -105,7 +105,7 @@ public class AdminApplicationListRepository {
           ) THEN 1 END) AS support_construction_in_progress_count
         """
             + JURISDICTION_APPLICATIONS,
-        new MapSqlParameterSource("region", BUCHEON + "(?:\\s|$)"),
+        new MapSqlParameterSource("region", regionPattern("")),
         (rs, rowNum) ->
             new AdminApplicationStatsResponse(
                 rs.getLong("total_count"),
@@ -141,9 +141,13 @@ public class AdminApplicationListRepository {
       RiskLevel riskLevel,
       ApplicationProcessingStage processingStage) {
     return new MapSqlParameterSource()
-        .addValue("region", BUCHEON + (district.isEmpty() ? "" : "\\s+" + district) + "(?:\\s|$)")
+        .addValue("region", regionPattern(district))
         .addValue("keyword", keyword)
         .addValue("riskLevel", riskLevel == null ? "" : riskLevel.name())
         .addValue("processingStage", processingStage == null ? "" : processingStage.name());
+  }
+
+  private static String regionPattern(String district) {
+    return BUCHEON + (district.isEmpty() ? "" : "\\s+" + district) + "(?:\\s|$)";
   }
 }

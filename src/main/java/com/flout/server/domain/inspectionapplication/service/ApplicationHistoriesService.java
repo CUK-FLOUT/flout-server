@@ -1,5 +1,7 @@
 package com.flout.server.domain.inspectionapplication.service;
 
+import static com.flout.server.domain.inspectionapplication.dto.response.InspectionApplicationDetailResponse.formatReceiptNo;
+
 import com.flout.server.domain.construction.entity.*;
 import com.flout.server.domain.construction.repository.ConstructionStatusHistoryRepository;
 import com.flout.server.domain.inspection.entity.*;
@@ -9,15 +11,11 @@ import com.flout.server.domain.inspectionapplication.dto.response.ApplicationHis
 import com.flout.server.domain.inspectionapplication.entity.ApplicationStatusHistory;
 import com.flout.server.domain.inspectionapplication.entity.InspectionApplicationStatus;
 import com.flout.server.domain.inspectionapplication.repository.ApplicationStatusHistoryRepository;
-import com.flout.server.domain.inspectionapplication.repository.InspectionApplicationRepository;
-import com.flout.server.domain.inspectionapplication.response.code.InspectionApplicationErrorCode;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatus;
 import com.flout.server.domain.supportapplication.repository.*;
 import com.flout.server.domain.user.entity.User;
-import com.flout.server.global.exception.BaseException;
 import java.time.*;
 import java.util.*;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,9 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ApplicationHistoriesService {
-  private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-  private final InspectionApplicationDetailService details;
-  private final InspectionApplicationRepository applications;
+  private final AdminApplicationAccess access;
   private final ApplicationStatusHistoryRepository applicationHistories;
   private final InspectionRepository inspections;
   private final InspectionStatusHistoryRepository inspectionHistories;
@@ -39,12 +35,7 @@ public class ApplicationHistoriesService {
   /** 실제 접수·공개 시각 및 변경 이력을 최신순으로 합친다. 초안·누락 시각·발생하지 않은 단계는 만들지 않는다. */
   @Transactional(readOnly = true)
   public ApplicationHistoriesResponse get(Long operatorId, Long applicationId) {
-    var detail = details.get(operatorId, applicationId);
-    var source =
-        applications
-            .findById(applicationId)
-            .orElseThrow(
-                () -> new BaseException(InspectionApplicationErrorCode.APPLICATION_NOT_FOUND));
+    var source = access.read(operatorId, applicationId);
     List<Event> events = new ArrayList<>();
     var inspection = inspections.findByApplicationId(applicationId).orElse(null);
     Long inspectionId = inspection == null ? null : inspection.getId();
@@ -132,8 +123,7 @@ public class ApplicationHistoriesService {
     for (var support :
         supports.findByApplicationIdAndStatusNotOrderBySubmittedAtAscIdAsc(
             applicationId, SupportApplicationStatus.DRAFT)) {
-      if (!BUCHEON.matcher(support.getAddress().strip()).find())
-        throw new BaseException(InspectionApplicationErrorCode.JURISDICTION_READ_ACCESS_DENIED);
+      access.requireReadableAddress(support.getAddress());
       supportIds.add(support.getId());
       if (support.getSubmittedAt() != null)
         events.add(
@@ -213,9 +203,9 @@ public class ApplicationHistoriesService {
                 Event::supportApplicationId, Comparator.nullsLast(Comparator.reverseOrder()))
             .thenComparing(Event::eventId, Comparator.reverseOrder()));
     return new ApplicationHistoriesResponse(
-        detail.applicationId(),
-        detail.receiptNo(),
-        detail.applicantName(),
+        source.getId(),
+        formatReceiptNo(source.getId()),
+        source.getApplicantName(),
         events.size(),
         List.copyOf(events));
   }

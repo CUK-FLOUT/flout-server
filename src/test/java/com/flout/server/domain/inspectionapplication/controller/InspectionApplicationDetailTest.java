@@ -25,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
@@ -36,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class InspectionApplicationDetailTest {
   @Autowired MockMvc mvc;
+  @Autowired ObjectMapper mapper;
   @Autowired JdbcTemplate jdbc;
   @Autowired UserRepository users;
   @Autowired RiskAssessmentRepository assessments;
@@ -385,23 +387,48 @@ class InspectionApplicationDetailTest {
   // 시간대 enum의 null 허용 및 OpenAPI 명세 검증
   @Test
   void documentsFieldsNullEnumAndErrors() throws Exception {
-    mvc.perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.paths['/api/admin/applications/{applicationId}'].get.tags[0]")
-                .value("운영자-GIS 신청관리"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/applications/{applicationId}'].get.responses['403'].content['application/json'].examples.jurisdictionAccessDenied.value.code")
-                .value("APPLICATION_403_4"))
-        .andExpect(
-            jsonPath(
-                    "$.components.schemas.InspectionApplicationDetailResponse.properties.preferredTimeSlot.enum")
-                .value(containsInAnyOrder("MORNING", "AFTERNOON", "ANY", null)))
-        .andExpect(
-            jsonPath(
-                    "$.components.schemas.InspectionApplicationDetailResponse.properties.preferredTimeSlot.type")
-                .value(hasItems("string", "null")));
+    var response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.paths['/api/admin/applications/{applicationId}'].get.tags[0]")
+                    .value("운영자-GIS 신청관리"))
+            .andExpect(
+                jsonPath(
+                        "$.paths['/api/admin/applications/{applicationId}'].get.responses['403'].content['application/json'].examples.jurisdictionAccessDenied.value.code")
+                    .value("APPLICATION_403_4"))
+            .andExpect(
+                jsonPath(
+                        "$.components.schemas.InspectionApplicationDetailResponse.properties.preferredTimeSlot.enum")
+                    .value(containsInAnyOrder("MORNING", "AFTERNOON", "ANY", null)))
+            .andExpect(
+                jsonPath(
+                        "$.components.schemas.InspectionApplicationDetailResponse.properties.preferredTimeSlot.type")
+                    .value(hasItems("string", "null")))
+            .andReturn()
+            .getResponse();
+    var gisPaths =
+        mapper.readTree(response.getContentAsString()).path("paths").properties().stream()
+            .filter(
+                path ->
+                    path.getValue().properties().stream()
+                        .anyMatch(
+                            method ->
+                                "운영자-GIS 신청관리"
+                                    .equals(method.getValue().path("tags").path(0).asText())))
+            .map(Map.Entry::getKey)
+            .toList();
+    assertThat(gisPaths)
+        .containsExactly(
+            "/api/admin/applications",
+            "/api/admin/applications/stats",
+            "/api/admin/map/applications",
+            "/api/admin/applications/{applicationId}",
+            "/api/admin/applications/{applicationId}/attachments",
+            "/api/admin/applications/{applicationId}/histories",
+            "/api/admin/applications/{applicationId}/support",
+            "/api/admin/applications/{applicationId}/construction",
+            "/api/admin/applications/{applicationId}/internal-memo");
   }
 
   @ParameterizedTest
