@@ -437,6 +437,29 @@ class AdminPublicIssueListTest {
   @Test
   void swaggerPublishesListSearchContract() throws Exception {
     var response = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andReturn();
+    var paths = mapper.readTree(response.getResponse().getContentAsString()).path("paths");
+    var rankedOperations = new TreeMap<Integer, String>();
+    for (var path : paths.properties()) {
+      for (var method : path.getValue().properties()) {
+        var operation = method.getValue();
+        if ("운영자-공공인프라".equals(operation.path("tags").path(0).asText())) {
+          var rank = operation.path("x-flout-display-order");
+          assertThat(rank.isIntegralNumber()).isTrue();
+          assertThat(rankedOperations.put(rank.asInt(), method.getKey() + " " + path.getKey()))
+              .isNull();
+        }
+      }
+    }
+    assertThat(rankedOperations.values())
+        .containsExactly(
+            "get /api/admin/public-issues",
+            "get /api/admin/public-issues/status",
+            "get /api/admin/map/public-issues",
+            "post /api/admin/public-issues",
+            "get /api/admin/public-issues/{publicIssueId}",
+            "get /api/admin/public-issues/{publicIssueId}/resident-applications",
+            "post /api/admin/public-issues/{publicIssueId}/review",
+            "post /api/admin/public-issues/{publicIssueId}/actions");
     var operation =
         mapper
             .readTree(response.getResponse().getContentAsString())

@@ -16,6 +16,28 @@ import org.junit.jupiter.api.Test;
 
 class OpenApiConfigTest {
   @Test
+  void authenticationPathsAreReorderedWithinTheirOriginalSlots() {
+    var paths = new Paths();
+    paths.addPathItem(
+        "/api/auth/logout", new PathItem().post(new Operation().addTagsItem("인증/인가")));
+    paths.addPathItem("/api/admin/applications", new PathItem().get(new Operation()));
+    paths.addPathItem("/api/auth/login", new PathItem().post(new Operation().addTagsItem("인증/인가")));
+    paths.addPathItem("/api/admin/applications/stats", new PathItem().get(new Operation()));
+    paths.addPathItem(
+        "/api/auth/signup", new PathItem().post(new Operation().addTagsItem("인증/인가")));
+
+    new OpenApiConfig().authDocumentation(3600).customise(new OpenAPI().paths(paths));
+
+    assertThat(paths.keySet())
+        .containsExactly(
+            "/api/auth/signup",
+            "/api/admin/applications",
+            "/api/auth/login",
+            "/api/admin/applications/stats",
+            "/api/auth/logout");
+  }
+
+  @Test
   void supportDecisionsDocumentMediaTypeErrorsWithoutLosingDecisionErrors() {
     var api = new OpenAPI().paths(new Paths());
     for (String action : Set.of("approve", "reject")) {

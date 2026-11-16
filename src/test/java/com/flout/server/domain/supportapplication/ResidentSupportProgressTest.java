@@ -365,6 +365,31 @@ class ResidentSupportProgressTest {
             .getResponse()
             .getContentAsString();
     var paths = mapper.readTree(payload).get("paths");
+    var rankedOperations = new TreeMap<Integer, String>();
+    for (var path : paths.properties()) {
+      for (var method : path.getValue().properties()) {
+        var operation = method.getValue();
+        if ("주민-지원신청".equals(operation.path("tags").path(0).asText())) {
+          var rank = operation.path("x-flout-display-order");
+          assertThat(rank.isIntegralNumber()).isTrue();
+          assertThat(rankedOperations.put(rank.asInt(), method.getKey() + " " + path.getKey()))
+              .isNull();
+        }
+      }
+    }
+    assertThat(rankedOperations.values())
+        .containsExactly(
+            "get /api/resident/applications/{applicationId}/recommended-facilities",
+            "post /api/resident/support-application/{supportApplicationId}/matching",
+            "put /api/resident/support-form-drafts/{draftId}",
+            "get /api/resident/support-applications/drafts",
+            "post /api/resident/support-applications",
+            "post /api/resident/support-applications/{supportApplicationId}/attachments",
+            "get /api/resident/support-applications/{supportApplicationId}/attachments",
+            "get /api/resident/support-applications/{supportApplicationId}/review",
+            "get /api/resident/support-applications/{supportApplicationId}/approval",
+            "get /api/resident/support-applications/{supportApplicationId}/schedule",
+            "get /api/resident/support-applications/{supportApplicationId}/rejection");
     for (String view : List.of("review", "approval", "rejection", "schedule", "attachments")) {
       var op =
           paths.get("/api/resident/support-applications/{supportApplicationId}/" + view).get("get");

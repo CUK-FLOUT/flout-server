@@ -1786,22 +1786,43 @@ class PriorityInspectionDesignationTest {
 
   @Test
   void swaggerDocumentsOrderEndpoint() throws Exception {
-    mvc.perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.paths['/api/admin/priority-inspections/order'].put.tags[0]")
-                .value("운영자-우선점검 관리"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/priority-inspections/order'].put.responses['200'].content['application/json'].examples.orderSaved.value.code")
-                .value("PRIORITY_INSPECTION_200_3"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/priority-inspections/order'].put.responses['404'].description")
-                .value("현장점검 신청을 찾을 수 없습니다."))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/admin/priority-inspections/order'].put.responses['409'].description")
-                .value("우선점검 미지정 신청 포함 또는 전체 대상 목록 불일치"));
+    var response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.paths['/api/admin/priority-inspections/order'].put.tags[0]")
+                    .value("운영자-우선점검 관리"))
+            .andExpect(
+                jsonPath(
+                        "$.paths['/api/admin/priority-inspections/order'].put.responses['200'].content['application/json'].examples.orderSaved.value.code")
+                    .value("PRIORITY_INSPECTION_200_3"))
+            .andExpect(
+                jsonPath(
+                        "$.paths['/api/admin/priority-inspections/order'].put.responses['404'].description")
+                    .value("현장점검 신청을 찾을 수 없습니다."))
+            .andExpect(
+                jsonPath(
+                        "$.paths['/api/admin/priority-inspections/order'].put.responses['409'].description")
+                    .value("우선점검 미지정 신청 포함 또는 전체 대상 목록 불일치"))
+            .andReturn()
+            .getResponse();
+    var priorityOperations =
+        mapper.readTree(response.getContentAsString()).path("paths").properties().stream()
+            .flatMap(
+                path ->
+                    path.getValue().properties().stream()
+                        .filter(
+                            method ->
+                                "운영자-우선점검 관리"
+                                    .equals(method.getValue().path("tags").path(0).asText()))
+                        .map(method -> method.getKey() + " " + path.getKey()))
+            .toList();
+    assertThat(priorityOperations)
+        .containsExactly(
+            "get /api/admin/priority-inspections",
+            "get /api/admin/priority-inspections/{applicationId}",
+            "put /api/admin/priority-inspections/designation",
+            "get /api/admin/priority-inspections/order",
+            "put /api/admin/priority-inspections/order");
   }
 }
