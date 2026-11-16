@@ -44,7 +44,6 @@ public record ResidentApplicationDetailResponse(
       List<InflowLocation> locations,
       long attachmentCount,
       InspectionStatus inspectionStatus,
-      boolean resultPublished,
       ResidentApplicationProgressResponse progress) {
     return new ResidentApplicationDetailResponse(
         application.getId(),
@@ -62,7 +61,7 @@ public record ResidentApplicationDetailResponse(
         attachmentCount,
         application.getStatus(),
         inspectionStatus,
-        resultPublished,
+        progress.resultPublished(),
         application.getCreatedAt(),
         application.getSubmittedAt(),
         progress);
