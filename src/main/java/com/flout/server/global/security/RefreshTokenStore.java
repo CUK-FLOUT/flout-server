@@ -11,12 +11,15 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RefreshTokenStore {
+  private static final Pattern TOKEN_FORMAT = Pattern.compile("[A-Za-z0-9_-]{43}");
+
   private final RefreshTokenRepository tokens;
   private final long expiresIn;
   private final SecureRandom random = new SecureRandom();
@@ -49,7 +52,7 @@ public class RefreshTokenStore {
 
   @Transactional
   public Long consume(String raw) {
-    if (!raw.matches("[A-Za-z0-9_-]{43}")) throw invalid();
+    if (!TOKEN_FORMAT.matcher(raw).matches()) throw invalid();
     String hash = hash(raw);
     var token = tokens.findByTokenHash(hash).orElseThrow(RefreshTokenStore::invalid);
     LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -62,7 +65,7 @@ public class RefreshTokenStore {
 
   @Transactional
   public void revoke(String raw) {
-    if (raw.matches("[A-Za-z0-9_-]{43}")) {
+    if (TOKEN_FORMAT.matcher(raw).matches()) {
       tokens.consume(hash(raw), LocalDateTime.now(ZoneOffset.UTC));
     }
   }

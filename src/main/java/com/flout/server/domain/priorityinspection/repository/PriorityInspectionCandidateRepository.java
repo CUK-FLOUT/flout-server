@@ -17,7 +17,9 @@ import org.springframework.stereotype.Repository;
 public class PriorityInspectionCandidateRepository {
   private static final int NEARBY_RADIUS_METERS = 1000;
   // 행정구역 경계로 부천시 주소 판별
-  private static final String JURISDICTION_PATTERN = "^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)";
+  private static final String JURISDICTION_PREFIX = "^(?:(?:경기도|경기)\\s+)?부천시";
+  private static final String ADDRESS_BOUNDARY = "(?:\\s|$)";
+  private static final String JURISDICTION_PATTERN = JURISDICTION_PREFIX + ADDRESS_BOUNDARY;
   private static final String FILTER =
       """
       FROM inspection_applications a
@@ -58,7 +60,7 @@ public class PriorityInspectionCandidateRepository {
                 "region",
                 district.isEmpty()
                     ? JURISDICTION_PATTERN
-                    : "^(?:(?:경기도|경기)\\s+)?부천시\\s+" + district + "(?:\\s|$)")
+                    : JURISDICTION_PREFIX + "\\s+" + district + ADDRESS_BOUNDARY)
             .addValue("riskLevel", riskLevel == null ? "" : riskLevel.name())
             .addValue("designated", designated, Types.BOOLEAN)
             .addValue("keyword", keyword)
@@ -86,10 +88,6 @@ public class PriorityInspectionCandidateRepository {
                     rs.getString("request_reason"),
                     0,
                     rs.getObject("designated_id") != null));
-    if (rows.isEmpty()) {
-      return new PriorityInspectionCandidatesResponse(
-          List.of(), page, size, total, (total + size - 1) / size);
-    }
     // 현재 페이지의 인근 건수를 한 번에 조회
     var counts =
         nearbyCounts(
@@ -109,7 +107,7 @@ public class PriorityInspectionCandidateRepository {
                         row.designated()))
             .toList();
     return new PriorityInspectionCandidatesResponse(
-        items, page, size, total, (total + size - 1) / size);
+        items, page, size, total, Math.ceilDiv(total, size));
   }
 
   // 요청 ID별로 관할 내 본인 제외 1km 신청 집계, 검색·페이지 조건 제외

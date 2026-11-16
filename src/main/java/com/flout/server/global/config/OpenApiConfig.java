@@ -1,5 +1,8 @@
 package com.flout.server.global.config;
 
+import static com.flout.server.global.config.SwaggerUiOrderConfig.DISPLAY_ORDER_EXTENSION;
+import static io.swagger.v3.oas.models.PathItem.HttpMethod.*;
+
 import com.flout.server.domain.address.response.code.AddressErrorCode;
 import com.flout.server.domain.address.response.code.AddressSuccessCode;
 import com.flout.server.domain.construction.response.code.ConstructionSuccessCode;
@@ -32,6 +35,7 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.*;
@@ -58,6 +62,142 @@ public class OpenApiConfig {
   private long refreshExpiresIn = 604800;
 
   private static final String BEARER_AUTH = "bearerAuth";
+  private static final String AUTH_TAG = "인증/인가";
+  private static final String GIS_APPLICATION_TAG = "운영자-GIS 신청관리";
+  private static final String PRIORITY_INSPECTION_TAG = "운영자-우선점검 관리";
+  private static final String INSPECTION_TAG = "운영자-현장점검 관리";
+  private static final String SUPPORT_MANAGEMENT_TAG = "운영자-지원관리";
+  private static final String CONSTRUCTION_MANAGEMENT_TAG = "운영자-시공관리";
+  private static final String PUBLIC_ISSUE_TAG = "운영자-공공인프라";
+  private static final String RESIDENT_RISK_ASSESSMENT_TAG = "주민-AI취약도 분석";
+  private static final String RESIDENT_INSPECTION_APPLICATION_TAG = "주민-현장점검 신청";
+  private static final String RESIDENT_SUPPORT_APPLICATION_TAG = "주민-지원신청";
+  private static final String RESIDENT_CONSTRUCTION_TAG = "주민-시공 신청";
+  private static final String RESIDENT_MY_APPLICATIONS_TAG = "주민-내신청";
+  private static final String RESIDENT_NOTIFICATION_TAG = "주민-알림";
+  private static final List<String> AUTH_PATH_ORDER =
+      List.of(
+          "/api/auth/signup",
+          "/api/auth/login",
+          "/api/resident/consents",
+          "/api/auth/refresh",
+          "/api/auth/google",
+          "/api/auth/admin/login",
+          "/api/auth/admin/google",
+          "/api/admin/me",
+          "/api/auth/logout");
+  private static final List<String> GIS_APPLICATION_PATH_ORDER =
+      List.of(
+          "/api/admin/applications",
+          "/api/admin/applications/stats",
+          "/api/admin/map/applications",
+          "/api/admin/applications/{applicationId}",
+          "/api/admin/applications/{applicationId}/attachments",
+          "/api/admin/applications/{applicationId}/histories",
+          "/api/admin/applications/{applicationId}/support",
+          "/api/admin/applications/{applicationId}/construction",
+          "/api/admin/applications/{applicationId}/internal-memo");
+  private static final List<String> PRIORITY_INSPECTION_PATH_ORDER =
+      List.of(
+          "/api/admin/priority-inspections",
+          "/api/admin/priority-inspections/{applicationId}",
+          "/api/admin/priority-inspections/designation",
+          "/api/admin/priority-inspections/order");
+  private static final String INSPECTION_ROOT = "/api/admin/inspections";
+  private static final String INSPECTION_DETAIL = INSPECTION_ROOT + "/{inspectionId}";
+  private static final List<OperationPath> INSPECTION_OPERATION_ORDER =
+      List.of(
+          new OperationPath(GET, INSPECTION_ROOT),
+          new OperationPath(GET, INSPECTION_DETAIL),
+          new OperationPath(POST, INSPECTION_DETAIL + "/assignment"),
+          new OperationPath(PUT, INSPECTION_DETAIL + "/result/draft"),
+          new OperationPath(POST, INSPECTION_DETAIL + "/attachments"),
+          new OperationPath(DELETE, INSPECTION_DETAIL + "/attachments/{photoId}"),
+          new OperationPath(GET, INSPECTION_DETAIL + "/result"),
+          new OperationPath(POST, INSPECTION_ROOT + "/recommended-facilities/validate"),
+          new OperationPath(POST, INSPECTION_DETAIL + "/result"));
+  private static final List<String> SUPPORT_MANAGEMENT_PATH_ORDER =
+      List.of(
+          "/api/admin/support-applications",
+          "/api/admin/support-applications/status",
+          "/api/admin/support-applications/{supportApplicationId}",
+          "/api/admin/support-applications/{supportApplicationId}/histories",
+          "/api/admin/support-applications/{supportApplicationId}/approve",
+          "/api/admin/support-applications/{supportApplicationId}/reject");
+  private static final String CONSTRUCTION_ROOT = "/api/admin/constructions";
+  private static final String CONSTRUCTION_DETAIL = CONSTRUCTION_ROOT + "/{constructionId}";
+  private static final List<OperationPath> CONSTRUCTION_OPERATION_ORDER =
+      List.of(
+          new OperationPath(GET, CONSTRUCTION_ROOT),
+          new OperationPath(GET, CONSTRUCTION_DETAIL),
+          new OperationPath(POST, CONSTRUCTION_DETAIL + "/schedule"),
+          new OperationPath(POST, CONSTRUCTION_DETAIL + "/photos"),
+          new OperationPath(POST, CONSTRUCTION_ROOT));
+  private static final String PUBLIC_ISSUE_ROOT = "/api/admin/public-issues";
+  private static final String PUBLIC_ISSUE_DETAIL = PUBLIC_ISSUE_ROOT + "/{publicIssueId}";
+  private static final List<OperationPath> PUBLIC_ISSUE_OPERATION_ORDER =
+      List.of(
+          new OperationPath(GET, PUBLIC_ISSUE_ROOT),
+          new OperationPath(GET, PUBLIC_ISSUE_ROOT + "/status"),
+          new OperationPath(GET, "/api/admin/map/public-issues"),
+          new OperationPath(POST, PUBLIC_ISSUE_ROOT),
+          new OperationPath(GET, PUBLIC_ISSUE_DETAIL),
+          new OperationPath(GET, PUBLIC_ISSUE_DETAIL + "/resident-applications"),
+          new OperationPath(POST, PUBLIC_ISSUE_DETAIL + "/review"),
+          new OperationPath(POST, PUBLIC_ISSUE_DETAIL + "/actions"));
+  private static final List<String> RESIDENT_RISK_ASSESSMENT_PATH_ORDER =
+      List.of(
+          "/api/resident/addresses/search",
+          "/api/resident/addresses/coordinates",
+          "/api/resident/risk-assessments",
+          "/api/resident/risk-assessments/{assessmentId}",
+          "/api/resident/risk-assessments/{assessmentId}/guide",
+          "/api/resident/prevention-guides/{guideId}",
+          "/api/resident/guide-items/{itemId}/progress",
+          "/api/resident/prevention-guides/{guideId}/resolution");
+  private static final String RESIDENT_APPLICATION_ROOT = "/api/resident/applications";
+  private static final String RESIDENT_APPLICATION_DETAIL =
+      RESIDENT_APPLICATION_ROOT + "/{applicationId}";
+  private static final List<OperationPath> RESIDENT_INSPECTION_APPLICATION_ORDER =
+      List.of(
+          new OperationPath(PUT, "/api/resident/application-form-drafts/{draftId}"),
+          new OperationPath(GET, RESIDENT_APPLICATION_ROOT + "/drafts"),
+          new OperationPath(POST, RESIDENT_APPLICATION_ROOT),
+          new OperationPath(PATCH, RESIDENT_APPLICATION_DETAIL),
+          new OperationPath(POST, RESIDENT_APPLICATION_DETAIL + "/attachments"),
+          new OperationPath(GET, RESIDENT_APPLICATION_DETAIL + "/result"),
+          new OperationPath(GET, RESIDENT_APPLICATION_DETAIL + "/recommendations"));
+  private static final String RESIDENT_SUPPORT_ROOT = "/api/resident/support-applications";
+  private static final String RESIDENT_SUPPORT_DETAIL =
+      RESIDENT_SUPPORT_ROOT + "/{supportApplicationId}";
+  private static final List<OperationPath> RESIDENT_SUPPORT_APPLICATION_ORDER =
+      List.of(
+          new OperationPath(GET, RESIDENT_APPLICATION_DETAIL + "/recommended-facilities"),
+          new OperationPath(
+              POST, "/api/resident/support-application/{supportApplicationId}/matching"),
+          new OperationPath(PUT, "/api/resident/support-form-drafts/{draftId}"),
+          new OperationPath(GET, RESIDENT_SUPPORT_ROOT + "/drafts"),
+          new OperationPath(POST, RESIDENT_SUPPORT_ROOT),
+          new OperationPath(POST, RESIDENT_SUPPORT_DETAIL + "/attachments"),
+          new OperationPath(GET, RESIDENT_SUPPORT_DETAIL + "/attachments"),
+          new OperationPath(GET, RESIDENT_SUPPORT_DETAIL + "/review"),
+          new OperationPath(GET, RESIDENT_SUPPORT_DETAIL + "/approval"),
+          new OperationPath(GET, RESIDENT_SUPPORT_DETAIL + "/schedule"),
+          new OperationPath(GET, RESIDENT_SUPPORT_DETAIL + "/rejection"));
+  private static final List<String> RESIDENT_CONSTRUCTION_PATH_ORDER =
+      List.of(
+          "/api/resident/constructions/{constructionId}/schedule",
+          "/api/resident/constructions/{constructionId}");
+  private static final List<OperationPath> RESIDENT_MY_APPLICATIONS_ORDER =
+      List.of(
+          new OperationPath(GET, RESIDENT_APPLICATION_ROOT),
+          new OperationPath(GET, RESIDENT_APPLICATION_DETAIL));
+  private static final List<String> RESIDENT_NOTIFICATION_PATH_ORDER =
+      List.of(
+          "/api/resident/notifications",
+          "/api/resident/notifications/unread-status",
+          "/api/resident/notifications/read-all",
+          "/api/notifications/tokens");
   private static final String JSON = "application/json";
   private static final String EXAMPLE_TIME = "2026-10-21 22:30:00";
   private static final Set<String> PUBLIC_POSTS =
@@ -125,19 +265,19 @@ public class OpenApiConfig {
       if (api.getTags() != null) {
         var tagOrder =
             List.of(
-                "인증/인가",
-                "운영자-GIS 신청관리",
-                "운영자-우선점검 관리",
-                "운영자-현장점검 관리",
-                "운영자-지원관리",
-                "운영자-시공관리",
-                "운영자-공공인프라",
+                AUTH_TAG,
+                GIS_APPLICATION_TAG,
+                PRIORITY_INSPECTION_TAG,
+                INSPECTION_TAG,
+                SUPPORT_MANAGEMENT_TAG,
+                CONSTRUCTION_MANAGEMENT_TAG,
+                PUBLIC_ISSUE_TAG,
                 "주민-홈",
-                "주민-AI취약도 분석",
-                "주민-현장점검 신청",
-                "주민-지원신청",
-                "주민-시공 신청",
-                "주민-내신청");
+                RESIDENT_RISK_ASSESSMENT_TAG,
+                RESIDENT_INSPECTION_APPLICATION_TAG,
+                RESIDENT_SUPPORT_APPLICATION_TAG,
+                RESIDENT_CONSTRUCTION_TAG,
+                RESIDENT_MY_APPLICATIONS_TAG);
         var tags = new ArrayList<>(api.getTags());
         if (tags.stream().noneMatch(tag -> "주민-홈".equals(tag.getName()))) {
           tags.add(new Tag().name("주민-홈"));
@@ -159,6 +299,26 @@ public class OpenApiConfig {
       if (api.getPaths() == null) {
         return;
       }
+      orderPathsForTag(api.getPaths(), AUTH_TAG, AUTH_PATH_ORDER);
+      orderPathsForTag(api.getPaths(), GIS_APPLICATION_TAG, GIS_APPLICATION_PATH_ORDER);
+      orderPathsForTag(api.getPaths(), PRIORITY_INSPECTION_TAG, PRIORITY_INSPECTION_PATH_ORDER);
+      describeOperationOrder(api.getPaths(), INSPECTION_TAG, INSPECTION_OPERATION_ORDER);
+      orderPathsForTag(api.getPaths(), SUPPORT_MANAGEMENT_TAG, SUPPORT_MANAGEMENT_PATH_ORDER);
+      describeOperationOrder(
+          api.getPaths(), CONSTRUCTION_MANAGEMENT_TAG, CONSTRUCTION_OPERATION_ORDER);
+      describeOperationOrder(api.getPaths(), PUBLIC_ISSUE_TAG, PUBLIC_ISSUE_OPERATION_ORDER);
+      orderPathsForTag(
+          api.getPaths(), RESIDENT_RISK_ASSESSMENT_TAG, RESIDENT_RISK_ASSESSMENT_PATH_ORDER);
+      describeOperationOrder(
+          api.getPaths(),
+          RESIDENT_INSPECTION_APPLICATION_TAG,
+          RESIDENT_INSPECTION_APPLICATION_ORDER);
+      describeOperationOrder(
+          api.getPaths(), RESIDENT_SUPPORT_APPLICATION_TAG, RESIDENT_SUPPORT_APPLICATION_ORDER);
+      orderPathsForTag(api.getPaths(), RESIDENT_CONSTRUCTION_TAG, RESIDENT_CONSTRUCTION_PATH_ORDER);
+      describeOperationOrder(
+          api.getPaths(), RESIDENT_MY_APPLICATIONS_TAG, RESIDENT_MY_APPLICATIONS_ORDER);
+      orderPathsForTag(api.getPaths(), RESIDENT_NOTIFICATION_TAG, RESIDENT_NOTIFICATION_PATH_ORDER);
       api.getPaths()
           .forEach(
               (path, item) ->
@@ -563,6 +723,49 @@ public class OpenApiConfig {
                           }));
     };
   }
+
+  // Operations without an explicit rank follow the document's path order.
+  private static void orderPathsForTag(Paths paths, String tag, List<String> pathOrder) {
+    var pathsForTag =
+        pathOrder.stream()
+            .filter(paths::containsKey)
+            .filter(
+                path -> {
+                  var operations = paths.get(path).readOperations();
+                  return !operations.isEmpty()
+                      && operations.stream()
+                          .allMatch(operation -> List.of(tag).equals(operation.getTags()));
+                })
+            .toList();
+    if (pathsForTag.size() < 2) {
+      return;
+    }
+    var orderedPathsForTag = pathsForTag.iterator();
+    var orderedPaths = new LinkedHashMap<String, PathItem>();
+    for (String path : paths.keySet()) {
+      String orderedPath = pathsForTag.contains(path) ? orderedPathsForTag.next() : path;
+      orderedPaths.put(orderedPath, paths.get(orderedPath));
+    }
+    paths.clear();
+    paths.putAll(orderedPaths);
+  }
+
+  private static void describeOperationOrder(
+      Paths paths, String tag, List<OperationPath> operationOrder) {
+    for (int index = 0; index < operationOrder.size(); index++) {
+      var target = operationOrder.get(index);
+      var path = paths.get(target.path());
+      if (path == null) {
+        continue;
+      }
+      var operation = path.readOperationsMap().get(target.method());
+      if (operation != null && List.of(tag).equals(operation.getTags())) {
+        operation.addExtension(DISPLAY_ORDER_EXTENSION, index + 1);
+      }
+    }
+  }
+
+  private record OperationPath(PathItem.HttpMethod method, String path) {}
 
   /** 주민 진행 상태·폼 임시 저장 API 6개의 실제 응답 구조를 문서화한다. */
   private void describeResidentProgress(

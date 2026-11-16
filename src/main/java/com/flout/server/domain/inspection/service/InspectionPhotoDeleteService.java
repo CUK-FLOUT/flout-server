@@ -5,12 +5,9 @@ import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.*;
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspectionapplication.service.AttachmentCleanupService;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.*;
 import org.springframework.transaction.annotation.*;
@@ -18,23 +15,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class InspectionPhotoDeleteService {
-  private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-  private final UserRepository users;
-  private final InspectionRepository inspections;
+  private final InspectionAccess access;
   private final InspectionResultRepository results;
   private final InspectionResultPhotoRepository photos;
   private final AttachmentCleanupService cleanup;
   private final TransactionTemplate transactions;
 
   public InspectionPhotoDeleteService(
-      UserRepository users,
-      InspectionRepository inspections,
+      InspectionAccess access,
       InspectionResultRepository results,
       InspectionResultPhotoRepository photos,
       AttachmentCleanupService cleanup,
       PlatformTransactionManager manager) {
-    this.users = users;
-    this.inspections = inspections;
+    this.access = access;
     this.results = results;
     this.photos = photos;
     this.cleanup = cleanup;
@@ -46,28 +39,15 @@ public class InspectionPhotoDeleteService {
   /** 점검 잠금으로 업로드·공개와 직렬화하고 초안 사진과 정리 요청을 함께 커밋한 뒤 저장소 객체를 정리한다. */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public InspectionPhotoDeleteResponse delete(Long operatorId, Long inspectionId, Long photoId) {
-    if (inspectionId == null || inspectionId <= 0 || photoId == null || photoId <= 0)
+    InspectionAccess.validateInspectionId(inspectionId);
+    if (photoId == null || photoId <= 0)
       throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
     var key =
         transactions.execute(
             status -> {
-              var operator =
-                  users
-                      .findById(operatorId)
-                      .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-              if (operator.getRole() != UserRole.ADMIN)
-                throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-              if (operator.getJurisdiction() == null
-                  || !"부천시".equals(operator.getJurisdiction().getName()))
-                throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+              access.requireWriteOperator(operatorId);
               // 결과 공개와 사진 삭제가 겹치지 않도록 점검 행을 잠근다.
-              var inspection =
-                  inspections
-                      .findForStatusUpdate(inspectionId)
-                      .orElseThrow(
-                          () -> new BaseException(InspectionErrorCode.INSPECTION_NOT_FOUND));
-              if (!BUCHEON.matcher(inspection.getApplication().getAddress().strip()).find())
-                throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+              access.requireWritableAddress(access.lock(inspectionId));
               var photo =
                   photos
                       .findByIdAndResultInspectionId(photoId, inspectionId)

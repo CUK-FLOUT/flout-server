@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -484,6 +485,27 @@ class InspectionApplicationFlowTest {
             .getResponse()
             .getContentAsString();
     var api = mapper.readTree(body);
+    var rankedOperations = new TreeMap<Integer, String>();
+    for (var path : api.path("paths").properties()) {
+      for (var method : path.getValue().properties()) {
+        var operation = method.getValue();
+        if ("주민-현장점검 신청".equals(operation.path("tags").path(0).asText())) {
+          var rank = operation.path("x-flout-display-order");
+          assertThat(rank.isIntegralNumber()).isTrue();
+          assertThat(rankedOperations.put(rank.asInt(), method.getKey() + " " + path.getKey()))
+              .isNull();
+        }
+      }
+    }
+    assertThat(rankedOperations.values())
+        .containsExactly(
+            "put /api/resident/application-form-drafts/{draftId}",
+            "get /api/resident/applications/drafts",
+            "post /api/resident/applications",
+            "patch /api/resident/applications/{applicationId}",
+            "post /api/resident/applications/{applicationId}/attachments",
+            "get /api/resident/applications/{applicationId}/result",
+            "get /api/resident/applications/{applicationId}/recommendations");
     var schemas = api.path("components").path("schemas");
     var create = schemas.path("CreateInspectionApplicationRequest");
     var required = new java.util.HashSet<String>();

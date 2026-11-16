@@ -4,6 +4,7 @@ import com.flout.server.domain.notification.entity.NotificationType;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class NotificationService {
   private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+  private static final Pattern EVENT_ID_FORMAT = Pattern.compile("[A-Za-z0-9_.:-]{1,128}");
 
   private final ApplicationEventPublisher events;
   private final JdbcTemplate jdbc;
@@ -33,7 +35,7 @@ public class NotificationService {
         || applicationId <= 0
         || type == null
         || eventId == null
-        || !eventId.matches("[A-Za-z0-9_.:-]{1,128}")) {
+        || !EVENT_ID_FORMAT.matcher(eventId).matches()) {
       throw new IllegalArgumentException("알림 대상·종류·신청 ID·이벤트 ID를 확인해주세요.");
     }
     jdbc.update(

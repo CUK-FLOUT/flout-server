@@ -723,6 +723,53 @@ class InspectionResultDraftTest {
   }
 
   @Test
+  void swaggerDisplaysInspectionOperationsInDemoOrder() throws Exception {
+    var response =
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var rankedOperations = new TreeMap<Integer, String>();
+    for (var path : mapper.readTree(response).path("paths").properties()) {
+      for (var method : path.getValue().properties()) {
+        var operation = method.getValue();
+        var rank = operation.path("x-flout-display-order");
+        if ("운영자-현장점검 관리".equals(operation.path("tags").path(0).asText())) {
+          assertThat(rank.isIntegralNumber()).isTrue();
+          assertThat(rankedOperations.put(rank.asInt(), method.getKey() + " " + path.getKey()))
+              .isNull();
+        } else if (!List.of("운영자-시공관리", "운영자-공공인프라", "주민-현장점검 신청", "주민-지원신청", "주민-내신청")
+            .contains(operation.path("tags").path(0).asText())) {
+          assertThat(rank.isMissingNode()).isTrue();
+        }
+      }
+    }
+    assertThat(rankedOperations.values())
+        .containsExactly(
+            "get /api/admin/inspections",
+            "get /api/admin/inspections/{inspectionId}",
+            "post /api/admin/inspections/{inspectionId}/assignment",
+            "put /api/admin/inspections/{inspectionId}/result/draft",
+            "post /api/admin/inspections/{inspectionId}/attachments",
+            "delete /api/admin/inspections/{inspectionId}/attachments/{photoId}",
+            "get /api/admin/inspections/{inspectionId}/result",
+            "post /api/admin/inspections/recommended-facilities/validate",
+            "post /api/admin/inspections/{inspectionId}/result");
+    var initializer =
+        mvc.perform(get("/swagger-ui/swagger-initializer.js"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(initializer)
+        .contains(
+            "operationsSorter: (first, second)",
+            "x-flout-display-order",
+            "/v3/api-docs/swagger-config");
+  }
+
+  @Test
   void documentsResponseErrorsAndOptionalFields() throws Exception {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())

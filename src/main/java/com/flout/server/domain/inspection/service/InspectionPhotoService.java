@@ -6,14 +6,10 @@ import com.flout.server.domain.inspection.repository.*;
 import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
 import com.flout.server.domain.inspectionapplication.service.AttachmentCleanupService;
 import com.flout.server.domain.inspectionapplication.service.AttachmentStorage;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
-import com.flout.server.global.response.code.GeneralErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,9 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @Slf4j
 public class InspectionPhotoService {
-  private static final Pattern BUCHEON = Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-  private final UserRepository users;
-  private final InspectionRepository inspections;
+  private final InspectionAccess access;
   private final InspectionResultRepository results;
   private final InspectionResultPhotoRepository photos;
   private final AttachmentStorage storage;
@@ -37,16 +31,14 @@ public class InspectionPhotoService {
   private final TransactionTemplate transactions;
 
   public InspectionPhotoService(
-      UserRepository users,
-      InspectionRepository inspections,
+      InspectionAccess access,
       InspectionResultRepository results,
       InspectionResultPhotoRepository photos,
       AttachmentStorage storage,
       AttachmentCleanupService cleanup,
       InspectionPhotoValidator validator,
       PlatformTransactionManager manager) {
-    this.users = users;
-    this.inspections = inspections;
+    this.access = access;
     this.results = results;
     this.photos = photos;
     this.storage = storage;
@@ -60,8 +52,7 @@ public class InspectionPhotoService {
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public InspectionPhotoUploadResponse upload(
       Long operatorId, Long inspectionId, List<MultipartFile> files) {
-    if (inspectionId == null || inspectionId <= 0)
-      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
+    InspectionAccess.validateInspectionId(inspectionId);
     transactions.executeWithoutResult(status -> authorize(operatorId, inspectionId, false));
     if (files == null || files.isEmpty()) throw new BaseException(InspectionErrorCode.EMPTY_PHOTOS);
     var validated = files.stream().map(validator::validate).toList();
@@ -127,19 +118,9 @@ public class InspectionPhotoService {
   }
 
   private Inspection authorize(Long operatorId, Long inspectionId, boolean lock) {
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN)
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    if (operator.getJurisdiction() == null || !"부천시".equals(operator.getJurisdiction().getName()))
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    var inspection =
-        (lock ? inspections.findForStatusUpdate(inspectionId) : inspections.findById(inspectionId))
-            .orElseThrow(() -> new BaseException(InspectionErrorCode.INSPECTION_NOT_FOUND));
-    if (!BUCHEON.matcher(inspection.getApplication().getAddress().strip()).find())
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
+    access.requireWriteOperator(operatorId);
+    var inspection = lock ? access.lock(inspectionId) : access.find(inspectionId);
+    access.requireWritableAddress(inspection);
     return inspection;
   }
 }
