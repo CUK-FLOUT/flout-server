@@ -4,13 +4,7 @@ import com.flout.server.domain.inspection.dto.request.SaveInspectionResultDraftR
 import com.flout.server.domain.inspection.dto.response.SaveInspectionResultDraftResponse;
 import com.flout.server.domain.inspection.entity.*;
 import com.flout.server.domain.inspection.repository.*;
-import com.flout.server.domain.inspection.response.code.InspectionErrorCode;
-import com.flout.server.domain.user.entity.UserRole;
-import com.flout.server.domain.user.repository.UserRepository;
-import com.flout.server.global.exception.BaseException;
-import com.flout.server.global.response.code.GeneralErrorCode;
 import java.time.ZoneId;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -19,11 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SaveInspectionResultDraftService {
-  private static final Pattern BUCHEON_ADDRESS =
-      Pattern.compile("^(?:(?:경기도|경기)\\s+)?부천시(?:\\s|$)");
-
-  private final UserRepository users;
-  private final InspectionRepository inspections;
+  private final InspectionAccess access;
   private final InspectionResultRepository results;
   private final InspectionVulnerabilityRepository vulnerabilities;
   private final PreventionRecommendationRepository recommendations;
@@ -31,25 +21,10 @@ public class SaveInspectionResultDraftService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public SaveInspectionResultDraftResponse save(
       Long operatorId, Long inspectionId, SaveInspectionResultDraftRequest request) {
-    if (inspectionId == null || inspectionId <= 0) {
-      throw new BaseException(GeneralErrorCode.INVALID_HTTP_MESSAGE_PARAMETER);
-    }
-    var operator =
-        users
-            .findById(operatorId)
-            .orElseThrow(() -> new BaseException(GeneralErrorCode.UNAUTHORIZED_ERROR));
-    if (operator.getRole() != UserRole.ADMIN) {
-      throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
-    }
-    var inspection =
-        inspections
-            .findForStatusUpdate(inspectionId)
-            .orElseThrow(() -> new BaseException(InspectionErrorCode.INSPECTION_NOT_FOUND));
-    if (operator.getJurisdiction() == null
-        || !"부천시".equals(operator.getJurisdiction().getName())
-        || !BUCHEON_ADDRESS.matcher(inspection.getApplication().getAddress().strip()).find()) {
-      throw new BaseException(InspectionErrorCode.JURISDICTION_ACCESS_DENIED);
-    }
+    InspectionAccess.validateInspectionId(inspectionId);
+    var operator = access.requireAdmin(operatorId);
+    var inspection = access.lock(inspectionId);
+    access.requireWritable(operator, inspection);
 
     var result =
         results
