@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -183,10 +184,21 @@ class InspectionResultDraftTest {
 
   /** 결과 공개 시 별도 상태 API 없이 완료 상태와 이력을 저장하는지 검증한다. */
   @ParameterizedTest
-  @ValueSource(
-      strings = {"RECEIVED", "SCHEDULED", "IN_PROGRESS", "UNASSIGNED", "NO_SCHEDULE", "FUTURE"})
-  void publishingCompletesInspectionWithoutStatusPatch(String previous) throws Exception {
+  @CsvSource({
+    "RECEIVED, INSPECTION_409_7, 점검 담당자를 먼저 배정해 주세요.",
+    "SCHEDULED, INSPECTION_409_10, 점검 상태가 ‘진행 중’으로 바뀌면 결과를 공개할 수 있습니다.",
+    "UNASSIGNED, INSPECTION_409_7, 점검 담당자를 먼저 배정해 주세요.",
+    "NO_SCHEDULE, INSPECTION_409_8, 확정 방문 일시를 먼저 저장해 주세요.",
+    "FUTURE, INSPECTION_409_9, 확정 방문 시각이 아직 되지 않았습니다. 방문 시각이 되어 점검이 ‘진행 중’으로 바뀌면 결과를 공개할 수 있습니다.",
+    "IN_PROGRESS, , "
+  })
+  void publishingCompletesInspectionWithoutStatusPatch(
+      String previous, String errorCode, String errorMessage) throws Exception {
     switch (previous) {
+      case "RECEIVED" ->
+          jdbc.update(
+              "UPDATE inspections SET status='RECEIVED', inspector_user_id=NULL, scheduled_at=NULL WHERE inspection_id=?",
+              inspectionId);
       case "UNASSIGNED" ->
           jdbc.update(
               "UPDATE inspections SET inspector_user_id=NULL WHERE inspection_id=?", inspectionId);
@@ -195,7 +207,7 @@ class InspectionResultDraftTest {
               "UPDATE inspections SET scheduled_at=NULL WHERE inspection_id=?", inspectionId);
       case "FUTURE" ->
           jdbc.update(
-              "UPDATE inspections SET scheduled_at='2099-01-01 10:00:00' WHERE inspection_id=?",
+              "UPDATE inspections SET status='SCHEDULED', scheduled_at='2099-01-01 10:00:00' WHERE inspection_id=?",
               inspectionId);
       default ->
           jdbc.update(
@@ -203,14 +215,15 @@ class InspectionResultDraftTest {
     }
     entityManager.clear();
     addPhoto();
-    if (!"IN_PROGRESS".equals(previous)) {
+    if (errorCode != null) {
       mvc.perform(
               post("/api/admin/inspections/" + inspectionId + "/result")
                   .header("Authorization", "Bearer " + token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(mapper.writeValueAsString(full())))
           .andExpect(status().isConflict())
-          .andExpect(jsonPath("$.code").value("INSPECTION_409_1"));
+          .andExpect(jsonPath("$.code").value(errorCode))
+          .andExpect(jsonPath("$.message").value(errorMessage));
       assertThat(count("inspection_status_histories")).isZero();
       assertThat(
               jdbc.queryForObject(
@@ -275,7 +288,9 @@ class InspectionResultDraftTest {
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(full())))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("INSPECTION_409_6"))
+        .andExpect(jsonPath("$.message").value("이미 주민에게 공개된 점검 결과입니다."));
     assertThat(count("application_status_histories")).isEqualTo(1);
   }
 
@@ -649,7 +664,8 @@ class InspectionResultDraftTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    var paths = mapper.readTree(response).get("paths");
+    var document = mapper.readTree(response);
+    var paths = document.get("paths");
     for (String suffix : List.of("/result/draft", "/result")) {
       var operation =
           paths
@@ -672,6 +688,38 @@ class InspectionResultDraftTest {
       assertThat(action.has("relatedTarget")).isFalse();
       assertThat(example.get("followUpType").asText()).isEqualTo("INDIVIDUAL_HOUSE");
     }
+
+    var publishResponses =
+        paths.path("/api/admin/inspections/{inspectionId}/result").path("post").path("responses");
+    var success = publishResponses.path("200");
+    var content = success.path("content").path("application/json");
+    assertThat(success.path("description").asText()).isEqualTo("점검 결과 공개 성공");
+    var schemaRef = content.path("schema").path("$ref").asText();
+    assertThat(schemaRef).startsWith("#/components/schemas/");
+    var schema = document.at(schemaRef.substring(1));
+    assertThat(schema.path("properties").path("result").path("$ref").asText())
+        .isEqualTo("#/components/schemas/PublishInspectionResultResponse");
+    assertThat(
+            content
+                .path("examples")
+                .path("resultPublished")
+                .path("value")
+                .path("result")
+                .path("resultStatus")
+                .asText())
+        .isEqualTo("PUBLISHED");
+
+    var conflict = publishResponses.path("409").path("content").path("application/json");
+    assertThat(conflict.path("schema").path("$ref").asText())
+        .isEqualTo("#/components/schemas/CommonErrorResponse");
+    assertThat(conflict.path("examples").properties())
+        .extracting(example -> example.getValue().path("value").path("code").asText())
+        .containsExactlyInAnyOrder(
+            "INSPECTION_409_6",
+            "INSPECTION_409_7",
+            "INSPECTION_409_8",
+            "INSPECTION_409_9",
+            "INSPECTION_409_10");
   }
 
   @Test

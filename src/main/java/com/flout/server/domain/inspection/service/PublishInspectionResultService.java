@@ -84,16 +84,23 @@ public class PublishInspectionResultService {
     if (results
         .findByInspectionIdAndResultStatus(inspectionId, ResultStatus.PUBLISHED)
         .isPresent()) {
-      throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
+      throw new BaseException(InspectionErrorCode.RESULT_ALREADY_PUBLISHED);
     }
 
+    if (inspection.getInspector() == null) {
+      throw new BaseException(InspectionErrorCode.RESULT_INSPECTOR_REQUIRED);
+    }
+    LocalDateTime scheduledAt = inspection.getScheduledAt();
+    if (scheduledAt == null) {
+      throw new BaseException(InspectionErrorCode.RESULT_SCHEDULE_REQUIRED);
+    }
     LocalDateTime now = LocalDateTime.now(inspectionClock).truncatedTo(ChronoUnit.SECONDS);
+    if (scheduledAt.isAfter(now)) {
+      throw new BaseException(InspectionErrorCode.RESULT_VISIT_TIME_NOT_REACHED);
+    }
     var previous = inspection.getStatus();
-    if ((previous != InspectionStatus.IN_PROGRESS && previous != InspectionStatus.COMPLETED)
-        || inspection.getInspector() == null
-        || inspection.getScheduledAt() == null
-        || inspection.getScheduledAt().isAfter(now)) {
-      throw new BaseException(InspectionErrorCode.INVALID_STATUS_TRANSITION);
+    if (previous != InspectionStatus.IN_PROGRESS && previous != InspectionStatus.COMPLETED) {
+      throw new BaseException(InspectionErrorCode.RESULT_INSPECTION_NOT_IN_PROGRESS);
     }
 
     // 공개 전 초안 사진 등록 여부 확인

@@ -1365,7 +1365,16 @@ public class OpenApiConfig {
                 "supportStatus", "NOT_APPLIED")));
     addError(operation, "resultPhotoRequired", InspectionErrorCode.RESULT_PHOTO_REQUIRED, null);
     addError(
-        operation, "invalidStatusTransition", InspectionErrorCode.INVALID_STATUS_TRANSITION, null);
+        operation, "resultAlreadyPublished", InspectionErrorCode.RESULT_ALREADY_PUBLISHED, null);
+    addError(operation, "inspectorRequired", InspectionErrorCode.RESULT_INSPECTOR_REQUIRED, null);
+    addError(operation, "scheduleRequired", InspectionErrorCode.RESULT_SCHEDULE_REQUIRED, null);
+    addError(
+        operation, "visitTimeNotReached", InspectionErrorCode.RESULT_VISIT_TIME_NOT_REACHED, null);
+    addError(
+        operation,
+        "inspectionNotInProgress",
+        InspectionErrorCode.RESULT_INSPECTION_NOT_IN_PROGRESS,
+        null);
   }
 
   private void describeInspectionResultDraft(Operation operation) {
