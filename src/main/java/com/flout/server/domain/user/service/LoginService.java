@@ -8,9 +8,7 @@ import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,10 +30,10 @@ public class LoginService {
 
   @Transactional
   public LoginResponse login(LoginRequest request, UserRole requiredRole) {
-    String email = request.email().strip().toLowerCase(Locale.ROOT);
+    String email = UserCredentials.normalizeEmail(request.email());
     User user = users.findByEmail(email).orElse(null);
     boolean matches =
-        request.password().getBytes(StandardCharsets.UTF_8).length <= 72
+        UserCredentials.isPasswordWithinBcryptLimit(request.password())
             && encoder.matches(
                 request.password(), user == null ? dummyHash : user.getPasswordHash());
     if (user == null || !matches || user.getRole() != requiredRole) {
