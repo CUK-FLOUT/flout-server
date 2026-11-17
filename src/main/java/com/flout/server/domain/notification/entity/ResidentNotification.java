@@ -1,10 +1,13 @@
 package com.flout.server.domain.notification.entity;
 
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "notifications")
@@ -30,9 +33,12 @@ public class ResidentNotification {
   private Long applicationId;
 
   @Column(name = "read_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime readAt;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  // Read the stored Seoul wall time directly, without conversion through java.sql.Timestamp.
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   public static ResidentNotification create(
@@ -47,6 +53,6 @@ public class ResidentNotification {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 }

@@ -8,7 +8,7 @@ import com.flout.server.domain.publicissue.entity.PublicIssueStatus;
 import com.flout.server.domain.publicissue.repository.FacilityReviewRepository;
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.global.exception.BaseException;
-import java.time.LocalDateTime;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ public class FacilityReviewService {
       throw new BaseException(PublicIssueErrorCode.REVIEW_NOT_ALLOWED);
     if (!SAVABLE_STATUSES.contains(request.reviewStatus()))
       throw new BaseException(PublicIssueErrorCode.INVALID_REVIEW_STATUS);
-    var reviewedAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+    var reviewedAt = SeoulDateTimes.now().truncatedTo(ChronoUnit.SECONDS);
     var review =
         reviews
             .findByLocalProblemId(publicIssueId)

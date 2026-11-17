@@ -52,14 +52,13 @@ public class AdminConstructionListService {
 
   private static AdminConstructionListResponse.Item toItem(
       ConstructionRepository.AdminListItem row) {
-    var scheduledAt = row.getScheduledAt();
     return new AdminConstructionListResponse.Item(
         row.getConstructionId(),
         row.getReceiptNo(),
         row.getApplicantName(),
         row.getRequestedFacility(),
-        scheduledAt == null ? null : scheduledAt.toLocalDate(),
-        scheduledAt == null ? null : scheduledAt.toLocalTime(),
+        row.getScheduledDate(),
+        row.getScheduledTime(),
         ConstructionStatus.valueOf(row.getStatus()));
   }
 }

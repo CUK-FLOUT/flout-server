@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -33,6 +35,7 @@ public class UserConsent {
   private boolean agreed;
 
   @Column(name = "agreed_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime agreedAt;
 
   public void confirm(LocalDateTime time) {

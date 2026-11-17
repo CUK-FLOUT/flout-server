@@ -3,10 +3,13 @@ package com.flout.server.domain.supportapplication.entity;
 import com.flout.server.domain.inspectionapplication.entity.*;
 import com.flout.server.domain.supportprogram.entity.SupportProgram;
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -74,17 +77,20 @@ public class SupportApplication {
   private User approvedBy;
 
   @Column(name = "approved_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime approvedAt;
 
   @Column(name = "submitted_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime submittedAt;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
     if (status == SupportApplicationStatus.SUBMITTED) submittedAt = createdAt;
   }
 
@@ -117,7 +123,7 @@ public class SupportApplication {
     if (status != SupportApplicationStatus.DRAFT)
       throw new IllegalStateException("임시 신청만 접수할 수 있습니다.");
     status = SupportApplicationStatus.SUBMITTED;
-    submittedAt = LocalDateTime.now();
+    submittedAt = SeoulDateTimes.now();
   }
 
   public void approve(String scope, User operator, LocalDateTime approvedAt) {

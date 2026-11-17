@@ -9,6 +9,8 @@ import java.time.temporal.ChronoUnit;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "inspections")
@@ -25,6 +27,7 @@ public class Inspection {
   private InspectionApplication application;
 
   @Column(name = "scheduled_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime scheduledAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -36,6 +39,7 @@ public class Inspection {
   private User scheduledBy;
 
   @Column(name = "assigned_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime assignedAt;
 
   @Column(name = "pre_visit_notice", columnDefinition = "TEXT")
@@ -46,9 +50,11 @@ public class Inspection {
   private InspectionStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime updatedAt;
 
   // 신청 직후 접수 상태

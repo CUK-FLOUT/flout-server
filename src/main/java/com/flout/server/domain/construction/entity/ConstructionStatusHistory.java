@@ -4,6 +4,8 @@ import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -40,6 +42,7 @@ public class ConstructionStatusHistory {
   private Source changeSource;
 
   @Column(name = "changed_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime changedAt;
 
   public enum Source {

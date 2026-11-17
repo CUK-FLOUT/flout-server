@@ -728,8 +728,9 @@ class InspectionApplicationFlowTest {
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inspections", Long.class)).isZero();
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application_status_histories", Long.class))
         .isZero();
+    var seoul = java.time.ZoneId.of("Asia/Seoul");
     var beforeReceipt =
-        java.time.LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        java.time.LocalDateTime.now(seoul).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
     mvc.perform(
             multipart("/api/resident/applications/{id}/attachments", applicationId)
                 .file(png())
@@ -746,13 +747,12 @@ class InspectionApplicationFlowTest {
         .andExpect(jsonPath("$.result.attachments[0].attachmentId").isNumber());
     var submittedAt =
         jdbc.queryForObject(
-                "SELECT submitted_at FROM inspection_applications WHERE application_id=?",
-                java.sql.Timestamp.class,
-                applicationId)
-            .toLocalDateTime();
+            "SELECT submitted_at FROM inspection_applications WHERE application_id=?",
+            (row, index) -> row.getObject("submitted_at", java.time.LocalDateTime.class),
+            applicationId);
     assertThat(submittedAt)
         .isAfterOrEqualTo(beforeReceipt)
-        .isBeforeOrEqualTo(java.time.LocalDateTime.now().plusSeconds(1));
+        .isBeforeOrEqualTo(java.time.LocalDateTime.now(seoul).plusSeconds(1));
     mvc.perform(
             get("/api/resident/applications/{id}", applicationId)
                 .header("Authorization", "Bearer " + token))

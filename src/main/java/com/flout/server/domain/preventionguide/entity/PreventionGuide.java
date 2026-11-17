@@ -1,12 +1,15 @@
 package com.flout.server.domain.preventionguide.entity;
 
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "prevention_guides")
@@ -33,9 +36,11 @@ public class PreventionGuide {
   private PreventionGuideStatus status;
 
   @Column(name = "generated_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime generatedAt;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "is_resolved")
@@ -49,23 +54,25 @@ public class PreventionGuide {
   private GuideResolution resolution;
 
   @Column(name = "progress_updated_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime progressUpdatedAt;
 
   @Column(name = "completed_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime completedAt;
 
   public void recordCompletion() {
-    if (completedAt == null) completedAt = LocalDateTime.now();
+    if (completedAt == null) completedAt = SeoulDateTimes.now();
   }
 
   public void updateResolution(GuideResolution resolution) {
     this.resolution = Objects.requireNonNull(resolution);
     this.resolved = resolution == GuideResolution.CONFIRMED;
-    this.progressUpdatedAt = LocalDateTime.now();
+    this.progressUpdatedAt = SeoulDateTimes.now();
   }
 
   public void recordProgressChange() {
-    progressUpdatedAt = LocalDateTime.now();
+    progressUpdatedAt = SeoulDateTimes.now();
   }
 
   public static PreventionGuide generated(
@@ -88,6 +95,6 @@ public class PreventionGuide {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 }

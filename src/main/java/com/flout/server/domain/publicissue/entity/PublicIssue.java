@@ -1,12 +1,15 @@
 package com.flout.server.domain.publicissue.entity;
 
 import com.flout.server.domain.inspection.entity.Inspection;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "public_issues")
@@ -50,11 +53,12 @@ public class PublicIssue {
   private PublicIssueStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 
   public static PublicIssue create(

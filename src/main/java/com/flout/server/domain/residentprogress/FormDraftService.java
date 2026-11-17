@@ -3,6 +3,7 @@ package com.flout.server.domain.residentprogress;
 import com.flout.server.domain.user.entity.UserRole;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
@@ -158,11 +159,12 @@ public class FormDraftService {
     if (id == null) return;
     int count =
         jdbc.update(
-            "UPDATE resident_form_drafts SET form_state=?,linked_id=?,submission_hash=?,submission_response=?,updated_at=CURRENT_TIMESTAMP WHERE draft_id=? AND user_id=? AND draft_type=? AND source_id=? AND form_state='EDITING'",
+            "UPDATE resident_form_drafts SET form_state=?,linked_id=?,submission_hash=?,submission_response=?,updated_at=? WHERE draft_id=? AND user_id=? AND draft_type=? AND source_id=? AND form_state='EDITING'",
             completed ? "COMPLETED" : "LINKED",
             linkedId,
             hash(request),
             mapper.writeValueAsString(response),
+            SeoulDateTimes.now(),
             id.toString(),
             userId,
             type,
@@ -172,7 +174,8 @@ public class FormDraftService {
 
   public void complete(String type, Long linkedId) {
     jdbc.update(
-        "UPDATE resident_form_drafts SET form_state='COMPLETED',updated_at=CURRENT_TIMESTAMP WHERE draft_type=? AND linked_id=? AND form_state='LINKED'",
+        "UPDATE resident_form_drafts SET form_state='COMPLETED',updated_at=? WHERE draft_type=? AND linked_id=? AND form_state='LINKED'",
+        SeoulDateTimes.now(),
         type,
         linkedId);
   }
@@ -297,8 +300,9 @@ public class FormDraftService {
           app.getPreferredTimeSlot() == null ? null : app.getPreferredTimeSlot().name());
       fields.set("inflowLocations", mapper.valueToTree(locations));
       jdbc.update(
-          "UPDATE resident_form_drafts SET fields_json=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
+          "UPDATE resident_form_drafts SET fields_json=?,version=version+1,updated_at=? WHERE draft_id=?",
           mapper.writeValueAsString(fields),
+          SeoulDateTimes.now(),
           row.get("draft_id"));
     }
   }
@@ -407,13 +411,16 @@ public class FormDraftService {
       throw new BaseException(FormDraftErrorCode.EDITING_EXISTS);
     }
     try {
+      var now = SeoulDateTimes.now();
       jdbc.update(
-          "INSERT INTO resident_form_drafts(draft_id,user_id,draft_type,source_id,form_state,fields_json,version,created_at,updated_at) VALUES(?,?,?,?,'EDITING',?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+          "INSERT INTO resident_form_drafts(draft_id,user_id,draft_type,source_id,form_state,fields_json,version,created_at,updated_at) VALUES(?,?,?,?,'EDITING',?,1,?,?)",
           id.toString(),
           userId,
           type,
           source,
-          json);
+          json,
+          now,
+          now);
     } catch (DataIntegrityViolationException e) {
       throw new BaseException(FormDraftErrorCode.CONFLICT);
     }
@@ -442,8 +449,9 @@ public class FormDraftService {
         || ((Number) row.get("version")).longValue() != request.version())
       throw new BaseException(FormDraftErrorCode.CONFLICT);
     jdbc.update(
-        "UPDATE resident_form_drafts SET fields_json=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
+        "UPDATE resident_form_drafts SET fields_json=?,version=version+1,updated_at=? WHERE draft_id=?",
         json,
+        SeoulDateTimes.now(),
         id.toString());
     return one(userId, type, id.toString(), false);
   }

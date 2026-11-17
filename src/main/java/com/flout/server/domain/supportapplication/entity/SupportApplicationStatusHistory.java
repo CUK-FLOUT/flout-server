@@ -4,6 +4,8 @@ import com.flout.server.domain.user.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "support_application_status_histories")
@@ -41,6 +43,7 @@ public class SupportApplicationStatusHistory {
   private User changedBy;
 
   @Column(name = "changed_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime changedAt;
 
   public static SupportApplicationStatusHistory approved(

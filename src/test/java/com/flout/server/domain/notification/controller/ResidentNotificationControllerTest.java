@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
@@ -34,6 +35,7 @@ class ResidentNotificationControllerTest {
   @Autowired UserRepository users;
   @Autowired ResidentNotificationRepository notifications;
   @Autowired NotificationService notificationService;
+  @Autowired JdbcTemplate jdbc;
   @Autowired JwtService jwt;
 
   User resident;
@@ -86,6 +88,22 @@ class ResidentNotificationControllerTest {
             .getFirst()
             .getCreatedAt();
     org.assertj.core.api.Assertions.assertThat(createdAt).isBetween(before, after);
+  }
+
+  @Test
+  void returnsTheStoredNotificationTimeWithSeoulOffset() throws Exception {
+    notificationService.send(
+        resident.getId(), NotificationType.INSPECTION_RECEIVED, 101L, "seoul-time-response");
+    jdbc.update(
+        "UPDATE notifications SET created_at = ? WHERE event_id = ?",
+        LocalDateTime.of(2026, 11, 17, 23, 6, 7),
+        "seoul-time-response");
+
+    mvc.perform(
+            get("/api/resident/notifications")
+                .header("Authorization", "Bearer " + jwt.issue(resident).accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result[0].createdAt").value("2026-11-17T23:06:07+09:00"));
   }
 
   @Test

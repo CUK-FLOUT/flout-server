@@ -4,7 +4,7 @@ import com.flout.server.domain.inspection.dto.request.SaveInspectionResultDraftR
 import com.flout.server.domain.inspection.dto.response.SaveInspectionResultDraftResponse;
 import com.flout.server.domain.inspection.entity.*;
 import com.flout.server.domain.inspection.repository.*;
-import java.time.ZoneId;
+import com.flout.server.global.time.SeoulDateTimes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -61,10 +61,6 @@ public class SaveInspectionResultDraftService {
     return new SaveInspectionResultDraftResponse(
         inspection.getId(),
         result.getResultStatus().name(),
-        result
-            .getUpdatedAt()
-            .atZone(ZoneId.systemDefault())
-            .withZoneSameInstant(ZoneId.of("Asia/Seoul"))
-            .toOffsetDateTime());
+        SeoulDateTimes.toOffset(result.getUpdatedAt()));
   }
 }
