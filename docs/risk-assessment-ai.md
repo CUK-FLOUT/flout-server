@@ -8,6 +8,16 @@ Swagger 그룹: `주민-AI취약도 분석`
 분석 결과는 `risk_assessments`에 저장하고 같은 응답에서 반환합니다. 점수와 등급은 지역
 상대 취약도이며 개별 주택의 실제 침수 확률이나 안전 여부를 뜻하지 않습니다.
 
+## 주소 검색과 좌표 조회
+
+- `GET /api/resident/addresses/search?keyword=...&currentPage=1`: 부천시 주소 검색. `keyword`는 필수이며 최대 100자, `currentPage`는 1부터 시작하고 기본값은 1입니다. 도로명·지번·건물명·동·구로 검색하며 부천시 단독 검색은 빈 결과입니다. result는 `addresses`, `currentPage`, `countPerPage`, `hasMore`, `nextPage`를 포함합니다. 외부 검색은 페이지당 10건이며 지역 필터링으로 빈 페이지에도 다음 페이지가 있을 수 있습니다.
+- `GET /api/resident/addresses/coordinates?address=...`: 원미구·소사구·오정구의 건물번호가 포함된 주소로 좌표를 조회합니다. `address`는 필수이며 최대 255자입니다. 결과는 `latitude`, `longitude`입니다.
+
+두 API는 인증이 필요합니다. 주소 검색 서비스 오류·시간 초과는 각각 `ADDRESS_502_2`,
+`ADDRESS_503_2`, 좌표 서비스 오류·시간 초과는 `ADDRESS_502_1`, `ADDRESS_503_1`입니다.
+좌표 조회는 주소가 불충분하면 `ADDRESS_400_1`, 선택 주소에 일치하는 좌표가 없으면
+`ADDRESS_404_2`를 반환합니다.
+
 ## 요청
 
 ```json

@@ -1,4 +1,4 @@
-# 운영자 지역·공공 문제 조회 API
+# 운영자 지역·공공 문제 조회 및 등록 API
 
 Swagger 그룹: `운영자-공공인프라`
 
@@ -33,6 +33,30 @@ Swagger 그룹: `운영자-공공인프라`
 상세 응답은 등록 출처, 반경 1km 관련 신청·유입 위치, 검토·연결 공공시설, 완료 조치와
 사진을 포함합니다. 검토나 연결 시설이 없으면 해당 필드는 `null`이며, 사진 URL은 권한
 확인 후 발급하는 비공개 임시 URL입니다.
+
+## 지역·공공 문제 등록
+
+`POST /api/admin/public-issues`는 관할 원본 점검에 연결된 문제를 `RECEIVED`로 등록합니다.
+운영자 Bearer 토큰과 JSON 요청 본문이 필요합니다. `inspectionId`는 현장점검 ID이며
+신청 ID와 다릅니다.
+
+```json
+{
+  "inspectionId": 1,
+  "issueType": "BLOCKED_STORM_DRAIN",
+  "description": "빗물받이 주변 배수 상태 확인이 필요합니다.",
+  "fieldFindings": "낙엽과 토사가 쌓여 있습니다."
+}
+```
+
+`issueType`은 위 네 유형 중 하나이며 `description`과 `fieldFindings`는 필수이고 각각
+최대 4000자입니다. 선택 필드 `address`를 생략하거나 null로 보내면 원본 신청 주소를
+사용합니다. 입력하면 공백이 아닌 최대 255자여야 합니다. 정규화한 주소가 원본 주소와
+같으면 원본 좌표를 사용하고, 다르면 주소 좌표 서비스를 호출합니다. 외부 좌표 조회는
+DB 트랜잭션 밖에서 수행하며 저장 시 원본 점검 권한을 다시 확인합니다.
+같은 점검에 여러 문제를 등록할 수 있습니다. 성공은 200 `PUBLIC_ISSUE_200_1`입니다.
+등록 후 검토와 조치 완료는 각각 [공공시설 검토](facility-review-save.md)와
+[조치 사진·완료](public-issue-action-registration.md)를 따릅니다.
 
 ## 오류
 

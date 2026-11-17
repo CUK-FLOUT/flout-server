@@ -16,7 +16,7 @@ ID 토큰 방식이므로 서버의 Google client secret은 필요하지 않습�
 `local` 프로필로 서버를 실행하고 `http://localhost:8080/dev/google-login`을 엽니다.
 Google Cloud의 승인된 JavaScript 원본에는 `http://localhost`와 `http://localhost:8080`을 등록합니다.
 별도 프론트 서버 없이 Google 버튼으로 ID 토큰을 받은 다음, 주민/운영자 API를 직접 테스트하거나
-ID 토큰을 복사해 Swagger에서 사용할 수 있습니다. 신규 주민 가입 시 두 동의 항목을 직접 선택합니다.
+ID 토큰을 복사해 Swagger에서 사용할 수 있습니다. 테스트 화면의 동의 선택값은 현재 Google 로그인 요청 DTO에 포함되지 않으며 동의 저장을 대신하지 않습니다.
 테스트 화면은 local 프로필에서만 제공하며 토큰은 브라우저 저장소에 저장하지 않습니다.
 
 - 주민: `POST /api/auth/google`
@@ -25,24 +25,20 @@ ID 토큰을 복사해 Swagger에서 사용할 수 있습니다. 신규 주민 �
 
 ```json
 {
-  "idToken": "example-google-id-token",
-  "thirdPartyProvisionAgreed": true,
-  "statusNotificationAgreed": true
+  "idToken": "example-google-id-token"
 }
 ```
 
-동의 값은 신규 주민 Google 가입 시에만 필수입니다. 개인정보 제3자 제공과 진행상태 알림 수신에
-모두 명시적으로 동의해야 하며, 하나라도 누락하거나 false이면 `USER_400_3`을 반환하며 가입하지 않습니다.
-각각 `THIRD_PARTY_PROVISION`, `STATUS_NOTIFICATION` 유형으로 동의 시각과 버전을 저장합니다.
-동의 버전은 `THIRD_PARTY_PROVISION_VERSION`, `STATUS_NOTIFICATION_VERSION`으로 설정하며 기본값은 1.0입니다.
-이메일 회원가입도 같은 두 필드와 동의 유형을 사용합니다. V6에서 기존 TERMS는 THIRD_PARTY_PROVISION으로, PRIVACY는 STATUS_NOTIFICATION으로 변경하며 동의 여부·버전·시각은 유지합니다.
-프론트는 동의 화면에서 받은 값만 보내야 합니다. 기존 Google 회원과 운영자는 생략합니다.
+Google 로그인 요청은 ID 토큰만 받습니다. 신규 주민은 계정이 생성되고 로그인 응답의
+`requiresConsent`로 현재 버전의 동의 필요 여부를 확인합니다. true이면 로그인 후 별도
+`POST /api/resident/consents`에서 두 필수 동의를 저장합니다. 요청·버전 및 V6 이력은
+[이메일 회원가입과 동의](signup.md)를 참고하세요. 운영자의 `requiresConsent`는 false입니다.
 성공 응답은 이메일 로그인과 동일한 `LoginResponse`로 서비스 Access Token과 Refresh Token을 발급합니다.
 재발급은 `POST /api/auth/refresh`를 공통으로 사용합니다. [토큰 재발급](refresh-token.md)을 참고하세요.
 
 ## 주민
 
-Google `sub`로 회원을 식별합니다. 미등록 계정은 RESIDENT로만 생성하고 동의를 함께 저장합니다.
+Google `sub`로 회원을 식별합니다. 미등록 계정은 RESIDENT로 생성하며 동의는 로그인 후 별도 저장합니다.
 이미 이메일 회원가입한 주소는 자동 연결하지 않고 `USER_409_3`과 이메일 로그인 안내를 반환합니다.
 이메일 로그인 실패는 가입 방식이나 계정 존재 여부와 관계없이 `USER_401_1`을 반환합니다. 인증 전에는 Google 가입 여부를 안내하지 않습니다.
 비밀번호 재인증 등을 거치는 별도 계정 연결 기능은 이 작업에 포함하지 않습니다.
@@ -67,7 +63,7 @@ Workspace 이메일이 등록 주소와 일치할 때만 최초 로그인에서 
 
 | HTTP | 코드 | 의미 |
 | --- | --- | --- |
-| 400 | USER_400_3 | 신규 주민 개인정보 제3자 제공 및 진행상태 알림 수신 동의 필요 |
+| 400 | COMMON_400_2 | ID 토큰 누락·공백 또는 잘못된 요청 본문 |
 | 401 | USER_401_2 | Google ID 토큰 검증 실패 |
 | 403 | USER_403_1 | 미등록 운영자 또는 역할/Google 계정 불일치 |
 | 409 | USER_409_2 | 계정 연결 필요 또는 동시 가입·연결 충돌. 신규 가입 저장 중 잠금 충돌도 포함하며, 충돌 시 재로그인 |

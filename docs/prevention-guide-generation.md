@@ -34,6 +34,7 @@
     "totalCount": 4,
     "items": [
       {
+        "itemId": 1,
         "order": 1,
         "ruleId": "BASEMENT_EVAC",
         "title": "반지하 대피 요령 확인",
@@ -41,6 +42,7 @@
         "completed": false
       }
     ],
+    "resolution": null,
     "generatedAt": "2026-11-07T12:00:00+09:00"
   }
 }
@@ -52,6 +54,7 @@
 - `grade`는 취약도 분석 모델의 결과를 그대로 반환한다. Gemini가 등급을 다시 판단하지
   않는다.
 - 예상 시간은 응답하지 않는다. 생성 직후 모든 항목의 `completed`는 `false`다.
+- `itemId`는 항목별 진행 상태 변경에 사용하며 `resolution`은 최종 선택 전 null이다.
 
 ## 우선순위
 

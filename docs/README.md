@@ -29,7 +29,7 @@
 | 문서 | 내용 |
 | --- | --- |
 | [Google 로그인](google-login.md) | 주민·운영자 Google 로그인과 로컬 테스트 |
-| [이메일 회원가입](signup.md) | 주민 회원가입과 필수 동의 |
+| [이메일 회원가입과 동의](signup.md) | 주민 회원가입과 로그인 후 필수 동의 |
 | [토큰 재발급·로그아웃](refresh-token.md) | Refresh Token 회전과 폐기 |
 | [운영자 관할](jurisdictions.md) | 관할 데이터와 `GET /api/admin/me` |
 
@@ -89,7 +89,7 @@
 
 | 문서 | 내용 |
 | --- | --- |
-| [공공 문제 조회](admin-public-issue-query.md) | 관할 목록·상세·지도 |
+| [공공 문제 조회·등록](admin-public-issue-query.md) | 관할 목록·상세·지도와 원본 점검 연결 등록 |
 | [공공시설 검토 저장](facility-review-save.md) | 검토 내용과 시설 연결 |
 | [조치 사진·완료](public-issue-action-registration.md) | 첨부 검증과 상태 변경 |
 

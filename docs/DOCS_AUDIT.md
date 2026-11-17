@@ -61,3 +61,17 @@
 - API의 전체 오류 코드와 트랜잭션 예외 테스트 점검
 - 최신 Flyway 버전과 지원사업 데이터의 실제 배포 반영 여부 확인
 - 시간대 및 접수번호 저장값/표시값 구별
+
+## 후속 코드·Swagger 확인 사항
+
+- 우선점검 후보 응답의 `nearbyApplicationCount`: `PriorityInspectionCandidatesResponse.Item`의
+  Swagger 설명은 신청 상태를 제한하지 않는다고 하지만 `PriorityInspectionCandidateRepository.nearbyCounts`는
+  현장점검 신청 `DRAFT`를 제외합니다. `AdminPriorityInspectionController`의 후보 조회 설명도
+  인근 전체 신청이라고 표현합니다. 실제 쿼리와 [후보 목록 문서](priority-inspection-candidates.md)를
+  기준으로 Swagger 설명을 수정해야 합니다. 이는 코드 변경이 필요한 별도 후속 작업입니다.
+- `GoogleLoginController.resident`의 Swagger 설명은 신규 주민이 동의 후 가입한다고 안내하지만,
+  `GoogleLoginRequest`는 ID 토큰만 받고 `GoogleLoginService`는 신규 주민을 생성한 뒤
+  로그인 결과의 `requiresConsent`로 별도 동의 필요 여부를 알립니다. 실제 동의 저장은
+  `POST /api/resident/consents`입니다. 컨트롤러 설명을 현재 흐름에 맞게 수정해야 합니다.
+- local Google 로그인 테스트 화면은 동의 값을 로그인 요청에 넣지만 현재 요청 DTO에서 사용하지
+  않습니다. 테스트 화면과 별도 동의 API 연결은 코드 담당자의 후속 검토가 필요합니다.

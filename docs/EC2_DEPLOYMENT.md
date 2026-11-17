@@ -15,6 +15,11 @@
 7. Health check가 실패하면 이전 JAR로 자동 롤백합니다.
 8. 서버의 파일 잠금으로 원격 배포가 겹치지 않게 하며, Actions 대기 시간이 끝나면 실행 중인 SSM 명령의 취소를 요청합니다.
 
+자동 롤백은 JAR를 되돌리는 절차이며 이미 적용된 Flyway 마이그레이션이나 데이터를
+되돌리지 않습니다. 배포 전 새 스키마가 이전 서버와 호환되는지, DB 백업·복구와
+구버전 인스턴스 중단이 필요한지 확인해야 합니다. 특히 V57의 구버전 호환성은
+[임대인 동의서 API 변경](landlord-consent-api-change.md)을 참고하세요.
+
 동시 배포는 `flout-main-deployment` concurrency group을 통해 직렬화됩니다. 자동 배포는 `main` push에서만 실행됩니다. GitHub Actions 화면의 수동 실행도 `main` 브랜치를 선택해야 합니다.
 
 ## 1. EC2 사전 설정
@@ -205,7 +210,9 @@ curl --fail http://127.0.0.1:8080/actuator/health
 
 ## 수동 롤백
 
-자동 롤백까지 실패한 경우 EC2에서 다음을 실행합니다.
+자동 롤백까지 실패한 경우 아래 명령을 실행하기 전에 적용된 Flyway 이력과 스키마가
+백업 JAR와 호환되는지 확인합니다. 호환되지 않으면 JAR만 교체하지 말고 DB 복구 계획을
+함께 검토해야 합니다. 호환성이 확인된 경우 EC2에서 다음을 실행합니다.
 
 ```bash
 sudo cp /opt/flout/flout-server.jar.previous /opt/flout/flout-server.jar
