@@ -78,15 +78,6 @@
 - `AdminConstructionPhotoController`의 사진 업로드 Swagger 500 설명에는 `CONSTRUCTION_500_1`만
   명시되어 있습니다. `ConstructionPhotoService.replay`는 멱등 성공 요청 재조회 중 사진 메타데이터나
   URL 복원에 실패하면 `CONSTRUCTION_500_2`를 반환하므로 Swagger 응답 설명을 보완해야 합니다.
-- `AdminConstructionDetailController`의 Swagger 설명에는 시공 상세에서 동의 정보를 조회한다고
-  되어 있으나 `AdminConstructionDetailResponse`와 `AdminConstructionDetailService`에는 동의 관련
-  필드가 없습니다. 컨트롤러 설명을 실제 응답에 맞게 정리해야 합니다.
-- `AdminApplicationSupportController`의 Swagger 설명은 여러 지원사업 신청을 일반적인 현재
-  정책처럼 표현합니다. 신규 지원 신청은 현장점검 신청당 최대 한 건이며, 여러 행 중 최신 접수 건을
-  선택하는 조회는 기존 데이터에 대한 방어 로직이라는 점을 설명에 구분해야 합니다.
-- `RelatedApplicationsResponse.ApplicationItem.fieldFindings`의 Swagger 설명은 현장점검 확인
-  내용이라고 하지만 `PublicIssueRelatedApplicationService.getRelated`는 현장점검 신청의
-  `requestReason`을 반환합니다. 실제 의미에 맞춘 필드·설명 정리 및 호환성 검토가 필요합니다.
 
 ## #287 정적 재점검 범위
 
