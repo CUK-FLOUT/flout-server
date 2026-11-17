@@ -1,105 +1,230 @@
-# FLOUT Server
+<div align="center">
 
-FLOUT 공통 백엔드 서버 및 API입니다.
+# 🌊 FLOUT · Server
 
-## 기술 스택
+**부천시 반지하 주민을 위한 침수 예방 서비스 API**
 
-- Java 21
-- Spring Boot 4.1.1
-- Gradle
-- Spring Web MVC
-- Spring Data JPA
-- MySQL 8.4
-- Flyway
-- Springdoc OpenAPI
-- Spring Boot Actuator
+<br/>
 
-## AI 취약도 분석 모델
+![Java](https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_4.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL_8.4-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
 
-수집된 데이터를 기반으로 `HIGH`, `CAUTION`, `LOW` 취약도 등급을 예측하고,
-Tree 계열과 Boosting 계열 모델을 학습 데이터 내 교차 검증으로 비교합니다. 선정된
-최종 모델은 그전까지 사용하지 않은 홀드아웃 테스트 데이터에서 한 번 평가합니다.
+![AWS](https://img.shields.io/badge/AWS_EC2_%C2%B7_S3-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase_FCM-DD2C00?style=for-the-badge&logo=firebase&logoColor=white)
+![Google](https://img.shields.io/badge/Google_Login_%C2%B7_Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 
-자세한 내용은 [AI_MODEL_PIPELINE.md](docs/AI_MODEL_PIPELINE.md)을 확인해 주세요.
+<br/>
 
-## 로컬 실행
+파일럿 지역 **경기도 부천시** · [Resident Web App](https://github.com/CUK-FLOUT/flout-resident-webapp)
 
-최초 실행 시 로컬 환경변수 파일을 생성합니다.
+</div>
+
+<br/>
+
+## 📌 목차
+
+1. [서비스 소개](#서비스-소개)
+2. [시스템 아키텍처](#시스템-아키텍처)
+3. [핵심 기능](#핵심-기능)
+4. [API 구성](#api-구성)
+5. [프로젝트 구조](#프로젝트-구조)
+6. [로컬 실행](#로컬-실행)
+7. [테스트와 배포](#테스트와-배포)
+8. [문서](#문서)
+
+<br/>
+
+<a id="서비스-소개"></a>
+
+## 🗺️ 서비스 소개
+
+FLOUT Server는 주소 기반 침수 취약도 분석부터 예방 가이드, 현장점검, 지원사업, 시공, 공공시설 문제 관리까지의 전 과정을 연결하는 Spring Boot API 서버입니다. 주민 API와 부천시 관할 운영자 API를 JWT 역할과 관할 기준으로 분리합니다.
+
+```mermaid
+flowchart LR
+    A["주소 · 거주 정보"] --> B["AI 침수 취약도"]
+    B --> C["맞춤 예방 가이드"]
+    B --> D["현장점검 신청"]
+    D --> E["운영자 배정 · 점검 결과"]
+    E --> F["지원사업 매칭 · 신청"]
+    F --> G["시공 일정 · 완료"]
+    E --> H["공공시설 문제 관리"]
+```
+
+<br/>
+
+<a id="시스템-아키텍처"></a>
+
+## 🏗️ 시스템 아키텍처
+
+```mermaid
+flowchart LR
+    W["React Resident Web App"] -->|"HTTPS · JWT"| A["Spring Boot API"]
+    O["운영자 클라이언트"] -->|"HTTPS · ADMIN JWT"| A
+    A --> D[("MySQL · Flyway")]
+    A --> S["Amazon S3"]
+    A --> F["Firebase Cloud Messaging"]
+    A --> P["Python 취약도 모델"]
+    A --> G["Google Login · Gemini"]
+    A --> K["Kakao · Juso 주소 API"]
+```
+
+- JPA 스키마는 `validate`로 검증하며, 변경은 `src/main/resources/db/migration` 의 Flyway SQL로 적용합니다.
+- 첨부파일은 비공개 S3 객체로 저장하고 조회 시 서명 URL을 발급합니다.
+- FCM 발송 이력과 인앱 알림을 DB에 기록하여 진행 상태 변경을 전달합니다.
+
+<br/>
+
+<a id="핵심-기능"></a>
+
+## 🔍 핵심 기능
+
+- **인증·인가** · 이메일/Google 로그인, Access/Refresh Token 회전, 로그아웃, 관할 기반 운영자 권한
+- **취약도·예방** · Python 모델 추론, Gemini 맞춤 예방 가이드, 실천 상태 관리
+- **현장점검** · 신청 임시저장, 멱등 첨부, 우선점검 선정, 배정, 결과 임시저장·공개
+- **지원·시공** · 지원사업 AI 매칭, 서류 접수, 승인·반려, 시공 배정·일정·사진·완료
+- **운영·알림** · 공공시설 문제와 조치 이력 관리, FCM·인앱 알림
+
+<br/>
+
+<a id="api-구성"></a>
+
+## 🔌 API 구성
+
+| 영역 | 대표 경로 | 모듈 |
+| --- | --- | --- |
+| 인증·회원 | `/api/auth/**`, `/api/admin/me` | `user` |
+| 주소·취약도 | `/api/resident/addresses/**`, `/api/resident/risk-assessments/**` | `address`, `riskassessment` |
+| 예방 가이드 | `/api/resident/prevention-guides/**`, `/api/resident/guide-items/**` | `preventionguide` |
+| 현장점검 신청 | `/api/resident/applications/**`, `/api/admin/applications/**` | `inspectionapplication` |
+| 점검·우선점검 | `/api/admin/inspections/**`, `/api/admin/priority-inspections/**` | `inspection`, `priorityinspection` |
+| 지원사업 | `/api/resident/support-applications/**`, `/api/admin/support-applications/**` | `supportapplication`, `supportprogram` |
+| 시공 | `/api/resident/constructions/**`, `/api/admin/constructions/**` | `construction` |
+| 공공시설 문제 | `/api/admin/public-issues/**`, `/api/admin/map/public-issues` | `publicissue` |
+| 진행 현황·알림 | `/api/resident/progress`, `/api/resident/notifications/**` | `residentprogress`, `notification` |
+
+실행 중인 서버의 전체 스키마와 응답 예시는 Swagger UI에서, 기능별 처리 규칙과 오류 코드는 [문서 인덱스](docs/README.md)에서 확인할 수 있습니다.
+
+<br/>
+
+<a id="프로젝트-구조"></a>
+
+## 📁 프로젝트 구조
+
+```text
+src/
+├── main/
+│   ├── java/com/flout/server/
+│   │   ├── domain/
+│   │   │   ├── address/                 # 주소 검색·좌표
+│   │   │   ├── construction/            # 시공
+│   │   │   ├── inspection/              # 점검 배정·결과
+│   │   │   ├── inspectionapplication/   # 현장점검 신청
+│   │   │   ├── notification/            # FCM·인앱 알림
+│   │   │   ├── preventionguide/         # 맞춤 예방 가이드
+│   │   │   ├── priorityinspection/       # 우선점검 선정
+│   │   │   ├── publicissue/              # 공공시설 문제
+│   │   │   ├── residentprogress/         # 주민 진행 현황·임시저장
+│   │   │   ├── riskassessment/           # AI 취약도
+│   │   │   ├── supportapplication/       # 지원 신청·매칭
+│   │   │   ├── supportprogram/           # 지원사업 정보
+│   │   │   └── user/                     # 인증·회원·동의
+│   │   └── global/                            # 설정·보안·공통 응답·시간
+│   └── resources/
+│       ├── db/migration/                          # Flyway SQL
+│       └── application*.yml                      # 공통·환경별 설정
+└── test/                                      # 단위·통합·마이그레이션 테스트
+```
+
+각 도메인은 필요에 따라 `controller`, `service`, `repository`, `entity`, `dto`, `response`, `client`, `config` 하위 패키지로 구성됩니다.
+
+<br/>
+
+<a id="로컬-실행"></a>
+
+## 🛠️ 로컬 실행
+
+Java 21과 Docker Desktop이 필요합니다.
 
 ```bash
 cp .env.example .env
-```
-
-주소 검색 API를 사용하려면 `.env`의 `KAKAO_REST_API_KEY`에 Kakao Developers에서 발급한 REST API 키를 설정합니다. `.env`는 Git에서 제외되므로 실제 키를 커밋하지 않습니다.
-
-이후 실행 스크립트를 사용하면 `.env`를 환경변수로 로드하고 MySQL이 준비된 다음
-Spring Boot 서버가 시작됩니다.
-
-```bash
+openssl rand -base64 32 # 출력값을 .env의 JWT_SECRET에 추가
 ./scripts/run-local.sh
 ```
 
-- 서버를 종료하려면 실행 중인 터미널에서 `Ctrl+C`를 누릅니다.
-- MySQL 컨테이너까지 종료하려면 `docker compose down`을 실행합니다.
-- Health check: `http://localhost:8080/actuator/health`
-- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+`run-local.sh`는 `.env`를 로드하고 MySQL 8.4 health check 후 `local` 프로필로 Spring Boot를 실행합니다.
 
-### Windows IntelliJ 실행
+| 항목 | 주소 |
+| --- | --- |
+| Swagger UI | `http://localhost:8080/swagger-ui/index.html` |
+| OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
+| Health check | `http://localhost:8080/actuator/health` |
+| Google 로그인 테스트 | `http://localhost:8080/dev/google-login` |
 
-1. Docker Desktop에서 MySQL을 먼저 실행합니다. Git Bash에서는 `./scripts/run-local.sh`로 `.env`를 포함해 실행할 수 있습니다.
-2. IntelliJ에서는 `Run` → `Edit Configurations...` → Spring Boot 실행 구성의 `Environment variables`에 `.env`의 DB 설정값과 `KAKAO_REST_API_KEY`를 추가합니다.
-3. `Active profiles`는 `local`로 유지하고 `FloutServerApplication`을 실행합니다.
+<details>
+<summary><b>주요 환경 변수</b></summary>
 
-`KAKAO_REST_API_KEY`에는 실제 REST API 키를 입력하며, `.env.example`의 예시 값은 사용하지 않습니다.
+| 분류 | 변수 | 용도 |
+| --- | --- | --- |
+| DB | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | MySQL 연결 |
+| 인증 | `JWT_SECRET`, `JWT_ACCESS_TOKEN_SECONDS`, `JWT_REFRESH_TOKEN_SECONDS` | JWT 서명·만료 |
+| Google | `GOOGLE_CLIENT_IDS` | Google ID Token 검증 |
+| 주소 | `KAKAO_REST_API_KEY`, `JUSO_CONFIRM_KEY` | 주소 검색·좌표 |
+| 파일 | `AWS_REGION`, `AWS_S3_BUCKET` | 비공개 첨부파일 저장 |
+| 알림 | `GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_PROJECT_ID`, `FCM_ENABLED` | Firebase Admin SDK·FCM |
+| AI | `AI_MODEL_BASE_URL`, `AI_MODEL_PREDICT_PATH` | Python 취약도 추론 API |
+| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | 예방 가이드·지원사업 매칭 |
+| Web | `CORS_ALLOWED_ORIGINS` | 허용할 프론트엔드 origin |
 
-### 현장점검 사진 저장
+`JWT_SECRET`은 32바이트 이상의 Base64 키여야 합니다. 실제 키·토큰·자격 증명 JSON은 저장소에 커밋하지 않습니다.
 
-사진 등록을 사용하려면 환경변수 `AWS_REGION`(예: `ap-northeast-2`)과 `AWS_S3_BUCKET`에 비공개 S3 버킷 이름을 설정합니다. 설정이 없더라도 서버는 시작되지만 사진 업로드는 실패합니다. 버킷은 퍼블릭 접근을 차단하고, 실행 주체에 해당 버킷의 `applications/*` 객체에 대한 `s3:PutObject`와 `s3:DeleteObject` 권한을 부여합니다. 기본 AWS 자격 증명 공급자 체인을 사용하므로 로컬에서는 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`와 필요한 경우 `AWS_SESSION_TOKEN` 환경변수 또는 AWS 프로파일을 사용할 수 있으며, 배포 환경에서는 IAM 역할을 사용할 수 있습니다. 실제 자격 증명은 저장소에 추가하지 않습니다.
+</details>
 
-프론트엔드는 사진이 없으면 신청 API를 호출하지 않고 사진 등록 안내를 표시합니다. 사진이 있으면 신청 생성 응답의 `applicationId`로 `POST /api/resident/applications/{applicationId}/attachments`에 `multipart/form-data`의 `files` 필드를 전송합니다. 신청 생성은 `DRAFT` 임시 저장이며 `inspectionId`와 `submittedAt`은 null입니다. 첫 사진 업로드가 성공해야 `RECEIVED`로 접수되므로 업로드 성공 전에는 신청 완료를 표시하지 않습니다. 실패 시 같은 임시 신청과 같은 업로드 요청 키를 사용해 재시도합니다. 동일한 임시 신청 재요청은 기존 ID를 반환하고 내용이 다르면 409를 반환합니다. 사진은 JPG/JPEG/PNG만 허용하며 파일당 15MB, 신청서당 기존 사진을 포함해 최대 5장입니다. 서버의 요청 전체 제한은 80MB입니다. 추가 업로드마다 고유한 `Idempotency-Key` 헤더를 생성하고, 응답이 유실되거나 실패해 재시도할 때는 같은 키와 같은 파일·파일명·순서를 사용하면 중복 등록을 방지할 수 있습니다. 키는 영문자, 숫자, `.`, `_`, `:`, `-`로 구성된 최대 128자이며, 같은 키로 다른 내용을 보내면 409가 반환됩니다. 키를 생략한 재시도는 중복 등록될 수 있습니다.
+- 서버 종료: 실행 터미널에서 `Ctrl+C`
+- MySQL 종료: `docker compose down`
+- Windows IntelliJ: Docker Desktop에서 MySQL을 실행한 뒤 Spring Boot 구성에 `.env`의 값을 등록하고 `local` 프로필로 실행
 
-업로드 시도 기록은 DB에 남으며 실패 또는 서버 중단 시 객체 정리를 재시도합니다. 실패한 정리는 한 시간 이후 주기적으로 다시 시도하고 로그에 기록합니다. S3 버킷과 리전 설정은 정리 완료 전까지 유지해야 하며 S3 삭제 권한과 미완료 정리 기록을 운영 중 점검해야 합니다.
+<br/>
 
-## 테스트와 코드 스타일
+<a id="테스트와-배포"></a>
+
+## ✅ 테스트와 배포
 
 ```bash
-./gradlew test
-./gradlew clean build
-./gradlew spotlessApply
-./gradlew spotlessCheck
+./gradlew test          # Spotless 검사 후 전체 테스트
+./gradlew clean build   # 클린 빌드
+./gradlew spotlessApply # Java·Markdown·YAML 포맷 적용
+./gradlew spotlessCheck # 포맷 검사
 ```
 
-## 패키지 구조
-
-```text
-com.flout.server
-├── global
-│   ├── config
-│   ├── error
-│   ├── response
-│   └── util
-└── {domain}
-    ├── controller
-    ├── service
-    ├── repository
-    ├── entity
-    └── dto
-        ├── request
-        └── response
+```mermaid
+flowchart LR
+    PR["PR → dev"] --> CI["GitHub Actions<br/>포맷 · 테스트 · 빌드"]
+    CI --> D["dev 머지"]
+    D --> M["dev → main"]
+    M --> CD["main push<br/>AWS OIDC · SSM"]
+    CD --> EC2["EC2 systemd"]
+    EC2 --> H["Actuator health check"]
 ```
 
-## 브랜치 및 PR 규칙
+API 변경 시 구현, Swagger/OpenAPI, 테스트, `docs/` 문서를 같은 PR에서 갱신합니다. 작업 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md), OIDC·EC2·HTTPS·복구 절차는 [EC2 배포 문서](docs/EC2_DEPLOYMENT.md)를 참고하세요.
 
-- 브랜치: `{type}/FLOUT-{github-issue-number}`
-- 예시: `feat/FLOUT-12`
-- PR 제목: `[FEAT] #12 회원가입 API 구현`
-- PR 본문에 `Closes #12`를 작성합니다.
-- 모든 변경은 PR을 통해 `dev`에 병합합니다.
-- `main`에는 원칙적으로 `dev`만 병합합니다.
+<br/>
 
-자세한 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인해 주세요.
+<a id="문서"></a>
 
-## 배포
+## 📚 문서
 
-개발 EC2 자동 배포 흐름과 GitHub Actions 설정은 [EC2 배포 문서](docs/EC2_DEPLOYMENT.md)를 확인해 주세요.
+- [기능·API 문서 인덱스](docs/README.md)
+- [기여 가이드](CONTRIBUTING.md)
+- [AI 취약도 모델 파이프라인](docs/AI_MODEL_PIPELINE.md)
+- [EC2 배포 가이드](docs/EC2_DEPLOYMENT.md)
+
+<br/>
+
+<div align="center">
+  <sub>🌊 비가 오기 전에, 우리 집 반지하부터.</sub>
+</div>
