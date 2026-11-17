@@ -13,9 +13,9 @@ import com.flout.server.domain.riskassessment.entity.RiskAssessment;
 import com.flout.server.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.flout.server.domain.riskassessment.entity.RiskLevel;
 import com.flout.server.global.exception.BaseException;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
-import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -64,7 +64,7 @@ public class PreventionGuideTransactions {
       var guide =
           guides.saveAndFlush(
               PreventionGuide.generated(
-                  assessment, GUIDE_TITLE, mapper.serialize(generated), LocalDateTime.now()));
+                  assessment, GUIDE_TITLE, mapper.serialize(generated), SeoulDateTimes.now()));
       return mapper.response(guide, generated, assessmentId, assessment.getRiskLevel());
     }
     var guide = guides.findLockedById(found.get()).orElseThrow();
@@ -78,7 +78,7 @@ public class PreventionGuideTransactions {
             .map(item -> item.ruleId())
             .toList()
             .equals(generated.items().stream().map(item -> item.ruleId()).toList())) {
-      guide.replaceGeneratedContent(GUIDE_TITLE, mapper.serialize(generated), LocalDateTime.now());
+      guide.replaceGeneratedContent(GUIDE_TITLE, mapper.serialize(generated), SeoulDateTimes.now());
       stored = generated;
     }
     return mapper.response(guide, stored, assessmentId, assessment.getRiskLevel());

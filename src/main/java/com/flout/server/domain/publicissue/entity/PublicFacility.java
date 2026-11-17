@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "public_facility")
@@ -33,8 +35,10 @@ public class PublicFacility {
   private BigDecimal longitude;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime updatedAt;
 }

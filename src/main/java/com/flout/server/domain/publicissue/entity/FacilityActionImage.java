@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "facility_action_image")
@@ -20,6 +22,7 @@ public class FacilityActionImage {
   private String imageUrl;
 
   @Column(name = "uploaded_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime uploadedAt;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)

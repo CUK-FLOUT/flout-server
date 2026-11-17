@@ -1,10 +1,13 @@
 package com.flout.server.domain.inspectionapplication.entity;
 
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "application_status_histories")
@@ -25,6 +28,7 @@ public class ApplicationStatusHistory {
   private InspectionApplicationStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   public static ApplicationStatusHistory received(InspectionApplication application) {
@@ -43,6 +47,6 @@ public class ApplicationStatusHistory {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 }

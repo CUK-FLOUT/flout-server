@@ -5,6 +5,7 @@ import com.flout.server.domain.user.repository.UserConsentRepository;
 import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.response.code.GeneralErrorCode;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -52,7 +53,7 @@ public class ConsentService {
       throw new BaseException(GeneralErrorCode.ACCESS_DENIED_REQUEST);
     }
     // 현재 버전의 필수 동의 두 항목을 같은 트랜잭션에 저장한다.
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = SeoulDateTimes.now();
     save(user, ConsentType.THIRD_PARTY_PROVISION, thirdPartyVersion, now);
     save(user, ConsentType.STATUS_NOTIFICATION, notificationVersion, now);
   }

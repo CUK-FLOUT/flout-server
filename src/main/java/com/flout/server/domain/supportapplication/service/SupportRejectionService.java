@@ -6,7 +6,7 @@ import com.flout.server.domain.supportapplication.dto.request.RejectSupportAppli
 import com.flout.server.domain.supportapplication.dto.response.RejectSupportApplicationResponse;
 import com.flout.server.domain.supportapplication.entity.SupportApplicationStatusHistory;
 import com.flout.server.domain.supportapplication.repository.SupportApplicationStatusHistoryRepository;
-import java.time.LocalDateTime;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,9 @@ public class SupportRejectionService {
     var application = decision.application();
     var previousStatus = application.getStatus();
     application.reject(
-        request.reason(), decision.operator(), LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+        request.reason(),
+        decision.operator(),
+        SeoulDateTimes.now().truncatedTo(ChronoUnit.SECONDS));
     histories.saveAndFlush(SupportApplicationStatusHistory.rejected(application, previousStatus));
     notifications.send(
         application.getApplicant().getId(),

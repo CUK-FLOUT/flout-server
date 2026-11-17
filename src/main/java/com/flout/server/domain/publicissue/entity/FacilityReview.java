@@ -1,11 +1,14 @@
 package com.flout.server.domain.publicissue.entity;
 
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "facility_review")
@@ -39,9 +42,11 @@ public class FacilityReview {
   private String reviewReason;
 
   @Column(name = "reviewed_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime reviewedAt;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   public static FacilityReview create(
@@ -80,6 +85,6 @@ public class FacilityReview {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 }

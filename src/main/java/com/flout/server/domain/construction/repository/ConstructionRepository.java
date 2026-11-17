@@ -2,7 +2,9 @@ package com.flout.server.domain.construction.repository;
 
 import com.flout.server.domain.construction.entity.Construction;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +33,8 @@ public interface ConstructionRepository extends JpaRepository<Construction, Long
               GREATEST(6, LENGTH(CONCAT('', s.application_id))), '0') AS receiptNo,
             s.applicant_name AS applicantName,
             s.requested_facility AS requestedFacility,
-            c.scheduled_at AS scheduledAt,
+            CAST(c.scheduled_at AS DATE) AS scheduledDate,
+            CAST(c.scheduled_at AS TIME) AS scheduledTime,
             c.status AS status
           """
               + ADMIN_LIST_FILTER
@@ -59,7 +62,9 @@ public interface ConstructionRepository extends JpaRepository<Construction, Long
 
     String getRequestedFacility();
 
-    LocalDateTime getScheduledAt();
+    LocalDate getScheduledDate();
+
+    LocalTime getScheduledTime();
 
     String getStatus();
   }

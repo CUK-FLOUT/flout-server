@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -32,6 +34,7 @@ public class Construction {
   private ConstructionStatus status;
 
   @Column(name = "scheduled_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime scheduledAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -39,15 +42,18 @@ public class Construction {
   private User manager;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime updatedAt;
 
   @Column(name = "final_installation_result", length = 4000)
   private String finalInstallationResult;
 
   @Column(name = "completed_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime completedAt;
 
   /** 최종 설치 결과를 주민 공개 데이터로 저장하고 완료 시각과 상태를 함께 확정한다. */

@@ -4,7 +4,7 @@ import com.flout.server.domain.inspection.dto.response.InspectionResultResponse;
 import com.flout.server.domain.inspection.entity.ResultStatus;
 import com.flout.server.domain.inspection.repository.*;
 import com.flout.server.global.exception.BaseException;
-import java.time.ZoneId;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class InspectionResultReader {
-  private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private final InspectionAccess access;
   private final InspectionResultRepository results;
   private final InspectionVulnerabilityRepository vulnerabilities;
@@ -59,14 +58,8 @@ public class InspectionResultReader {
                 .toList(),
             result.getFollowUpType(),
             result.getInternalMemo(),
-            result
-                .getUpdatedAt()
-                .atZone(ZoneId.systemDefault())
-                .withZoneSameInstant(SEOUL)
-                .toOffsetDateTime(),
-            result.getPublishedAt() == null
-                ? null
-                : result.getPublishedAt().atZone(SEOUL).toOffsetDateTime(),
+            SeoulDateTimes.toOffset(result.getUpdatedAt()),
+            SeoulDateTimes.toOffset(result.getPublishedAt()),
             List.of());
     return new Snapshot(
         response,
