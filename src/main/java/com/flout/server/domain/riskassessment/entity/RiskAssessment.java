@@ -2,12 +2,15 @@ package com.flout.server.domain.riskassessment.entity;
 
 import com.flout.server.domain.inspectionapplication.entity.HousingType;
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -50,6 +53,7 @@ public class RiskAssessment {
   private String resultJson;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   public static RiskAssessment completedDemo(
@@ -89,6 +93,6 @@ public class RiskAssessment {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 }

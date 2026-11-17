@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "inspection_status_histories")
@@ -38,6 +40,7 @@ public class InspectionStatusHistory {
   private InspectionStatusChangeSource changeSource;
 
   @Column(name = "changed_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime changedAt;
 
   public static InspectionStatusHistory changed(

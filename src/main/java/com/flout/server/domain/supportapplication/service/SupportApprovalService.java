@@ -11,7 +11,7 @@ import com.flout.server.domain.supportapplication.entity.*;
 import com.flout.server.domain.supportapplication.repository.*;
 import com.flout.server.domain.supportapplication.response.code.SupportApprovalErrorCode;
 import com.flout.server.global.exception.BaseException;
-import java.time.LocalDateTime;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,7 @@ public class SupportApprovalService {
     // 승인 이력과 미배정 시공 건을 같은 트랜잭션에서 생성한다.
     var previousStatus = application.getStatus();
     application.approve(
-        request.supportScope(), operator, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+        request.supportScope(), operator, SeoulDateTimes.now().truncatedTo(ChronoUnit.SECONDS));
     histories.saveAndFlush(SupportApplicationStatusHistory.approved(application, previousStatus));
     var construction =
         constructions.saveAndFlush(Construction.pending(application, application.getApprovedAt()));

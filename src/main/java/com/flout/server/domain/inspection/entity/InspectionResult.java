@@ -1,11 +1,14 @@
 package com.flout.server.domain.inspection.entity;
 
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -40,6 +43,7 @@ public class InspectionResult {
   ;
 
   @Column(name = "published_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime publishedAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -47,20 +51,22 @@ public class InspectionResult {
   private User publishedBy;
 
   @Column(name = "created_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime updatedAt;
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
     updatedAt = createdAt;
   }
 
   @PreUpdate
   void onUpdate() {
-    updatedAt = LocalDateTime.now();
+    updatedAt = SeoulDateTimes.now();
   }
 
   public static InspectionResult draft(Inspection inspection) {
@@ -82,7 +88,7 @@ public class InspectionResult {
       throw new IllegalStateException("초안만 임시저장할 수 있습니다.");
     }
     updateContent(summary, followUpType, internalMemo);
-    updatedAt = LocalDateTime.now();
+    updatedAt = SeoulDateTimes.now();
   }
 
   public void publish(LocalDateTime publishedAt) {

@@ -1,10 +1,13 @@
 package com.flout.server.domain.user.entity;
 
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -39,12 +42,15 @@ public class User {
   private Jurisdiction jurisdiction;
 
   @Column(name = "last_login_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime lastLoginAt;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime updatedAt;
 
   public static User resident(String email, String passwordHash, String name) {
@@ -61,17 +67,17 @@ public class User {
   }
 
   public void recordLogin() {
-    this.lastLoginAt = LocalDateTime.now();
+    this.lastLoginAt = SeoulDateTimes.now();
   }
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
     updatedAt = createdAt;
   }
 
   @PreUpdate
   void onUpdate() {
-    updatedAt = LocalDateTime.now();
+    updatedAt = SeoulDateTimes.now();
   }
 }

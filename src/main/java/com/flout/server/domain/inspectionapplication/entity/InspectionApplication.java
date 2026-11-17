@@ -4,6 +4,7 @@ import com.flout.server.domain.inspectionapplication.dto.request.CreateInspectio
 import com.flout.server.domain.inspectionapplication.dto.request.UpdateInspectionApplicationRequest;
 import com.flout.server.domain.riskassessment.entity.RiskAssessment;
 import com.flout.server.domain.user.entity.User;
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,6 +12,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "inspection_applications")
@@ -83,9 +86,11 @@ public class InspectionApplication {
   private InspectionApplicationStatus status;
 
   @Column(name = "created_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime createdAt;
 
   @Column(name = "submitted_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime submittedAt;
 
   // 신청 즉시 접수
@@ -130,7 +135,7 @@ public class InspectionApplication {
       throw new IllegalStateException("임시 신청만 접수할 수 있습니다.");
     }
     status = InspectionApplicationStatus.RECEIVED;
-    submittedAt = LocalDateTime.now();
+    submittedAt = SeoulDateTimes.now();
   }
 
   public void updateDraft(UpdateInspectionApplicationRequest request) {
@@ -149,7 +154,7 @@ public class InspectionApplication {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 
   public void completeInspection() {

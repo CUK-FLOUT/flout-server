@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "priority_inspection_designations")
@@ -27,6 +29,7 @@ public class PriorityInspectionDesignation {
   private User designatedBy;
 
   @Column(name = "designated_at", nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime designatedAt;
 
   @Column(name = "selection_order", nullable = false)
@@ -37,6 +40,7 @@ public class PriorityInspectionDesignation {
   private User orderUpdatedBy;
 
   @Column(name = "order_updated_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime orderUpdatedAt;
 
   public void changeOrder(int selectionOrder, User operator, LocalDateTime now) {

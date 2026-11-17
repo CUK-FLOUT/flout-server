@@ -1,8 +1,11 @@
 package com.flout.server.domain.supportapplication.entity;
 
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -42,11 +45,12 @@ public class SupportAttachment {
   private String contentType;
 
   @Column(name = "submitted_at", nullable = false, updatable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime submittedAt;
 
   @PrePersist
   void onCreate() {
-    submittedAt = LocalDateTime.now();
+    submittedAt = SeoulDateTimes.now();
   }
 
   public static SupportAttachment submitted(

@@ -13,7 +13,6 @@ import com.flout.server.domain.publicissue.repository.PublicIssueActionRepositor
 import com.flout.server.domain.publicissue.response.code.PublicIssueErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.time.SeoulDateTimes;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -115,7 +114,7 @@ public class FacilityActionImageService {
                         .findByLocalProblemId(publicIssueId)
                         .orElseThrow(() -> new BaseException(PublicIssueErrorCode.REVIEW_REQUIRED));
 
-                var completedAt = LocalDateTime.now();
+                var completedAt = SeoulDateTimes.now();
 
                 var action =
                     actions.saveAndFlush(
@@ -125,7 +124,7 @@ public class FacilityActionImageService {
                             request.actionDescription(),
                             completedAt));
 
-                var uploadedAt = LocalDateTime.now();
+                var uploadedAt = SeoulDateTimes.now();
 
                 List<CompletePublicIssueActionResponse.Image> saved = new ArrayList<>();
 

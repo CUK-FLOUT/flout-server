@@ -1,5 +1,6 @@
 package com.flout.server.domain.notification.entity;
 
+import com.flout.server.global.time.SeoulDateTimes;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -32,6 +33,7 @@ public class ResidentNotification {
   private Long applicationId;
 
   @Column(name = "read_at")
+  @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
   private LocalDateTime readAt;
 
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -51,6 +53,6 @@ public class ResidentNotification {
 
   @PrePersist
   void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = SeoulDateTimes.now();
   }
 }

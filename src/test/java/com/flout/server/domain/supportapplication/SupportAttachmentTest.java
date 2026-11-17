@@ -516,19 +516,18 @@ class SupportAttachmentTest {
         "UPDATE support_applications SET submitted_at=? WHERE support_application_id=?",
         java.sql.Timestamp.valueOf(oldSubmittedAt),
         support);
-    var before = LocalDateTime.now().minusSeconds(1);
+    var seoul = java.time.ZoneId.of("Asia/Seoul");
+    var before = LocalDateTime.now(seoul).minusSeconds(1);
     upload(file("consent.pdf", pdf()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.result.status").value("SUBMITTED"));
-    var after = LocalDateTime.now().plusSeconds(1);
-    var row =
-        jdbc.queryForMap(
-            "SELECT status, submitted_at FROM support_applications WHERE support_application_id=?",
+    var after = LocalDateTime.now(seoul).plusSeconds(1);
+    var submittedAt =
+        jdbc.queryForObject(
+            "SELECT submitted_at FROM support_applications WHERE support_application_id=? AND status='SUBMITTED'",
+            (row, index) -> row.getObject("submitted_at", LocalDateTime.class),
             support);
-    assertThat(row.get("STATUS")).isEqualTo("SUBMITTED");
-    assertThat(((java.sql.Timestamp) row.get("SUBMITTED_AT")).toLocalDateTime())
-        .isAfter(oldSubmittedAt)
-        .isBetween(before, after);
+    assertThat(submittedAt).isAfter(oldSubmittedAt).isBetween(before, after);
   }
 
   @Test

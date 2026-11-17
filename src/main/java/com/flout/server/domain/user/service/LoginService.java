@@ -8,7 +8,7 @@ import com.flout.server.domain.user.repository.UserRepository;
 import com.flout.server.domain.user.response.code.UserErrorCode;
 import com.flout.server.global.exception.BaseException;
 import com.flout.server.global.security.JwtService;
-import java.time.LocalDateTime;
+import com.flout.server.global.time.SeoulDateTimes;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,7 +42,7 @@ public class LoginService {
     // 인증 중 계정이 변경되면 토큰을 반환하지 않는다.
     int updated =
         users.updateLoginTime(
-            user.getId(), requiredRole, email, user.getPasswordHash(), LocalDateTime.now());
+            user.getId(), requiredRole, email, user.getPasswordHash(), SeoulDateTimes.now());
     if (updated != 1) {
       throw new BaseException(UserErrorCode.LOGIN_FAILED);
     }
