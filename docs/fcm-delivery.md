@@ -1,6 +1,17 @@
 # FCM 공통 발송 서비스
 
-기존 토큰 등록 API로 저장한 사용자 기기로 푸시를 보냅니다. 공개 발송 API, 앱 내 알림 목록·읽음 처리 및 개별 업무 상태 연결은 포함하지 않습니다.
+업무 이벤트 발생 시 주민 알림 내역을 저장하고, 토큰 등록 API로 저장한 사용자 기기에 푸시를 요청합니다. 공개 발송 API는 제공하지 않습니다. 주민은 `GET /api/resident/notifications`, `GET /api/resident/notifications/unread-status`, `PATCH /api/resident/notifications/read-all`로 알림 목록과 읽음 상태를 관리합니다.
+
+## 주민 알림함 API
+
+세 API는 인증된 주민 본인에게만 적용됩니다. 목록 응답 `result`는 생성 시각과 ID의 내림차순
+배열이며 각 항목에 `notificationId`, `type`, `title`, `body`, `applicationId`,
+`receiptNumber`, `target`, `read`, `createdAt`이 있습니다. `receiptNumber`는 원본 현장점검
+신청 ID를 최소 6자리로 표시합니다. 목록이 없으면 빈 배열입니다.
+
+미확인 여부 조회의 `result`는 `{ "hasUnread": true }`처럼 Boolean을 반환합니다. 전체 읽음
+처리의 `result`는 이번 요청으로 변경된 `readCount`와 한국 시간 오프셋이 있는 `readAt`을
+반환합니다. 변경할 알림이 없어도 성공하며 `readCount`는 0입니다.
 
 ## 호출
 
@@ -20,7 +31,7 @@ notificationService.send(
 - 마지막 `eventId`는 1~128자의 영문·숫자·`_ . : -` 문자열입니다. 동일 이벤트 재호출 시 같은 값을 사용해야 기기별 중복 대기 작업을 방지합니다. 서로 다른 수신자·종류·상태 변경에는 서로 다른 이벤트 ID를 사용합니다.
 - 세 인자 오버로드도 제공하지만 매 호출마다 새 이벤트 ID를 생성하므로 업무 이벤트 재처리에는 네 인자 메서드를 사용합니다.
 - 트랜잭션 안에서 호출하면 커밋 후 대기 작업을 저장하고, 롤백하면 저장·발송하지 않습니다. 트랜잭션 밖에서 호출하면 즉시 대기 작업을 저장합니다.
-- 토큰이 없는 사용자는 건너뜁니다. 요청 시점에 등록된 기기만 대상으로 합니다.
+- 토큰이 없는 사용자도 주민 알림 내역은 저장되지만 푸시할 기기는 없습니다.
 - 결과 공개 알림은 임시 저장이 아닌 실제 주민 공개 기능에서 호출해야 합니다.
 
 ## 발송 데이터
@@ -43,8 +54,8 @@ FCM `notification`에는 종류별 `title`, `body`를 넣습니다. `data` 값�
 | INSPECTION_RECEIVED / INSPECTION_SCHEDULED / INSPECTION_STARTED | INSPECTION_DETAIL |
 | INSPECTION_RESULT_PUBLISHED | INSPECTION_RESULT |
 | SUPPORT_RECEIVED / SUPPORT_REVIEW_STARTED / SUPPORT_APPROVED / SUPPORT_REJECTED | SUPPORT_DETAIL |
-| CONSTRUCTION_SCHEDULED / CONSTRUCTION_STARTED / CONSTRUCTION_COMPLETED | CONSTRUCTION_DETAIL |
-| CONSTRUCTION_RESULT_PUBLISHED | CONSTRUCTION_RESULT |
+| CONSTRUCTION_SCHEDULED / CONSTRUCTION_STARTED | CONSTRUCTION_DETAIL |
+| CONSTRUCTION_COMPLETED / CONSTRUCTION_RESULT_PUBLISHED | CONSTRUCTION_RESULT |
 
 방문·시공 일시 등 상세값은 이번 공통 메시지에 포함하지 않습니다. 실제 화면 이동 경로는 프론트와 협의해야 합니다.
 

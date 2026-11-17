@@ -8,7 +8,7 @@
 
 - 지원 승인 시 `constructions`에 PENDING 시공 건을 한 개 생성하고 승인 응답에 `constructionId`를 추가합니다. 승인·처리 이력·시공 생성은 같은 트랜잭션으로 처리합니다.
 - 기존 APPROVED 신청은 V42 마이그레이션에서 PENDING 시공 건을 생성합니다. 희망 날짜를 확정 일정으로 복사하거나 담당자를 임의 지정하지 않습니다.
-- 기존 승인 건의 ID는 다음 읽기 쿼리로 확인할 수 있습니다. 별도의 시공 목록 조회는 이 변경 범위에 포함하지 않습니다.
+- 시공 건은 [시공 목록·상세 API](admin-construction-query.md)로 조회할 수 있습니다. DB 점검이 필요한 경우 다음 읽기 쿼리로도 확인할 수 있습니다.
 
 ```sql
 SELECT construction_id, support_application_id, status, scheduled_at
@@ -51,9 +51,9 @@ ORDER BY construction_id DESC;
 - 과거 날짜뿐 아니라 오늘 이미 지난 시간도 거부합니다. 검사 시각과 같은 시각은 허용합니다.
 - 지원 신청 상태는 APPROVED를 유지합니다. 주민 희망 일정·원본 현장점검 일정·신청 정보는 변경하지 않습니다.
 - 주민 `GET /api/resident/support-applications/{supportApplicationId}/approval`의 `scheduledConstructionDate/Time`에 저장한 일정을 반환합니다. 일정이 없으면 null입니다.
-- 확정 시각이 되면 기본 5초 간격의 자동 작업이 SCHEDULED를 IN_PROGRESS로 전환합니다. 서버 중단 중 지난 일정은 재시작 후 처리하며 한 주기당 최대 100건을 처리합니다. 사진 업로드·시공 결과 공개·푸시 발송은 일정 저장 요청에 포함하지 않습니다.
+- 확정 시각이 되면 기본 5초 간격의 자동 작업이 SCHEDULED를 IN_PROGRESS로 전환합니다. 서버 중단 중 지난 일정은 재시작 후 처리하며 한 주기당 최대 100건을 처리합니다. 일정 저장 시 주민 알림을 요청하며 사진 업로드와 시공 결과 공개는 별도입니다.
 
-상태 흐름은 지원 승인 시 PENDING → 최초 배정·일정 저장 시 SCHEDULED → 확정 시각 도래 시 IN_PROGRESS → 전체 완료 POST 시 COMPLETED입니다. 전체 완료 API는 SCHEDULED에서도 호출할 수 있으며, 자동 전환과 동시에 호출해도 COMPLETED를 덮어쓰지 않습니다.
+상태 흐름은 지원 승인 시 PENDING → 최초 배정·일정 저장 시 SCHEDULED → 확정 시각 도래 시 IN_PROGRESS → 전체 완료 POST 시 COMPLETED입니다. 전체 완료에는 확정 시각 도래와 IN_PROGRESS 상태가 필요합니다. 시각이 지났어도 자동 전환 전이면 전환을 확인한 뒤 재요청합니다.
 
 자동 전환은 `CONSTRUCTION_AUTO_START_ENABLED`(기본 true), 실행 간격은 `CONSTRUCTION_AUTO_START_INTERVAL_MILLIS`(기본 5000)로 설정합니다. 기존 검사와 동일한 한국 시간 Clock을 사용하며 지원 승인·예정 상태·확정 시각을 잠금 후 다시 확인합니다. 개별 전환 실패는 다음 주기에 재시도합니다.
 
@@ -70,3 +70,14 @@ ORDER BY construction_id DESC;
 - 409 `CONSTRUCTION_409_2`: 이미 담당자·일정이 저장됐거나 상태가 PENDING이 아님. 메시지: `이미 배정되었거나 시공이 시작·완료되어 일정을 저장할 수 없습니다.`
 
 변경 경로의 잠금 순서는 지원 신청 → 시공입니다. 향후 시공 진행·결과 변경 기능에서도 동일한 순서를 유지해야 합니다.
+
+## 주민 시공 조회
+
+주민은 본인의 승인된 시공 건을 `GET /api/resident/constructions/{constructionId}/schedule`로
+조회합니다. `scheduledConstructionDate`와 `scheduledConstructionTime`은 확정 전 null이며
+희망 일정으로 대체하지 않습니다. `GET /api/resident/constructions/{constructionId}`는
+진행 상태와 저장된 상태 변경 이력 `workHistory`를 반환합니다. 완료 전에는 `completedAt`과
+`finalInstallationResult`가 null이고 `beforePhotos`, `photos`는 빈 배열입니다. 완료 후
+`beforePhotos`는 공개된 현장점검 사진이고 `photos`는 시공 사진이며 일대일 대응을 보장하지 않습니다.
+사진 조회 URL 발급 실패는 `500 / CONSTRUCTION_500_2`입니다. 다른 주민의 시공 건은
+`403 / COMMON_403_1`, 연결된 지원 신청이 승인되지 않았다면 `409 / CONSTRUCTION_409_1`입니다.

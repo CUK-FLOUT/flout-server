@@ -20,6 +20,7 @@ Swagger 그룹은 `운영자-GIS 신청관리`입니다. 요청 본문·쿼리 �
     "contact": "010-1234-1234",
     "address": "경기도 부천시 원미구 길주로 53",
     "detailAddress": "101호",
+    "housingType": "SEMI_BASEMENT",
     "occupancyType": "TENANT",
     "riskLevel": "HIGH",
     "floodExperience": "YES",
@@ -40,6 +41,7 @@ Swagger 그룹은 `운영자-GIS 신청관리`입니다. 요청 본문·쿼리 �
 | receiptNo | 신청 ID를 최소 6자리로 표시. 긴 ID는 자르지 않음 |
 | applicantName / contact | 신청 당시 입력한 신청자 이름 / 신청에 입력한 연락처 |
 | address / detailAddress | 신청에 저장된 전체 주소 / 상세주소 |
+| housingType | 연결된 취약도 분석의 거주층. 미입력 시 null |
 | occupancyType | OWNER=자가, TENANT=세입자, ETC=기타 |
 | riskLevel | 연결된 분석 결과. HIGH=높음, CAUTION=주의, LOW=낮음 |
 | floodExperience | YES=침수 경험 있음, NO=침수 경험 없음, UNKNOWN=모름 |
@@ -49,7 +51,7 @@ Swagger 그룹은 `운영자-GIS 신청관리`입니다. 요청 본문·쿼리 �
 | requestReason | 주민 점검 요청 사유 |
 | preferredTimeSlot | MORNING=오전, AFTERNOON=오후, ANY=상관없음 |
 
-- 반지하는 프론트 기본 표시이며 별도 층수 필드는 반환하지 않습니다.
+- 거주층은 저장된 `housingType`을 사용하며 입력하지 않은 경우 추정하지 않습니다.
 - 화면의 시간 범위 표시는 프론트에서 처리하며 별도 시각 데이터는 반환하지 않습니다.
 - 상세주소·희망일·시간대·요청 사유가 없으면 null, 유입 위치가 없으면 빈 배열입니다.
 - 희망 일정은 확정 방문 일정과 다릅니다. 조회는 데이터를 변경하지 않습니다.
@@ -67,3 +69,12 @@ Swagger 그룹은 `운영자-GIS 신청관리`입니다. 요청 본문·쿼리 �
 | 404 | APPLICATION_404_2 | 현장점검 신청을 찾을 수 없습니다. |
 
 관할 미설정·미지원 관할 또는 관할 밖 주소인 경우 APPLICATION_403_4를 반환합니다.
+
+## 목록·지도·현황
+
+`GET /api/admin/applications`는 관할 내 접수 신청을 ID 내림차순으로 조회합니다. `district`,
+`riskLevel`, `processingStatus`(INSPECTION·SUPPORT·CONSTRUCTION), `keyword`를 조합하고
+`page`는 0부터, `size`는 1~100입니다. 주소·상세주소·접수번호를 검색하며 DRAFT는 제외합니다.
+`GET /api/admin/map/applications`는 같은 검색 조건에 맞는 전체 신청의 좌표와 처리 상태를
+반환합니다. `GET /api/admin/applications/stats`는 목록 검색 조건과 관계없이 관할 전체를
+집계합니다. 처리 상태는 저장된 점검 상태와 최신 접수 지원·시공 상태로 계산됩니다.

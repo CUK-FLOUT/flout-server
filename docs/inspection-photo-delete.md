@@ -1,5 +1,17 @@
 # 현장점검 초안 사진 삭제
 
+## 초안 사진 등록
+
+`POST /api/admin/inspections/{inspectionId}/attachments`는 부천시 관할 ADMIN이
+`multipart/form-data`의 `files`로 사진을 추가합니다. JPG/JPEG/PNG 최소 1장, 파일당 최대
+10 MiB이며 요청 전체 제한은 80 MiB입니다. 기존 초안이 없으면 생성하고 공개본과 점검·신청
+상태는 변경하지 않습니다. 응답 `result`는 `inspectionId`와 이번 업로드의 `photos` 배열이며,
+각 사진에는 `photoId`, `fileName`, `url`, `size`, `contentType`이 있습니다. 빈 사진은
+`400 / INSPECTION_400_4`, 유효하지 않은 사진은 `400 / INSPECTION_400_3`, 저장 실패는
+`500 / INSPECTION_500_1`입니다. 응답 URL은 임시 열람용입니다.
+
+## 초안 사진 삭제
+
 DELETE `/api/admin/inspections/{inspectionId}/attachments/{photoId}`
 
 부천시 관할 ADMIN이 현장점검 결과의 DRAFT 사진 한 장을 삭제합니다. photoId는 사진 업로드 또는 결과 조회 응답의 `photos[].photoId`입니다. 주민 신청 사진의 attachmentId와 구분합니다. 요청 본문과 쿼리 파라미터는 없습니다.

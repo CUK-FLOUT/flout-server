@@ -12,8 +12,13 @@
 4. EC2가 `./gradlew bootJar`로 실행 JAR를 빌드합니다.
 5. 기존 `/opt/flout/flout-server.jar`를 이전 버전으로 백업하고 `flout` 서비스를 재시작합니다.
 6. `http://127.0.0.1:8080/actuator/health`가 `UP`인지 최대 90초간 확인합니다.
-7. Health check가 실패하면 이전 JAR로 자동 롤백합니다.
+7. Health check가 실패해도 자동 롤백하지 않습니다. 새 JAR가 `/opt/flout/flout-server.jar`에 남으며 서비스가 새 JAR로 실행 중이거나 기동 중일 수 있습니다.
 8. 서버의 파일 잠금으로 원격 배포가 겹치지 않게 하며, Actions 대기 시간이 끝나면 실행 중인 SSM 명령의 취소를 요청합니다.
+
+배포 스크립트는 실패한 새 JAR를 자동으로 되돌리지 않으며, 이미 적용된 Flyway
+마이그레이션이나 데이터도 되돌리지 않습니다. 배포 전 새 스키마가 이전 서버와
+호환되는지, DB 백업·복구와 구버전 인스턴스 중단이 필요한지 확인해야 합니다. 특히 V57의 구버전 호환성은
+[임대인 동의서 API 변경](landlord-consent-api-change.md)을 참고하세요.
 
 동시 배포는 `flout-main-deployment` concurrency group을 통해 직렬화됩니다. 자동 배포는 `main` push에서만 실행됩니다. GitHub Actions 화면의 수동 실행도 `main` 브랜치를 선택해야 합니다.
 
@@ -203,9 +208,11 @@ curl --fail http://127.0.0.1:8080/actuator/health
 /opt/flout/flout-server.jar.previous
 ```
 
-## 수동 롤백
+## 수동 복구
 
-자동 롤백까지 실패한 경우 EC2에서 다음을 실행합니다.
+배포 실패 후 아래 명령을 실행하기 전에 적용된 Flyway 이력과 스키마가 백업 JAR와
+호환되는지 확인합니다. 호환되지 않으면 JAR만 교체하지 말고 DB 복구 계획을 함께
+검토해야 합니다. 호환성이 확인된 경우 EC2에서 다음을 실행합니다.
 
 ```bash
 sudo cp /opt/flout/flout-server.jar.previous /opt/flout/flout-server.jar

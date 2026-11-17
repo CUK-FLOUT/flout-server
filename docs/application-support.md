@@ -42,7 +42,7 @@ GET `/api/admin/applications/{applicationId}/support`
 - 승인: `status: APPROVED`, `supportScope`에 DB 저장된 승인 범위를 반환합니다. 시공 건이 있으면 실제 constructionId·constructionStatus를 반환하고 없으면 둘 다 null입니다. 승인만으로 진행 중 상태를 추정하지 않습니다.
 - 미승인: `status: REJECTED`, `rejectionReason`에 운영자가 저장한 사유를 반환합니다. 승인 범위·시공 연계는 null입니다. 고정 미승인 문구를 서버에서 임의 생성하지 않습니다.
 
-화면 제목·주소는 기존 GIS 신청 정보 탭과 같은 원본 신청 값을 사용합니다. `housingType`은 지원 신청 여부와 관계없이 연결된 침수 취약도 분석에 저장된 거주층이며, 미입력 시 null입니다. 여러 사업에 신청했으면 DRAFT를 제외하고 접수 시각 내림차순, 같으면 지원 신청 ID 내림차순의 한 건을 선택합니다.
+화면 제목·주소는 기존 GIS 신청 정보 탭과 같은 원본 신청 값을 사용합니다. `housingType`은 지원 신청 여부와 관계없이 연결된 침수 취약도 분석에 저장된 거주층이며, 미입력 시 null입니다. 현재 신규 지원 신청은 현장점검 신청당 최대 한 건이며 V54가 같은 제약을 추가합니다. 조회 구현은 여러 행이 존재하는 경우에도 DRAFT를 제외하고 접수 시각 내림차순, 같으면 지원 신청 ID 내림차순의 한 건을 선택합니다.
 
 임대인 동의 필요 여부는 지원 신청 당시 TENANT이면 true, OWNER·ETC이면 false입니다. `landlordConsentDocumentSubmitted`는 해당 지원 신청에 LANDLORD_CONSENT 파일이 실제 존재하는지 나타내며 운영자 확인 완료 상태를 의미하지 않습니다. 현재 승인 로직처럼 동의서 제출과 지원 승인 결과를 구분합니다. 파일 URL은 이 API에 포함하지 않습니다.
 

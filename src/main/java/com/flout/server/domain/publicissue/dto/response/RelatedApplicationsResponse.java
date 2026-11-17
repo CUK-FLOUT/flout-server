@@ -14,5 +14,5 @@ public record RelatedApplicationsResponse(
       @Schema(description = "최소 6자리 접수번호", example = "000021") String receiptNo,
       @Schema(description = "신청 주소", example = "경기도 부천시 원미구 길주로 210") String address,
       @Schema(description = "신청에 연결된 취약도 등급", example = "HIGH") RiskLevel vulnerabilityGrade,
-      @Schema(nullable = true, description = "현장점검 확인 내용") String fieldFindings) {}
+      @Schema(nullable = true, description = "주민 현장점검 신청의 요청 사유") String fieldFindings) {}
 }
