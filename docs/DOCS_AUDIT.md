@@ -75,3 +75,33 @@
   `POST /api/resident/consents`입니다. 컨트롤러 설명을 현재 흐름에 맞게 수정해야 합니다.
 - local Google 로그인 테스트 화면은 동의 값을 로그인 요청에 넣지만 현재 요청 DTO에서 사용하지
   않습니다. 테스트 화면과 별도 동의 API 연결은 코드 담당자의 후속 검토가 필요합니다.
+- `AdminConstructionPhotoController`의 사진 업로드 Swagger 500 설명에는 `CONSTRUCTION_500_1`만
+  명시되어 있습니다. `ConstructionPhotoService.replay`는 멱등 성공 요청 재조회 중 사진 메타데이터나
+  URL 복원에 실패하면 `CONSTRUCTION_500_2`를 반환하므로 Swagger 응답 설명을 보완해야 합니다.
+- `AdminConstructionDetailController`의 Swagger 설명에는 시공 상세에서 동의 정보를 조회한다고
+  되어 있으나 `AdminConstructionDetailResponse`와 `AdminConstructionDetailService`에는 동의 관련
+  필드가 없습니다. 컨트롤러 설명을 실제 응답에 맞게 정리해야 합니다.
+- `AdminApplicationSupportController`의 Swagger 설명은 여러 지원사업 신청을 일반적인 현재
+  정책처럼 표현합니다. 신규 지원 신청은 현장점검 신청당 최대 한 건이며, 여러 행 중 최신 접수 건을
+  선택하는 조회는 기존 데이터에 대한 방어 로직이라는 점을 설명에 구분해야 합니다.
+- `RelatedApplicationsResponse.ApplicationItem.fieldFindings`의 Swagger 설명은 현장점검 확인
+  내용이라고 하지만 `PublicIssueRelatedApplicationService.getRelated`는 현장점검 신청의
+  `requestReason`을 반환합니다. 실제 의미에 맞춘 필드·설명 정리 및 호환성 검토가 필요합니다.
+
+## #287 정적 재점검 범위
+
+- `0410b4b`의 Controller 매핑 어노테이션에서 검출한 87개 메서드·경로·클래스를
+  [API 카탈로그](API_CATALOG.md)와 비교하여 차이가 없는 것을 확인했습니다. 정적 추출은
+  실행 중 Spring 매핑이나 Swagger 생성 결과를 대체하지 않습니다.
+- 문서 인덱스·상대 파일 링크와 JSON 구문 검사는 실행할 수 있지만 JSON의 의미와 모든
+  DTO·오류·권한·상태 전이의 정합성을 자동으로 보증하지 않습니다.
+- JSON 예시 52개는 구문을 확인하고 키가 Java 소스에 등장하는지 정적으로 대조했습니다.
+  이는 동일한 이름이 다른 DTO에 존재할 수도 있으므로 각 API의 중첩 DTO·값·필수성에 대한
+  검증은 아닙니다. 주요 응답 9개는 추가로 최상위 키를 각 DTO와 대조했습니다.
+- 87개 API는 메서드·경로·Controller 대조 범위이며, 각 API의 모든 오류 코드·소유권·관할·
+  동시성·상태 전이는 전부 검증한 것이 아닙니다. 관련 Service·Repository·테스트와 실행 중
+  `/v3/api-docs`를 계속 대조해야 합니다.
+- API별로 확인한 코드와 남은 범위는 [API별 정합성 검증 현황](API_VERIFICATION.md)에 기록합니다.
+- 대상 환경의 `flyway_schema_history`, V26·V57·V66 적용 및 복구 상태, 실제 EC2 설정과
+  배포된 외부 AI 모델의 학습·평가 결과는 이 저장소만으로 확인할 수 없습니다. 해당 환경 및
+  담당자 확인 전에는 적용 완료 또는 모델 검증 완료로 간주하지 않습니다.

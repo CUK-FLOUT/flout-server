@@ -32,6 +32,9 @@
 
 서버는 소유권, 공개된 점검 결과, 사업 접수 상태·기간을 검증합니다. 사업 유형에 따라
 자격 정보와 신청 시설의 지원·권장 적합성도 검증합니다. 현장점검 신청당 지원 신청은 한 건입니다.
+사업 유형이 비어 있는 기존 데이터에는 추가 자격·시설 검증을 적용하지 않습니다. 시설 사업은
+접수 상태 OPEN, 시작·종료일과 자격 조건이 확인되어야 하며 신청 시설도 사업 지원시설 및 공개된
+점검 결과의 권장시설과 맞아야 합니다.
 성공은 201이며 result에는 `supportApplicationId`, `applicationId`, `programId`, `status`,
 `submittedAt`, `receiptNumber`, `applicantName`, `programName`, `createdAt`이 포함됩니다.
 `receiptNumber`는 원본 현장점검 신청 ID를 최소 6자리로 표시합니다.

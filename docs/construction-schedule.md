@@ -70,3 +70,14 @@ ORDER BY construction_id DESC;
 - 409 `CONSTRUCTION_409_2`: 이미 담당자·일정이 저장됐거나 상태가 PENDING이 아님. 메시지: `이미 배정되었거나 시공이 시작·완료되어 일정을 저장할 수 없습니다.`
 
 변경 경로의 잠금 순서는 지원 신청 → 시공입니다. 향후 시공 진행·결과 변경 기능에서도 동일한 순서를 유지해야 합니다.
+
+## 주민 시공 조회
+
+주민은 본인의 승인된 시공 건을 `GET /api/resident/constructions/{constructionId}/schedule`로
+조회합니다. `scheduledConstructionDate`와 `scheduledConstructionTime`은 확정 전 null이며
+희망 일정으로 대체하지 않습니다. `GET /api/resident/constructions/{constructionId}`는
+진행 상태와 저장된 상태 변경 이력 `workHistory`를 반환합니다. 완료 전에는 `completedAt`과
+`finalInstallationResult`가 null이고 `beforePhotos`, `photos`는 빈 배열입니다. 완료 후
+`beforePhotos`는 공개된 현장점검 사진이고 `photos`는 시공 사진이며 일대일 대응을 보장하지 않습니다.
+사진 조회 URL 발급 실패는 `500 / CONSTRUCTION_500_2`입니다. 다른 주민의 시공 건은
+`403 / COMMON_403_1`, 연결된 지원 신청이 승인되지 않았다면 `409 / CONSTRUCTION_409_1`입니다.

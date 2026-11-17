@@ -2,6 +2,17 @@
 
 업무 이벤트 발생 시 주민 알림 내역을 저장하고, 토큰 등록 API로 저장한 사용자 기기에 푸시를 요청합니다. 공개 발송 API는 제공하지 않습니다. 주민은 `GET /api/resident/notifications`, `GET /api/resident/notifications/unread-status`, `PATCH /api/resident/notifications/read-all`로 알림 목록과 읽음 상태를 관리합니다.
 
+## 주민 알림함 API
+
+세 API는 인증된 주민 본인에게만 적용됩니다. 목록 응답 `result`는 생성 시각과 ID의 내림차순
+배열이며 각 항목에 `notificationId`, `type`, `title`, `body`, `applicationId`,
+`receiptNumber`, `target`, `read`, `createdAt`이 있습니다. `receiptNumber`는 원본 현장점검
+신청 ID를 최소 6자리로 표시합니다. 목록이 없으면 빈 배열입니다.
+
+미확인 여부 조회의 `result`는 `{ "hasUnread": true }`처럼 Boolean을 반환합니다. 전체 읽음
+처리의 `result`는 이번 요청으로 변경된 `readCount`와 한국 시간 오프셋이 있는 `readAt`을
+반환합니다. 변경할 알림이 없어도 성공하며 `readCount`는 0입니다.
+
 ## 호출
 
 업무 서비스에서 `NotificationService`를 주입받아 호출합니다.

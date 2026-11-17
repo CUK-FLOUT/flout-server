@@ -15,6 +15,7 @@
 | --- | --- |
 | [서버 아키텍처](ARCHITECTURE.md) | 시스템 구성, 외부 서비스, 배포 경계 |
 | [API 경로 카탈로그](API_CATALOG.md) | Controller 매핑 기준 메서드·경로·소스 |
+| [API별 정합성 검증 현황](API_VERIFICATION.md) | API별 정적 검토 범위와 미검증 항목 |
 | [API 공통 규약](API_CONVENTIONS.md) | 응답, 인증, 날짜·시간, 접수번호, 페이징·파일 |
 | [인증·인가·접근 제어](SECURITY_AND_ROLES.md) | 주민 소유권과 운영자 관할 검증 |
 | [상태 전이](STATUS_LIFECYCLES.md) | 점검, 공공 문제, 지원, 시공 상태 |

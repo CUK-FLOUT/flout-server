@@ -6,6 +6,14 @@
 
 요청 본문과 쿼리 파라미터는 없습니다. 경로에는 점검 ID가 아닌 지원 신청 ID를 입력합니다.
 
+목록 `GET /api/admin/support-applications`과 현황 `GET /api/admin/support-applications/status`는
+부천시 관할 신청 중 DRAFT를 제외합니다. 목록은 지원 신청 ID 내림차순이며 `page`는 0부터,
+`size`는 1~100입니다. `district`는 원미구·소사구·오정구, `status`는 SUBMITTED·REVIEWING·
+SCHEDULING·APPROVED·REJECTED를 받습니다. 현재 저장 상태에는 REVIEWING과 SCHEDULING이
+없으며 REVIEWING 필터는 SUBMITTED를 조회합니다. 현황의 `reviewingCount`는 SUBMITTED 건수입니다.
+상세 `GET /api/admin/support-applications/{supportApplicationId}`는 관할 밖·DRAFT·없는 신청을
+모두 `404 / SUPPORT_404_1`로 처리합니다.
+
 ## 200 응답의 result 예시
 
 ```json
@@ -54,7 +62,8 @@
 - `landlordConsentDocumentSubmitted`는 해당 신청에 동의서 첨부 레코드가 있으면 true입니다.
 - 희망 방문일·시간은 지원 신청에 입력한 설치 희망 일정이며 확정 일정이 아닙니다.
 - 첨부파일은 실제 저장된 서류만 조회합니다. 파일명과 15분 유효 비공개 서명 URL을 반환하며, 첨부가 없으면 빈 배열입니다. 신청서 PDF를 임의로 만들지 않습니다.
-- 승인된 지원 범위가 없으면 `supportScope`는 null입니다. 접수된 신청은 SUBMITTED를 반환합니다.
+- 승인된 지원 범위가 없으면 `supportScope`는 null입니다. 검토 중인 신청은 SUBMITTED이며,
+  이미 결정된 신청은 실제 저장된 APPROVED 또는 REJECTED 상태를 반환합니다.
 
 ## 오류
 
@@ -65,3 +74,19 @@
 - 500 `SUPPORT_DETAIL_500_1`: 첨부파일 조회 URL 발급 실패
 
 기존 공통 응답 형식을 사용하며 성공 코드는 `COMMON_200`입니다. 임대인 동의 확인 API는 제공하지 않습니다. 목록·상세의 동의서 제출 필드와 주민 API 변경은 [임대인 동의서 API 변경](landlord-consent-api-change.md)을 참고하세요.
+
+## 승인과 미승인
+
+부천시 관할 ADMIN은 관할 주소의 `SUBMITTED` 신청에 대해 결정을 저장할 수 있습니다.
+`POST /api/admin/support-applications/{supportApplicationId}/approve`에는 필수 문자열
+`supportScope`(앞뒤 공백 제거 후 1~500자)와 `applicantHousingReviewed`,
+`expertInspectionReviewed`, `eligibilityDocumentsReviewed`를 전달합니다. 세 검토 값은 모두
+JSON Boolean `true`여야 합니다. TENANT는 임대인 동의서 첨부가 필요하며 OWNER·ETC에는
+필요하지 않습니다. 승인과 이력 저장, 미배정 시공 건 생성은 같은 트랜잭션으로 처리하고 응답에
+`constructionId`를 반환합니다.
+
+`POST /api/admin/support-applications/{supportApplicationId}/reject`에는 필수 문자열
+`reason`(앞뒤 공백 제거 후 1~500자)을 전달합니다. 미승인에는 승인용 검토 항목과 동의서가
+필요하지 않습니다. 두 결정은 이미 처리된 신청에 반복할 수 없으며 `409 / SUPPORT_APPROVAL_409_1`을
+반환합니다. 승인 시 세입자 동의서가 없으면 `400 / SUPPORT_APPROVAL_400_1`, 관할 밖 변경은
+`403 / SUPPORT_APPROVAL_403_1`, 신청이 없으면 `404 / SUPPORT_APPROVAL_404_1`입니다.

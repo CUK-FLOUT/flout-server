@@ -69,3 +69,12 @@ Swagger 그룹은 `운영자-GIS 신청관리`입니다. 요청 본문·쿼리 �
 | 404 | APPLICATION_404_2 | 현장점검 신청을 찾을 수 없습니다. |
 
 관할 미설정·미지원 관할 또는 관할 밖 주소인 경우 APPLICATION_403_4를 반환합니다.
+
+## 목록·지도·현황
+
+`GET /api/admin/applications`는 관할 내 접수 신청을 ID 내림차순으로 조회합니다. `district`,
+`riskLevel`, `processingStatus`(INSPECTION·SUPPORT·CONSTRUCTION), `keyword`를 조합하고
+`page`는 0부터, `size`는 1~100입니다. 주소·상세주소·접수번호를 검색하며 DRAFT는 제외합니다.
+`GET /api/admin/map/applications`는 같은 검색 조건에 맞는 전체 신청의 좌표와 처리 상태를
+반환합니다. `GET /api/admin/applications/stats`는 목록 검색 조건과 관계없이 관할 전체를
+집계합니다. 처리 상태는 저장된 점검 상태와 최신 접수 지원·시공 상태로 계산됩니다.

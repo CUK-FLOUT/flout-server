@@ -52,12 +52,13 @@ Swagger 그룹: `주민-AI취약도 분석`
     "reasons": [],
     "floodRecord": "침수 기록 없음 (안전을 뜻하지 않음)",
     "disclaimer": "지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다."
-  }
+  },
+  "timeStamp": "2026-11-07 12:00:00"
 }
 ```
 
-`riskLevel`은 `HIGH`, `CAUTION`, `LOW` 중 하나입니다. 현재 격자 데이터가 SHAP 근거를
-제공하지 않으면 `reasons`는 빈 배열입니다.
+`riskLevel`은 `HIGH`, `CAUTION`, `LOW` 중 하나입니다. 현재 Python 응답 파서는
+`reasons`를 빈 배열로 구성하며 SHAP 근거를 응답에 포함하지 않습니다.
 
 ## Spring-Python 계약
 
@@ -82,7 +83,7 @@ Python 성공 응답은 `status=OK`, 격자 ID, 0~1 점수, 등급, 침수 기�
 | 403 | `COMMON_403_1` | 주민 계정이 아님 |
 | 404 | `ADDRESS_404_2` | 입력 주소와 일치하는 좌표 없음 |
 | 422 | `RISK_ASSESSMENT_422_1` | 분석 대상 격자 밖 |
-| 500 | `RISK_ASSESSMENT_500_1` | 분석 결과 직렬화·저장 실패 |
+| 500 | `RISK_ASSESSMENT_500_1` | 분석 결과 직렬화 실패 |
 | 502 | `ADDRESS_502_1` | 주소 좌표 서비스 호출 실패 |
 | 502 | `RISK_ASSESSMENT_502_1`, `RISK_ASSESSMENT_502_2` | Python 호출 또는 응답 검증 실패 |
 | 503 | `ADDRESS_503_1` | 주소 좌표 서비스 시간 초과 |
