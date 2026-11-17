@@ -150,7 +150,7 @@ src/
 Java 21과 Docker Desktop이 필요합니다.
 
 ```bash
-cp .env.example .env
+test -f .env || cp .env.example .env
 openssl rand -base64 32 # 출력값을 .env의 JWT_SECRET에 추가
 ./scripts/run-local.sh
 ```

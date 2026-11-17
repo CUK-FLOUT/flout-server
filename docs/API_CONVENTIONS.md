@@ -11,11 +11,11 @@
   "code": "<도메인별_성공_코드>",
   "message": "<성공 메시지>",
   "result": {},
-  "timeStamp": "2026-11-17T12:00:00+09:00"
+  "timeStamp": "2026-11-17 12:00:00"
 }
 ```
 
-`status`는 HTTP 상태 코드와 같은 정수이고, `timeStamp`는 응답 생성 시각입니다. `204 No Content`를 반환하는 API는 envelope 본문이 없을 수 있으므로 Controller의 실제 반환형을 확인합니다.
+`status`는 HTTP 상태 코드와 같은 정수이고, `timeStamp`는 **서울 시간(Asia/Seoul)** 기준 응답 생성 시각입니다. 형식은 `yyyy-MM-dd HH:mm:ss`이며 UTC 오프셋은 포함하지 않습니다. `204 No Content`를 반환하는 API는 envelope 본문이 없을 수 있으므로 Controller의 실제 반환형을 확인합니다.
 
 ## 인증
 

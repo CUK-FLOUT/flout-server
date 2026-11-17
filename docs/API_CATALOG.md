@@ -83,7 +83,7 @@
 | `POST` | `/api/resident/risk-assessments` | [`ResidentRiskAssessmentController.java`](../src/main/java/com/flout/server/domain/riskassessment/controller/ResidentRiskAssessmentController.java) |
 | `GET` | `/api/resident/risk-assessments/{assessmentId}` | [`ResidentProgressController.java`](../src/main/java/com/flout/server/domain/residentprogress/ResidentProgressController.java) |
 | `POST` | `/api/resident/risk-assessments/{assessmentId}/guide` | [`ResidentPreventionGuideController.java`](../src/main/java/com/flout/server/domain/preventionguide/controller/ResidentPreventionGuideController.java) |
-| `POST` | `/api/resident/support-application/{supportApplicationId}/matching` | [`SupportProgramMatchingController.java`](../src/main/java/com/flout/server/domain/supportapplication/controller/SupportProgramMatchingController.java) |
+| `POST` | `/api/resident/support-application/{supportApplicationId}/matching` (경로 값: **현장점검 신청 ID**, 지원 신청 ID 아님) | [`SupportProgramMatchingController.java`](../src/main/java/com/flout/server/domain/supportapplication/controller/SupportProgramMatchingController.java) |
 | `POST` | `/api/resident/support-applications` | [`SupportApplicationController.java`](../src/main/java/com/flout/server/domain/supportapplication/controller/SupportApplicationController.java) |
 | `GET` | `/api/resident/support-applications/drafts` | [`ResidentFormDraftController.java`](../src/main/java/com/flout/server/domain/residentprogress/ResidentFormDraftController.java) |
 | `GET` | `/api/resident/support-applications/{supportApplicationId}/approval` | [`ResidentSupportDetailController.java`](../src/main/java/com/flout/server/domain/supportapplication/controller/ResidentSupportDetailController.java) |
