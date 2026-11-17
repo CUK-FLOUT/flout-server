@@ -3,6 +3,13 @@
 `POST /api/resident/applications`는 신청을 임시저장하는 API입니다.
 첫 신청 사진 등록이 성공하면 신청이 접수되고 점검이 생성됩니다. 별도의 운영자 접수 API는 호출하지 않습니다.
 
+작성 중 폼 임시저장은 실제 신청의 `DRAFT`와 별개입니다. 주민은 클라이언트 UUID로
+`PUT /api/resident/application-form-drafts/{draftId}`에 취약도 분석 ID와 폼 전체를 저장하고,
+`GET /api/resident/applications/drafts`로 이어 쓸 폼을 조회합니다. 최초 저장의 `version`은
+생략 또는 null이고 갱신에는 마지막 응답의 version이 필요합니다. `fields`는 최대 16000자의
+JSON 객체로 전체 교체되며 버전 충돌은 409입니다. 폼 제출 시 `X-Form-Draft-Id`로 연결합니다.
+신청 생성 후 사진 등록 전까지 실제 신청이 `DRAFT`로 남는 단계와 구분해야 합니다.
+
 ## 처리 흐름
 
 1. 본인의 완료된 취약도 분석 결과와 선택한 가이드 연결을 검증합니다.
@@ -63,7 +70,7 @@ V33은 기존 신청의 이름을 연결된 계정 이름으로 채웁니다. �
 
 ## 사진 등록 후 점검 ID
 
-`POST /api/resident/applications/{applicationId}/attachments`의 성공 result는 배열에서 객체로 변경됩니다.
+`POST /api/resident/applications/{applicationId}/attachments`의 성공 result는 점검 ID와 사진 목록을 포함하는 객체입니다.
 
 ```json
 {

@@ -1,6 +1,6 @@
 # API 경로 카탈로그
 
-> 본 문서는 `dev` Java Controller의 매핑 어노테이션을 정적으로 추출합니다. 실제 노출 여부·권한·응답 계약은 각 Controller/DTO/테스트와 OpenAPI를 확인하세요.
+> 본 목록은 아래 기준 커밋의 Java Controller 매핑 어노테이션을 정적으로 추출한 스냅샷입니다. 이후 변경이 반영되지 않았을 수 있습니다. 실제 노출 여부·경로·권한·응답 계약은 현재 Controller/DTO/테스트와 실행 중 OpenAPI를 확인하세요.
 
 - 기준 커밋: `b4c05b5`
 - Swagger/OpenAPI: 서버 설정에 따른 `/swagger-ui/index.html`, `/v3/api-docs`

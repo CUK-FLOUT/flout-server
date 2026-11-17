@@ -1,6 +1,7 @@
 # 문서-소스 정합성 점검
 
 > 점검 기준: `b4c05b5` · 2026-11-16
+> 이 문서는 당시의 점검 기록입니다. 표의 일괄 표시는 각 문서의 현행 정합성이나 삭제 가능성에 대한 현재 판정이 아닙니다. 이후 코드·문서 변경은 현재 소스와 별도로 대조해야 합니다.
 
 | 파일 | 점검 결과 |
 |---|---|
@@ -36,7 +37,7 @@
 | [prevention-guide-generation.md](prevention-guide-generation.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [priority-inspection-bulk-designation.md](priority-inspection-bulk-designation.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [priority-inspection-candidates.md](priority-inspection-candidates.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
-| [priority-inspection-designation.md](priority-inspection-designation.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
+| `priority-inspection-designation.md` | 당시 점검 대상. 이후 [지정·취소 문서](priority-inspection-bulk-designation.md)에 통합 |
 | [priority-inspection-detail.md](priority-inspection-detail.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [priority-inspection-order-query.md](priority-inspection-order-query.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [priority-inspection-order.md](priority-inspection-order.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |

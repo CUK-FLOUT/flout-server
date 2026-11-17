@@ -16,7 +16,8 @@ Swagger 그룹: `운영자-공공인프라`
 
 목록과 지도는 `district`, `status`, `issueType`, `keyword`를 조합합니다. 목록에는
 0부터 시작하는 `page`와 1~100 범위의 `size`가 추가됩니다. 현황은 `status`를 제외한
-같은 조건으로 등록·검토·조치·완료 건수를 반환합니다.
+같은 조건으로 등록 건수(`registeredCount`), 검토 대기·검토 중 건수
+(`pendingOrUnderReviewCount`), 조치 완료 건수(`completedCount`)를 반환합니다.
 
 - `district`: 빈 값, `원미구`, `소사구`, `오정구`
 - `status`: `RECEIVED`, `UNDER_REVIEW`, `COMPLETED`

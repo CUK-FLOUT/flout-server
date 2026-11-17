@@ -19,7 +19,7 @@ Swagger 그룹: `주민-AI취약도 분석`
 ```
 
 - `address`, `detailAddress`: 필수, 공백 제외 내용이 있어야 하며 최대 255자
-- `housingType`: 선택, `SEMI_BASEMENT`, `GROUND_FLOOR`, `ABOVE_GROUND`
+- `housingType`: 선택, `SEMI_BASEMENT`, `FIRST_FLOOR`, `SECOND_FLOOR_OR_ABOVE`
 - 성공 응답의 `assessmentId`는 현장점검 신청과 맞춤 예방 가이드 생성에 사용
 
 ## 성공 응답

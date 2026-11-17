@@ -17,6 +17,7 @@
   "contact": "010-1234-0002",
   "address": "경기도 부천시 원미구 길주로 210",
   "detailAddress": "101호",
+  "housingType": "SEMI_BASEMENT",
   "occupancyType": "TENANT",
   "vulnerabilityTypes": ["ENTRANCE", "DRAIN"],
   "inspectionId": 3,
@@ -47,7 +48,7 @@
 }
 ```
 
-- 이름·연락처·주소·거주 형태는 지원 신청 당시 저장값입니다. 연락처는 전체 번호를 저장 형식 그대로 반환합니다. 상세주소와 `residentRequest`는 연결된 현장점검 신청에서 조회하며 요청 사유가 없으면 null입니다. 기존 상세 조회도 같은 연락처와 요청 사유를 반환합니다. 반지하 등 주택 유형은 새 검토 응답에 포함하지 않습니다.
+- 이름·연락처·주소·점유 형태는 지원 신청 당시 저장값입니다. 연락처는 전체 번호를 저장 형식 그대로 반환합니다. 상세주소와 `residentRequest`는 연결된 현장점검 신청에서 조회하며 요청 사유가 없으면 null입니다. `housingType`은 연결된 취약도 분석의 거주층이며 미입력 시 null입니다.
 - 취약지점과 권장조치는 PUBLISHED 결과만 사용하며 초안을 노출하지 않습니다. 배열은 저장 순서를 유지하고 취약지점의 중복 유형은 제외합니다. 점검이나 공개 결과가 없으면 빈 배열입니다.
 - `landlordConsentRequired`는 세입자이면 true입니다. 동의서 확인 완료 여부를 뜻하지 않습니다.
 - `landlordConsentDocumentSubmitted`는 해당 신청에 동의서 첨부 레코드가 있으면 true입니다.

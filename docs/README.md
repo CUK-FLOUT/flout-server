@@ -68,8 +68,7 @@
 | [초안 사진 삭제](inspection-photo-delete.md) | 공개 전 사진 삭제 |
 | [우선점검 후보](priority-inspection-candidates.md) | 후보 검색·필터 |
 | [우선점검 상세](priority-inspection-detail.md) | 신청·취약도 정보 |
-| [우선점검 지정](priority-inspection-designation.md) | 단건·일괄 지정 API 안내 |
-| [지정·취소](priority-inspection-bulk-designation.md) | 단건·일괄 지정 |
+| [우선점검 지정·취소](priority-inspection-bulk-designation.md) | 단건·일괄 지정과 이력 |
 | [선정 순서 조회](priority-inspection-order-query.md) | 저장된 우선순위 조회 |
 | [선정 순서 저장](priority-inspection-order.md) | 전체 순서 갱신 |
 
@@ -78,6 +77,7 @@
 | 문서 | 내용 |
 | --- | --- |
 | [지원사업 AI 매칭](support-program-matching.md) | Gemini 후보 선정과 검증 |
+| [주민 지원 신청과 이어쓰기](resident-support-application.md) | 폼·신청·서류와 상태별 조회 |
 | [지원 자격 검토](support-application-review.md) | 운영자 검토 화면 응답 |
 | [임대인 동의서 변경](landlord-consent-api-change.md) | 동의 상태 제거와 첨부 기준 |
 | [운영자 시공 조회](admin-construction-query.md) | 목록·상세 |
