@@ -75,7 +75,6 @@
 | [현장점검 사진 등록·삭제](inspection-photo-delete.md) | 공개 전 초안 사진 등록·삭제 |
 | [우선점검 후보](priority-inspection-candidates.md) | 후보 검색·필터 |
 | [우선점검 상세](priority-inspection-detail.md) | 신청·취약도 정보 |
-| [우선점검 대상 지정·취소](priority-inspection-designation.md) | 지정 API 요약과 V18·V19 마이그레이션 기록 |
 | [우선점검 지정·취소](priority-inspection-bulk-designation.md) | 단건·일괄 지정과 이력 |
 | [선정 순서 조회](priority-inspection-order-query.md) | 저장된 우선순위 조회 |
 | [선정 순서 저장](priority-inspection-order.md) | 전체 순서 갱신 |
