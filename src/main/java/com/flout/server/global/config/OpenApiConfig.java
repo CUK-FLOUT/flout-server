@@ -1279,6 +1279,19 @@ public class OpenApiConfig {
                   "000021",
                   "applicantName",
                   "김주민"),
+              "referencePhotos",
+              List.of(
+                  values(
+                      "photoId",
+                      41,
+                      "fileName",
+                      "현장 배수구.jpg",
+                      "imageUrl",
+                      "https://example.com/private/inspection-results/41",
+                      "size",
+                      1200,
+                      "contentType",
+                      "image/jpeg")),
               "referenceInformation",
               Map.of(
                   "relatedApplicationCount", 0,

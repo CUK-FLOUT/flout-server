@@ -52,6 +52,7 @@ class AdminPublicIssueDetailTest {
             "public_facility",
             "public_issues",
             "application_inflow_locations",
+            "inspection_result_photos",
             "inspection_results",
             "inspections",
             "inspection_applications",
@@ -134,6 +135,21 @@ class AdminPublicIssueDetailTest {
   @Test
   void returnsProblemSourceReferencesReviewFacilityActionsAndImages() throws Exception {
     var issue = addIssue("경기도 부천시 원미구 길주로 210", 37.5000000, 126.7600000, "COMPLETED");
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status,published_at) VALUES(?,'PUBLISHED','2026-11-08 09:00:00')",
+        issue.inspectionId());
+    long resultId =
+        jdbc.queryForObject("SELECT MAX(result_id) FROM inspection_results", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) VALUES(?,'inspection-results/test/drain.jpg','현장 배수구.jpg',1200,'image/jpeg')",
+        resultId);
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) VALUES(?,'inspection-results/test/entrance.png','출입구.png',2400,'image/png')",
+        resultId);
+    when(storage.readUrl("inspection-results/test/drain.jpg"))
+        .thenReturn("https://example.test/drain.jpg");
+    when(storage.readUrl("inspection-results/test/entrance.png"))
+        .thenReturn("https://example.test/entrance.png");
     var nearby =
         addApplication(
             "인근주민",
@@ -186,6 +202,17 @@ class AdminPublicIssueDetailTest {
         .andExpect(jsonPath("$.result.source.inspectionId").value(issue.inspectionId()))
         .andExpect(jsonPath("$.result.source.applicationId").value(issue.applicationId()))
         .andExpect(jsonPath("$.result.source.receiptNo").value(issue.receipt()))
+        .andExpect(jsonPath("$.result.referencePhotos.length()").value(2))
+        .andExpect(jsonPath("$.result.referencePhotos[0].fileName").value("현장 배수구.jpg"))
+        .andExpect(
+            jsonPath("$.result.referencePhotos[0].imageUrl")
+                .value("https://example.test/drain.jpg"))
+        .andExpect(jsonPath("$.result.referencePhotos[0].size").value(1200))
+        .andExpect(jsonPath("$.result.referencePhotos[0].contentType").value("image/jpeg"))
+        .andExpect(jsonPath("$.result.referencePhotos[1].fileName").value("출입구.png"))
+        .andExpect(
+            jsonPath("$.result.referencePhotos[1].imageUrl")
+                .value("https://example.test/entrance.png"))
         .andExpect(jsonPath("$.result.referenceInformation.relatedApplicationCount").value(3))
         .andExpect(jsonPath("$.result.referenceInformation.floodHistoryCount").value(2))
         .andExpect(jsonPath("$.result.referenceInformation.relatedApplications.length()").value(3))
@@ -214,11 +241,20 @@ class AdminPublicIssueDetailTest {
   @Test
   void returnsNullReviewAndFacilityAndEmptyActionsBeforeReview() throws Exception {
     var issue = addIssue("부천시 소사구 경인로 1", 37.4700000, 126.8000000, "RECEIVED");
+    jdbc.update(
+        "INSERT INTO inspection_results(inspection_id,result_status) VALUES(?,'DRAFT')",
+        issue.inspectionId());
+    long draftResultId =
+        jdbc.queryForObject("SELECT MAX(result_id) FROM inspection_results", Long.class);
+    jdbc.update(
+        "INSERT INTO inspection_result_photos(result_id,object_key,original_filename,file_size,content_type) VALUES(?,'inspection-results/test/draft.jpg','임시저장.jpg',100,'image/jpeg')",
+        draftResultId);
 
     mvc.perform(
             get("/api/admin/public-issues/{publicIssueId}", issue.id())
                 .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.referencePhotos").isEmpty())
         .andExpect(jsonPath("$.result.review").doesNotExist())
         .andExpect(jsonPath("$.result.publicFacility").doesNotExist())
         .andExpect(jsonPath("$.result.actions").isEmpty());
