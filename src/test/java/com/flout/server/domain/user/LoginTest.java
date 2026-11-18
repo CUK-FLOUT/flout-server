@@ -41,6 +41,13 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @Import(LoginTest.ProbeController.class)
 class LoginTest {
+  @Test
+  void developmentGoogleLoginPageIsUnavailableWithoutLocalProfile() throws Exception {
+    mvc.perform(get("/dev/google-login"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("COMMON_404_1"));
+  }
+
   @Autowired MockMvc mvc;
   @Autowired UserRepository users;
   @Autowired UserConsentRepository consents;
