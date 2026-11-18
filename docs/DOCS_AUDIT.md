@@ -9,7 +9,7 @@
 | [EC2_DEPLOYMENT.md](EC2_DEPLOYMENT.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [admin-construction-query.md](admin-construction-query.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [admin-inspection-result-query.md](admin-inspection-result-query.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
-| [admin-public-issue-query.md](admin-public-issue-query.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
+| [admin-public-issue-query.md](admin-public-issue-query.md) | 목록·상세·동일 주소 조회 통합 테스트와 대조 |
 | [application-attachments.md](application-attachments.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [application-construction.md](application-construction.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |
 | [application-detail.md](application-detail.md) | 문서 항목 유지 · 코드와 수동 대조 권장 |

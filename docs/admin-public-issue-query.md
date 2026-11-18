@@ -36,6 +36,23 @@ Swagger 그룹: `운영자-공공인프라`
 사진을 포함합니다. 검토나 연결 시설이 없으면 해당 필드는 `null`이며, 사진 URL은 권한
 확인 후 발급하는 비공개 임시 URL입니다.
 
+## 동일 주소 주민 신청 조회
+
+`GET /api/admin/public-issues/{publicIssueId}/resident-applications`
+
+공공 문제 주소와 현장점검 신청 주소를 다음 규칙으로 정규화한 뒤 정확히 같은 신청을 조회합니다.
+
+- 주소 앞뒤 공백을 제거합니다.
+- 연속된 공백을 하나로 합칩니다.
+- 주소 앞의 `경기 `를 `경기도 `로 통일합니다.
+- `DRAFT` 임시저장 신청은 제외합니다.
+- `created_at` 내림차순, 같은 시각이면 `application_id` 내림차순으로 반환합니다.
+- 조회 결과가 없으면 `totalCount`는 `0`, `applications`는 빈 배열입니다.
+
+`applications`의 각 항목은 `applicationId`, 최소 6자리 `receiptNo`, `address`, `vulnerabilityGrade`, `fieldFindings`를 반환합니다. `fieldFindings`는 신청자가 현장점검 신청에 입력한 요청 사유이며 입력이 없으면 `null`입니다.
+
+이 API는 실행 시 DB 내용을 변경하지 않으며, 반경 1km 기준의 목록·상세 집계와 다른 결과를 반환할 수 있습니다.
+
 ## 지역·공공 문제 등록
 
 `POST /api/admin/public-issues`는 관할 원본 점검에 연결된 문제를 `RECEIVED`로 등록합니다.
@@ -68,7 +85,8 @@ DB 트랜잭션 밖에서 수행하며 저장 시 원본 점검 권한을 다시
 - 400 `COMMON_400_3`: ID·검색·필터·페이지 조건 오류
 - 401 `COMMON_401_1` / `COMMON_401_3`: 인증 누락·유효하지 않은 토큰
 - 403 `COMMON_403_1`: 운영자 권한 없음
-- 403 `INSPECTION_403_1` / `INSPECTION_403_2`: 관할 변경·조회 권한 없음
+- 403 `INSPECTION_403_1`: 공공 문제 등록·검토·조치 및 동일 주소 신청 조회의 관할 권한 없음
+- 403 `INSPECTION_403_2`: 목록·현황·지도·상세의 관할 조회 권한 없음
 - 404 `PUBLIC_ISSUE_404_1`: 공공시설 문제 없음
 - 406 `COMMON_406_1`: 지원하지 않는 응답 형식
 - 500 `COMMON_500_1`: 공통 서버 오류
