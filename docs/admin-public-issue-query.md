@@ -49,7 +49,7 @@ Swagger 그룹: `운영자-공공인프라`
 - `created_at` 내림차순, 같은 시각이면 `application_id` 내림차순으로 반환합니다.
 - 조회 결과가 없으면 `totalCount`는 `0`, `applications`는 빈 배열입니다.
 
-`applications`의 각 항목은 `applicationId`, 최소 6자리 `receiptNo`, `address`, `vulnerabilityGrade`, `fieldFindings`를 반환합니다. `fieldFindings`는 현장점검 신청에 저장된 확인 내용이며 입력이 없으면 `null`입니다.
+`applications`의 각 항목은 `applicationId`, 최소 6자리 `receiptNo`, `address`, `vulnerabilityGrade`, `fieldFindings`를 반환합니다. `fieldFindings`는 신청자가 현장점검 신청에 입력한 요청 사유이며 입력이 없으면 `null`입니다.
 
 이 API는 실행 시 DB 내용을 변경하지 않으며, 반경 1km 기준의 목록·상세 집계와 다른 결과를 반환할 수 있습니다.
 
