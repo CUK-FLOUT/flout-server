@@ -73,8 +73,6 @@
   `GoogleLoginRequest`는 ID 토큰만 받고 `GoogleLoginService`는 신규 주민을 생성한 뒤
   로그인 결과의 `requiresConsent`로 별도 동의 필요 여부를 알립니다. 실제 동의 저장은
   `POST /api/resident/consents`입니다. 컨트롤러 설명을 현재 흐름에 맞게 수정해야 합니다.
-- local Google 로그인 테스트 화면은 동의 값을 로그인 요청에 넣지만 현재 요청 DTO에서 사용하지
-  않습니다. 테스트 화면과 별도 동의 API 연결은 코드 담당자의 후속 검토가 필요합니다.
 - `AdminConstructionPhotoController`의 사진 업로드 Swagger 500 설명에는 `CONSTRUCTION_500_1`만
   명시되어 있습니다. `ConstructionPhotoService.replay`는 멱등 성공 요청 재조회 중 사진 메타데이터나
   URL 복원에 실패하면 `CONSTRUCTION_500_2`를 반환하므로 Swagger 응답 설명을 보완해야 합니다.
@@ -82,7 +80,8 @@
 ## #287 정적 재점검 범위
 
 - `0410b4b`의 Controller 매핑 어노테이션에서 검출한 87개 메서드·경로·클래스를
-  [API 카탈로그](API_CATALOG.md)와 비교하여 차이가 없는 것을 확인했습니다. 정적 추출은
+  당시 API 카탈로그와 비교하여 차이가 없는 것을 확인했습니다. 현재 [API 카탈로그](API_CATALOG.md)는
+  개발용 Google 로그인 페이지 삭제를 반영했습니다. 정적 추출은
   실행 중 Spring 매핑이나 Swagger 생성 결과를 대체하지 않습니다.
 - 문서 인덱스·상대 파일 링크와 JSON 구문 검사는 실행할 수 있지만 JSON의 의미와 모든
   DTO·오류·권한·상태 전이의 정합성을 자동으로 보증하지 않습니다.
