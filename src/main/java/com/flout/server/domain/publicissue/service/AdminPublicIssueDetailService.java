@@ -61,6 +61,18 @@ public class AdminPublicIssueDetailService {
     long floodHistoryCount =
         relatedRows.stream().filter(row -> "YES".equals(row.floodExperience())).count();
 
+    var referencePhotos =
+        details.findReferencePhotos(header.inspectionId()).stream()
+            .map(
+                photo ->
+                    new AdminPublicIssueDetailResponse.ReferencePhoto(
+                        photo.photoId(),
+                        photo.fileName(),
+                        storage.readUrl(photo.objectKey()),
+                        photo.size(),
+                        photo.contentType()))
+            .toList();
+
     var actionRows = details.findActions(publicIssueId);
     var images =
         details.findImages(
@@ -102,6 +114,7 @@ public class AdminPublicIssueDetailService {
             header.applicationId(),
             header.receiptNo(),
             header.applicantName()),
+        referencePhotos,
         new AdminPublicIssueDetailResponse.ReferenceInformation(
             related.size(), floodHistoryCount, related),
         review(header),

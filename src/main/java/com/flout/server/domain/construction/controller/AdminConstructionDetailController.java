@@ -26,7 +26,7 @@ public class AdminConstructionDetailController {
   @Operation(
       summary = "시공 상세 조회",
       description =
-          "부천시 관할 운영자가 시공 대상의 지원·동의 정보, 주민 희망 일정, 확정 일정, 진행 상태와 업로드 사진을 조회합니다. 업로드 사진은 완료 전에도 운영자에게 제공하며 최종 설치 결과와 완료 시각은 전체 완료 후에만 반환합니다. resultPublished는 전체 완료와 동시에 주민 공개된 상태를 의미합니다. 조회로 데이터를 변경하지 않습니다.")
+          "부천시 관할 운영자가 시공 대상의 지원 정보, 주민 희망 일정, 확정 일정, 진행 상태와 업로드 사진을 조회합니다. 업로드 사진은 완료 전에도 운영자에게 제공하며 최종 설치 결과와 완료 시각은 전체 완료 후에만 반환합니다. resultPublished는 전체 완료와 동시에 주민 공개된 상태를 의미합니다. 조회로 데이터를 변경하지 않습니다.")
   @ApiResponse(responseCode = "200", description = "조회 성공", useReturnTypeSchema = true)
   @ApiResponse(
       responseCode = "400",

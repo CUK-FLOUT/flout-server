@@ -125,6 +125,25 @@ public class AdminPublicIssueDetailRepository {
                 Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
   }
 
+  public List<ReferencePhotoRow> findReferencePhotos(Long inspectionId) {
+    return jdbc.query(
+        """
+        SELECT p.photo_id, p.object_key, p.original_filename, p.file_size, p.content_type
+        FROM inspection_results r
+        JOIN inspection_result_photos p ON p.result_id = r.result_id
+        WHERE r.inspection_id = :inspectionId AND r.result_status = 'PUBLISHED'
+        ORDER BY p.photo_id
+        """,
+        new MapSqlParameterSource("inspectionId", inspectionId),
+        (rs, rowNum) ->
+            new ReferencePhotoRow(
+                rs.getLong("photo_id"),
+                rs.getString("object_key"),
+                rs.getString("original_filename"),
+                rs.getLong("file_size"),
+                rs.getString("content_type")));
+  }
+
   public List<ActionRow> findActions(Long publicIssueId) {
     return jdbc.query(
         """
@@ -209,6 +228,9 @@ public class AdminPublicIssueDetailRepository {
       String floodExperience,
       boolean existingFacility,
       String requestReason) {}
+
+  public record ReferencePhotoRow(
+      Long photoId, String objectKey, String fileName, long size, String contentType) {}
 
   public record ActionRow(
       Long actionId,

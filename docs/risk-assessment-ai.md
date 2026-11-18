@@ -8,6 +8,16 @@ Swagger 그룹: `주민-AI취약도 분석`
 분석 결과는 `risk_assessments`에 저장하고 같은 응답에서 반환합니다. 점수와 등급은 지역
 상대 취약도이며 개별 주택의 실제 침수 확률이나 안전 여부를 뜻하지 않습니다.
 
+## 주소 검색과 좌표 조회
+
+- `GET /api/resident/addresses/search?keyword=...&currentPage=1`: 부천시 주소 검색. `keyword`는 필수이며 최대 100자, `currentPage`는 1부터 시작하고 기본값은 1입니다. 도로명·지번·건물명·동·구로 검색하며 부천시 단독 검색은 빈 결과입니다. result는 `addresses`, `currentPage`, `countPerPage`, `hasMore`, `nextPage`를 포함합니다. 외부 검색은 페이지당 10건이며 지역 필터링으로 빈 페이지에도 다음 페이지가 있을 수 있습니다.
+- `GET /api/resident/addresses/coordinates?address=...`: 원미구·소사구·오정구의 건물번호가 포함된 주소로 좌표를 조회합니다. `address`는 필수이며 최대 255자입니다. 결과는 `latitude`, `longitude`입니다.
+
+두 API는 인증이 필요합니다. 주소 검색 서비스 오류·시간 초과는 각각 `ADDRESS_502_2`,
+`ADDRESS_503_2`, 좌표 서비스 오류·시간 초과는 `ADDRESS_502_1`, `ADDRESS_503_1`입니다.
+좌표 조회는 주소가 불충분하면 `ADDRESS_400_1`, 선택 주소에 일치하는 좌표가 없으면
+`ADDRESS_404_2`를 반환합니다.
+
 ## 요청
 
 ```json
@@ -19,7 +29,7 @@ Swagger 그룹: `주민-AI취약도 분석`
 ```
 
 - `address`, `detailAddress`: 필수, 공백 제외 내용이 있어야 하며 최대 255자
-- `housingType`: 선택, `SEMI_BASEMENT`, `GROUND_FLOOR`, `ABOVE_GROUND`
+- `housingType`: 선택, `SEMI_BASEMENT`, `FIRST_FLOOR`, `SECOND_FLOOR_OR_ABOVE`
 - 성공 응답의 `assessmentId`는 현장점검 신청과 맞춤 예방 가이드 생성에 사용
 
 ## 성공 응답
@@ -42,12 +52,13 @@ Swagger 그룹: `주민-AI취약도 분석`
     "reasons": [],
     "floodRecord": "침수 기록 없음 (안전을 뜻하지 않음)",
     "disclaimer": "지역 상대 취약도이며 개별 주택 침수 위험도가 아닙니다."
-  }
+  },
+  "timeStamp": "2026-11-07 12:00:00"
 }
 ```
 
-`riskLevel`은 `HIGH`, `CAUTION`, `LOW` 중 하나입니다. 현재 격자 데이터가 SHAP 근거를
-제공하지 않으면 `reasons`는 빈 배열입니다.
+`riskLevel`은 `HIGH`, `CAUTION`, `LOW` 중 하나입니다. 현재 Python 응답 파서는
+`reasons`를 빈 배열로 구성하며 SHAP 근거를 응답에 포함하지 않습니다.
 
 ## Spring-Python 계약
 
@@ -72,7 +83,7 @@ Python 성공 응답은 `status=OK`, 격자 ID, 0~1 점수, 등급, 침수 기�
 | 403 | `COMMON_403_1` | 주민 계정이 아님 |
 | 404 | `ADDRESS_404_2` | 입력 주소와 일치하는 좌표 없음 |
 | 422 | `RISK_ASSESSMENT_422_1` | 분석 대상 격자 밖 |
-| 500 | `RISK_ASSESSMENT_500_1` | 분석 결과 직렬화·저장 실패 |
+| 500 | `RISK_ASSESSMENT_500_1` | 분석 결과 직렬화 실패 |
 | 502 | `ADDRESS_502_1` | 주소 좌표 서비스 호출 실패 |
 | 502 | `RISK_ASSESSMENT_502_1`, `RISK_ASSESSMENT_502_2` | Python 호출 또는 응답 검증 실패 |
 | 503 | `ADDRESS_503_1` | 주소 좌표 서비스 시간 초과 |

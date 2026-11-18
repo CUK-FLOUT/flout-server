@@ -18,13 +18,16 @@
 - `reviewTarget`: 화면의 검토 대상, 필수 문자열, 앞뒤 공백 제거 후 1~100자
 - `reviewStatus`: `PENDING`, `UNDER_REVIEW` 중 하나
 - `inspectionNotes`: 필수, 앞뒤 공백 제거 후 1~4000자
-- `reviewReason`: 선택, 입력 시 앞뒤 공백 제거 후 최대 4000자
+- `reviewReason`: 선택·null 허용, 입력 시 앞뒤 공백 제거 후 최대 4000자. 공백만 입력하면 null로 저장합니다.
+
+응답 `result`에는 `reviewId`, `publicIssueId`, `reviewTarget`, `reviewStatus`, `publicIssueStatus`, `inspectionNotes`, `reviewReason`(null 가능), `reviewerUserId`, `reviewedAt`이 포함됩니다.
 
 ## 동작
 
 - 최초 저장은 `facility_review`를 생성합니다.
 - 다시 저장하면 기존 검토의 검토 대상, 상태, 점검 필요사항, 검토 사유, 검토자와 검토 일시를 수정합니다.
 - 검토자는 현재 로그인한 운영자로 기록합니다.
+- 저장하려면 운영자의 관할이 부천시이고 해당 문제의 주소도 부천시여야 합니다.
 - 검토 상태를 지역 문제 상태와 동기화합니다. `PENDING`은 기존 지역 문제 상태값 `RECEIVED`로 대응합니다.
 - 완료된 지역 문제의 검토 내용은 다시 저장할 수 없습니다.
 

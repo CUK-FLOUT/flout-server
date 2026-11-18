@@ -53,8 +53,6 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, PUBLIC_AUTH_POST_ENDPOINTS)
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/dev/google-login")
-                    .permitAll()
                     .requestMatchers(
                         "/swagger-ui.html",
                         "/swagger-ui/**",

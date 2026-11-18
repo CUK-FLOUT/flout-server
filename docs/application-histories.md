@@ -41,7 +41,7 @@ result는 `applicationId`, `receiptNo`, `applicantName`, `totalCount`, `historie
 - CONSTRUCTION_IN_PROGRESS → 시공 진행: 확정 시각이 되어 실제 자동 전환된 시각. SYSTEM.
 - CONSTRUCTION_COMPLETED → 시공완료: 전체 완료 POST 성공 시각과 운영자.
 
-항상 모든 단계가 존재하는 것은 아닙니다. 진행 전·미승인 후·진행 전 전체 완료 등 실제로 발생하지 않은 단계는 생략합니다. 여러 지원사업에 신청했다면 접수된 모든 지원 신청의 실제 이력을 함께 반환하며 supportApplicationId로 구분합니다. 지원·현장점검 DRAFT를 처리 이력으로 노출하지 않습니다.
+항상 모든 단계가 존재하는 것은 아닙니다. 실제로 발생하지 않은 단계는 생략합니다. 현재 신규 지원 신청은 현장점검 신청당 최대 한 건이며 V54가 같은 제약을 추가합니다. 조회 구현은 연결된 접수 지원 신청의 실제 이력을 모아 supportApplicationId로 구분합니다. 지원·현장점검 DRAFT를 처리 이력으로 노출하지 않습니다.
 
 ## 처리자와 과거 데이터
 
