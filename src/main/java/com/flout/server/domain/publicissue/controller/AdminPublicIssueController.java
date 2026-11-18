@@ -93,7 +93,7 @@ public class AdminPublicIssueController {
   @Operation(
       summary = "지역 문제·참고 정보 상세 조회",
       description =
-          "인증된 부천시 운영자에게 문제 기본정보와 등록 출처, 반경 1km 관련 주민 신청·침수 경험·유입 위치·배수 참고정보, 저장된 검토·연결 공공시설, 조치 및 사진을 반환합니다. 데이터를 변경하지 않습니다.")
+          "인증된 부천시 운영자에게 문제 기본정보와 등록 출처, 원본 점검의 공개 현장사진, 반경 1km 관련 주민 신청·침수 경험·유입 위치·배수 참고정보, 저장된 검토·연결 공공시설, 조치 및 사진을 반환합니다. 현장사진과 조치 사진은 권한 확인 후 발급한 비공개 임시 URL입니다. 데이터를 변경하지 않습니다.")
   public SuccessResponse<AdminPublicIssueDetailResponse> detail(
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "지역·공공 문제 ID", example = "1") @PathVariable Long publicIssueId) {

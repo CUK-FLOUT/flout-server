@@ -23,6 +23,7 @@ public record AdminPublicIssueDetailResponse(
     String fieldFindings,
     OffsetDateTime createdAt,
     Source source,
+    @Schema(description = "원본 현장점검에서 공개한 현장사진") List<ReferencePhoto> referencePhotos,
     ReferenceInformation referenceInformation,
     @Schema(nullable = true, description = "저장된 검토가 없으면 null") Review review,
     @Schema(nullable = true, description = "검토에 연결된 기존 공공시설이 없으면 null")
@@ -31,6 +32,13 @@ public record AdminPublicIssueDetailResponse(
 
   public record Source(
       Long inspectionId, Long applicationId, String receiptNo, String applicantName) {}
+
+  public record ReferencePhoto(
+      Long photoId,
+      String fileName,
+      @Schema(description = "15분 유효한 비공개 사진 조회 URL") String imageUrl,
+      long size,
+      String contentType) {}
 
   public record ReferenceInformation(
       long relatedApplicationCount,
