@@ -1,6 +1,6 @@
 # API별 정적 정합성 검증 현황
 
-기준 코드: `f429885`. Controller 매핑 87개의 정적 검토 기록입니다. 별도로 명시된 항목에는 실행 검증 결과도 포함합니다.
+기준 코드: `f429885`. 개발용 Google 로그인 페이지 삭제를 반영한 Controller 매핑 86개의 정적 검토 기록입니다.
 
 - **Detailed (상세 대조)**: 관련 Controller·DTO·Service·오류 코드·보안 설정과 테스트를 읽고 주요 정상·오류 조건을 대조했습니다. 테스트를 실행했다는 뜻은 아닙니다.
 - **Partial (부분 검증)**: 메서드·경로·Controller는 대조했지만 DTO·오류·권한·상태·테스트의 전체 검증은 끝나지 않았습니다.
@@ -94,6 +94,5 @@
 | GET | `/api/resident/support-applications/{supportApplicationId}/review` | Detailed | [ResidentSupportDetailController.java](../src/main/java/com/flout/server/domain/supportapplication/controller/ResidentSupportDetailController.java) - ResidentSupportReviewResponse, ResidentSupportDetailService, SupportDetailErrorCode, ResidentSupportDetailTest |
 | GET | `/api/resident/support-applications/{supportApplicationId}/schedule` | Detailed | [ResidentSupportProgressController.java](../src/main/java/com/flout/server/domain/supportapplication/controller/ResidentSupportProgressController.java) - ResidentSupportScheduleResponse, ResidentSupportDetailService, SupportDetailErrorCode, ResidentSupportProgressTest |
 | PUT | `/api/resident/support-form-drafts/{draftId}` | Detailed | [ResidentFormDraftController.java](../src/main/java/com/flout/server/domain/residentprogress/ResidentFormDraftController.java) - FormDraftService.SaveRequest/Draft, FormDraftService, FormDraftErrorCode, SupportResultPublicationValidator, ResidentProgressTest |
-| GET | `/dev/google-login` | Detailed | [GoogleLoginDevController.java](../src/main/java/com/flout/server/domain/user/controller/GoogleLoginDevController.java), [SecurityConfig.java](../src/main/java/com/flout/server/global/config/SecurityConfig.java) 대조. [GoogleLoginDevControllerTest](../src/test/java/com/flout/server/domain/user/GoogleLoginDevControllerTest.java)는 `local`·`test` 프로필 및 H2로 기동한 HTTP 서버에서 인증 없이 200, UTF-8 HTML, 캐시 금지, 첫 번째 Google 클라이언트 ID 적용을 확인. [LoginTest](../src/test/java/com/flout/server/domain/user/LoginTest.java)는 `local` 없이 404 확인. 실제 Google 로그인은 검증 범위에서 제외. |
 
 정적 경로 추출이나 문자열 존재 검사만으로 상세 대조를 완료했다고 표시하지 않습니다.

@@ -162,7 +162,6 @@ openssl rand -base64 32 # 출력값을 .env의 JWT_SECRET에 추가
 | Swagger UI | `http://localhost:8080/swagger-ui/index.html` |
 | OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
 | Health check | `http://localhost:8080/actuator/health` |
-| Google 로그인 테스트 | `http://localhost:8080/dev/google-login` |
 
 <details>
 <summary><b>주요 환경 변수</b></summary>

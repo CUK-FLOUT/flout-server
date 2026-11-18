@@ -11,14 +11,6 @@ ID 토큰 방식이므로 서버의 Google client secret은 필요하지 않습�
 
 ## API
 
-### 프론트 없는 로컬 테스트
-
-`local` 프로필로 서버를 실행하고 `http://localhost:8080/dev/google-login`을 엽니다.
-Google Cloud의 승인된 JavaScript 원본에는 `http://localhost`와 `http://localhost:8080`을 등록합니다.
-별도 프론트 서버 없이 Google 버튼으로 ID 토큰을 받은 다음, 주민/운영자 API를 직접 테스트하거나
-ID 토큰을 복사해 Swagger에서 사용할 수 있습니다. 테스트 화면의 동의 선택값은 현재 Google 로그인 요청 DTO에 포함되지 않으며 동의 저장을 대신하지 않습니다.
-테스트 화면은 local 프로필에서만 제공하며 토큰은 브라우저 저장소에 저장하지 않습니다.
-
 - 주민: `POST /api/auth/google`
 - 운영자: `POST /api/auth/admin/google`
 - 인증 헤더 불필요, Content-Type: application/json
